@@ -3,11 +3,11 @@
 A collaborative Japan trip planner. Create a trip, invite your friends, propose
 activities, vote on them, discuss the details, and settle on a shared itinerary.
 
-This repository currently contains the **project foundation**: a .NET 10 modular
-monolith, an Angular 22 standalone SPA, a SQL Server database, and one thin end-to-end
-vertical slice (`Trip`) that proves every layer is wired together.
+This repository contains a .NET 10 modular monolith, an Angular 22 standalone SPA and a
+SQL Server database. The `Trip` slice is complete end to end: a trip can be created from the
+browser, listed, and opened, with an editorial interface built around it.
 
-> **Status:** Phase 0 of the roadmap. See [`docs/roadmap.md`](docs/roadmap.md) for what
+> **Status:** Phase 0.75 of the roadmap. See [`docs/roadmap.md`](docs/roadmap.md) for what
 > comes next and [`docs/architecture.md`](docs/architecture.md) for how the code is put
 > together.
 
@@ -251,7 +251,7 @@ decision records.
 
 ```powershell
 dotnet test backend/Tabiji.sln   # 23 tests
-cd frontend && npm test           # 36 tests
+cd frontend && npm test           # 76 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that

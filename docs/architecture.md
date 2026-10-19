@@ -210,18 +210,28 @@ Angular 22, standalone components, strict TypeScript, signals, the new control f
 syntax, and the Vitest test runner. No NgModules.
 
 ```
-frontend/src/app/
-├── app.ts / app.html / app.css     root shell and navigation
-├── app.config.ts                    providers: router, HttpClient
-├── app.routes.ts                    lazy-loaded routes
-├── core/
-│   ├── api/                         HealthService, TripsService, http-error
-│   └── models/                      HealthReport, Trip
-├── features/
-│   ├── home/                        backend status
-│   ├── trips/                       trip list and create form
-│   └── trip-detail/                 a single trip
-└── shared/ui/                       StatusBadge, TripCard
+frontend/src/
+├── styles/
+│   ├── tokens.css                       colour, type, space, radius, shadow
+│   ├── base.css                         element defaults, focus ring, reduced motion
+│   ├── components.css                   shared primitives
+│   └── utilities.css                    single purpose helpers
+└── app/
+    ├── app.ts / app.html / app.css      root shell and navigation
+    ├── app.config.ts                    providers: router, HttpClient
+    ├── app.routes.ts                    lazy-loaded routes
+    ├── core/
+    │   ├── api/                         HealthService, TripsService, http-error
+    │   └── models/                      HealthReport, Trip
+    ├── features/
+    │   ├── home/                        the landing page and the service status
+    │   ├── trips/                       the trip list
+    │   ├── trip-create/                 the create trip form and its page
+    │   └── trip-detail/                 a single trip
+    └── shared/
+        ├── format/                      pure formatting helpers
+        ├── media/                       the destination photograph lookup
+        └── ui/                          StatusBadge, TripCard, DestinationPhoto
 ```
 
 The rules:
@@ -237,16 +247,42 @@ than a single union, because Angular's template type checker cannot narrow a uni
 is reached through a signal call. `Home` established that pattern and the trip screens
 follow it.
 
-Form validation is owned by the feature, not by a library. `trip-date-range.ts` holds a
-pure `validateTripDates` function and the `ValidatorFn` that wraps it, so the rule that
-the end date cannot precede the start date can be unit tested on its own. The rule
-itself lives in the domain; the form mirrors it so the user gets immediate feedback,
-and the API remains the authority.
+**The design system is global, not per component.** Angular caps a component stylesheet
+at 4kB, so a shared component library cannot live in component CSS without breaking the
+build. `src/styles/` therefore holds the tokens, the element defaults and the shared
+primitives, and a component stylesheet is left for that component's own layout. The
+global classes are the primitives; anything that needs behaviour is a component.
+
+**Colour roles are constrained, not merely chosen.** `--color-ink`, `--color-ink-soft`
+and `--color-ink-faint` are the only text colours and each clears 4.5:1 on every
+surface. `--color-terracotta` is 4.4:1 on paper, so it is reserved for large text, rules
+and indicators, and `--color-terracotta-deep` exists for small text. `--color-sage` is
+3.1:1 and is never used for text at all.
+
+**Photography is a lookup, not a guess.** `Trip` has no image, so
+`resolveDestinationPhoto` maps the free text destination onto one of the photographs
+committed under `public/photos/`. A destination it does not recognise — a region such as
+"Kanto", say — resolves to nothing and the 旅 monogram is shown, because a photograph of
+the wrong place would be worse than no photograph.
+
+Form validation is owned by the feature, not by a library. In `features/trip-create/`,
+`trip-date-range.ts` holds a pure `validateTripDates` function and the `ValidatorFn` that
+wraps it, so the rule that the end date cannot precede the start date can be unit tested
+on its own. The rule itself lives in the domain; the form mirrors it so the user gets
+immediate feedback, and the API remains the authority.
+
+**Dates are parsed and formatted in UTC.** The API sends `DateOnly` values as plain
+`YYYY-MM-DD` strings, so `formatTripDates` parses them as UTC and formats them with
+`timeZone: 'UTC'`. Parsing them in local time would move a trip a day for some readers.
 
 In development the Angular dev server proxies `/api` and `/health` to
 `http://localhost:5080` (`proxy.conf.json`). The browser therefore only ever talks to
 its own origin and there is no CORS preflight in the common path. A CORS policy is still
 configured on the API for direct cross-origin calls.
+
+**The app makes no third party request at runtime.** Fraunces and Inter are self hosted
+under the SIL Open Font License and the photographs are committed to the repository, so
+the browser only ever talks to this origin.
 
 ## 7. Cross-cutting decisions
 

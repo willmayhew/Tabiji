@@ -46,6 +46,35 @@ state of every screen is covered by a test.
 
 ---
 
+## Phase 0.75 — Editorial interface · **Done**
+
+Give the application a visual identity that is worth looking at, without
+changing what it does. The goal was a product that reads as a travel
+journal rather than an admin panel, built on the existing architecture.
+
+- [x] A design system of global stylesheets: tokens, base, components and
+      utilities, with the duplicated card rules consolidated into one place
+- [x] A Japanese travel editorial palette: warm ivory paper, deep forest
+      green, muted sage and a restrained terracotta, with the colour roles
+      constrained so a token cannot be misused
+- [x] Self hosted Fraunces and Inter under the SIL Open Font License, so
+      the app makes no third party request at runtime
+- [x] Ten curated photographs of Japan, committed locally, and a pure
+      lookup that maps a trip's destination to one of them or to the 旅
+      monogram
+- [x] An editorial home page, a photo led trips list, a create trip page of
+      its own at `/trips/new`, and a trip detail spread
+- [x] Accessibility: a skip link, a focus ring on every control, labelled
+      fields with errors wired to their inputs, a heading order with no
+      gaps, and honoured reduced motion
+- [x] Responsive from 320px to 2560px with no horizontal overflow
+
+**Exit criteria:** every route renders in the new identity, the existing
+tests still pass, an axe audit reports no violations, and the type over
+the trip detail hero measures at least 4.5:1 against a white photograph.
+
+---
+
 ## Phase 1 — Accounts, trips and membership
 
 *Planned.* Everything downstream needs to know who the participants are.
