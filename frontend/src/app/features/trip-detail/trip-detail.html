@@ -1,0 +1,21 @@
+<section class="panel">
+  <a class="back-link" routerLink="/trips">&larr; All trips</a>
+
+  @if (loading()) {
+    <p class="muted">Loading trip&hellip;</p>
+  } @else if (notFound()) {
+    <div class="callout callout--danger">
+      <p>That trip could not be found. It may have been removed.</p>
+    </div>
+  } @else if (error(); as message) {
+    <div class="callout callout--danger">
+      <p>{{ message }}</p>
+    </div>
+  } @else if (trip(); as found) {
+    <article class="card">
+      <app-trip-card [trip]="found" />
+
+      <p class="muted">Id: <code>{{ found.id }}</code></p>
+    </article>
+  }
+</section>

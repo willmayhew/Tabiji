@@ -28,6 +28,13 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         return trip is null ? null : ToResponse(trip);
     }
 
+    public async Task<IReadOnlyList<TripResponse>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        var trips = await repository.ListAsync(cancellationToken);
+
+        return trips.Select(ToResponse).ToArray();
+    }
+
     private static TripResponse ToResponse(Trip trip) => new(
         trip.Id,
         trip.Name,

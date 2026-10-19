@@ -4,9 +4,9 @@ using Microsoft.Extensions.Hosting;
 
 namespace Tabiji.Tests;
 
-public sealed class TabijiWebApplicationFactory : WebApplicationFactory<Program>
+public class TabijiWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private const string LocalDbConnectionString =
+    protected const string LocalDbConnectionString =
         "Server=(localdb)\\MSSQLLocalDB;Database=Tabiji;Trusted_Connection=True;TrustServerCertificate=True";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -16,5 +16,15 @@ public sealed class TabijiWebApplicationFactory : WebApplicationFactory<Program>
         // The host needs a syntactically valid connection string to build the DbContext
         // options. No connection is opened, so the tests run without a live database.
         builder.UseSetting("ConnectionStrings:Tabiji", LocalDbConnectionString);
+
+        ConfigureServices(builder);
+    }
+
+    /// <summary>
+    /// Hook for a test that needs to replace an infrastructure service, for example to swap
+    /// the trip repository for an in-memory fake. The default leaves the real services alone.
+    /// </summary>
+    protected virtual void ConfigureServices(IWebHostBuilder builder)
+    {
     }
 }

@@ -97,13 +97,20 @@ Tabiji.Tests           →  all four
 
 - Standalone components only. No NgModules.
 - The 2025 file naming style: `home.ts`, class `Home`, template `home.html`.
-- Signals for state, `inject()` instead of constructor injection, `takeUntilDestroyed()`
-  for subscriptions.
+- Signals for state, `inject()` instead of constructor injection.
+- `takeUntilDestroyed()` must always be given an explicit `DestroyRef`
+  (`takeUntilDestroyed(this.destroyRef)`). Without one it calls `inject()`, which
+  throws outside an injection context — a template event handler is not one.
+- Keep one signal per state (`loading`, `error`, payload) rather than a single union.
+  Angular's template type checker cannot narrow a union reached through a signal call.
 - New control flow syntax: `@if`, `@for`, `@switch`.
 - `core/` holds API services and models. `features/` holds screens. `shared/` holds
   presentational components with no feature knowledge.
 - Route to a feature with `loadComponent` so it stays lazy.
 - Only `core/api/` may call the API. Features talk to services, never to `HttpClient`.
+- Map API failures to a user-facing message with `core/api/http-error.ts`.
+- Form validation lives in the feature. Put the rule in a pure function and wrap it in
+  a `ValidatorFn`, so the rule can be unit tested on its own.
 - Components use `ChangeDetectionStrategy.OnPush`.
 
 ### Git and secrets

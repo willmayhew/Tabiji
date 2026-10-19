@@ -115,6 +115,43 @@ body {
   cursor: not-allowed;
 }
 
+.button--secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.button--secondary:hover:not(:disabled) {
+  background: var(--color-muted-soft);
+  filter: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.field-error--api {
+  font-size: 0.85rem;
+}
+
+.field-success {
+  margin: 0;
+  color: var(--color-success);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
 code {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.8rem;

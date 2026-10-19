@@ -1,80 +1,52 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
+import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
 import { Trip } from '../../core/models/trip';
+import { TripCard } from '../../shared/ui/trip-card';
+import { TripCreateForm } from './trip-create-form';
 
 @Component({
   selector: 'app-trips',
-  imports: [FormsModule],
+  imports: [RouterLink, TripCard, TripCreateForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trips.html',
   styleUrl: './trips.css',
 })
 export class Trips {
   private readonly tripsService = inject(TripsService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  protected name = '';
-  protected destination = '';
-  protected startsOn = '';
-  protected endsOn = '';
-  protected tripId = '';
+  readonly trips = signal<Trip[]>([]);
+  readonly loading = signal(true);
+  readonly error = signal<string | null>(null);
 
-  protected readonly created = signal<Trip | null>(null);
-  protected readonly found = signal<Trip | null>(null);
-  protected readonly error = signal<string | null>(null);
-  protected readonly busy = signal(false);
+  constructor() {
+    this.load();
+  }
 
-  protected createTrip(): void {
-    this.busy.set(true);
+  protected load(): void {
+    this.loading.set(true);
     this.error.set(null);
-    this.created.set(null);
 
     this.tripsService
-      .create({
-        name: this.name,
-        destination: this.destination,
-        startsOn: this.startsOn,
-        endsOn: this.endsOn,
-      })
-      .pipe(takeUntilDestroyed())
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (trip) => {
-          this.created.set(trip);
-          this.tripId = trip.id;
-          this.busy.set(false);
+        next: (trips) => {
+          this.trips.set(trips);
+          this.loading.set(false);
         },
         error: (failure: HttpErrorResponse) => {
-          this.error.set(this.describe(failure));
-          this.busy.set(false);
+          this.error.set(describeHttpError(failure));
+          this.loading.set(false);
         },
       });
   }
 
-  protected findTrip(): void {
-    this.busy.set(true);
-    this.error.set(null);
-    this.found.set(null);
-
-    this.tripsService
-      .getById(this.tripId.trim())
-      .pipe(takeUntilDestroyed())
-      .subscribe({
-        next: (trip) => {
-          this.found.set(trip);
-          this.busy.set(false);
-        },
-        error: (failure: HttpErrorResponse) => {
-          this.error.set(this.describe(failure));
-          this.busy.set(false);
-        },
-      });
-  }
-
-  private describe(failure: HttpErrorResponse): string {
-    const detail = failure.error?.detail;
-
-    return typeof detail === 'string' ? detail : `The API returned ${failure.status}.`;
+  protected onTripCreated(): void {
+    this.load();
   }
 }

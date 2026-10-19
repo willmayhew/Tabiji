@@ -2,82 +2,53 @@
   <div class="panel-header">
     <div>
       <h1>Trips</h1>
-      <p class="panel-subtitle">Create a trip and look it up again.</p>
+      <p class="panel-subtitle">Every trip in this workspace, ordered by start date.</p>
     </div>
+    <button type="button" class="button button--secondary" (click)="load()" [disabled]="loading()">
+      Refresh
+    </button>
   </div>
 
   @if (error(); as message) {
-    <div class="callout callout--danger">{{ message }}</div>
+    <div class="callout callout--danger">
+      <p>{{ message }}</p>
+      <button type="button" class="button" (click)="load()">Try again</button>
+    </div>
   }
 
-  <div class="cards">
-    <article class="card">
+  <div class="layout">
+    <section class="card">
+      <header class="card-header">
+        <h2>Existing trips</h2>
+        <code>GET /api/trips</code>
+      </header>
+
+      @if (loading()) {
+        <p class="muted">Loading trips&hellip;</p>
+      } @else if (error()) {
+        <p class="muted">The trips could not be loaded.</p>
+      } @else if (trips().length === 0) {
+        <p class="muted">No trips yet. Create the first one.</p>
+      } @else {
+        <ul class="trip-list">
+          @for (trip of trips(); track trip.id) {
+            <li>
+              <a class="trip-link" [routerLink]="['/trips', trip.id]">
+                <app-trip-card [trip]="trip" />
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="card">
       <header class="card-header">
         <h2>Create a trip</h2>
         <code>POST /api/trips</code>
       </header>
 
-      <form class="form" (ngSubmit)="createTrip()">
-        <label>
-          <span>Name</span>
-          <input name="name" type="text" [(ngModel)]="name" required maxlength="100" />
-        </label>
-
-        <label>
-          <span>Destination</span>
-          <input name="destination" type="text" [(ngModel)]="destination" required maxlength="200" />
-        </label>
-
-        <div class="form-row">
-          <label>
-            <span>Starts on</span>
-            <input name="startsOn" type="date" [(ngModel)]="startsOn" required />
-          </label>
-
-          <label>
-            <span>Ends on</span>
-            <input name="endsOn" type="date" [(ngModel)]="endsOn" required />
-          </label>
-        </div>
-
-        <button type="submit" class="button" [disabled]="busy()">Create trip</button>
-      </form>
-
-      @if (created(); as trip) {
-        <dl class="summary">
-          <div><dt>Id</dt><dd><code>{{ trip.id }}</code></dd></div>
-          <div><dt>Name</dt><dd>{{ trip.name }}</dd></div>
-          <div><dt>Destination</dt><dd>{{ trip.destination }}</dd></div>
-          <div><dt>Dates</dt><dd>{{ trip.startsOn }} &rarr; {{ trip.endsOn }}</dd></div>
-          <div><dt>Status</dt><dd>{{ trip.status }}</dd></div>
-        </dl>
-      }
-    </article>
-
-    <article class="card">
-      <header class="card-header">
-        <h2>Find a trip</h2>
-        <code>GET /api/trips/&#123;id&#125;</code>
-      </header>
-
-      <form class="form" (ngSubmit)="findTrip()">
-        <label>
-          <span>Trip id</span>
-          <input name="tripId" type="text" [(ngModel)]="tripId" required />
-        </label>
-
-        <button type="submit" class="button" [disabled]="busy()">Look up trip</button>
-      </form>
-
-      @if (found(); as trip) {
-        <dl class="summary">
-          <div><dt>Id</dt><dd><code>{{ trip.id }}</code></dd></div>
-          <div><dt>Name</dt><dd>{{ trip.name }}</dd></div>
-          <div><dt>Destination</dt><dd>{{ trip.destination }}</dd></div>
-          <div><dt>Dates</dt><dd>{{ trip.startsOn }} &rarr; {{ trip.endsOn }}</dd></div>
-          <div><dt>Status</dt><dd>{{ trip.status }}</dd></div>
-        </dl>
-      }
-    </article>
+      <app-trip-create-form (created)="onTripCreated()" />
+    </section>
   </div>
 </section>

@@ -28,6 +28,24 @@ browser and read back out of SQL Server.
 
 ---
 
+## Phase 0.5 — Trips experience · **Done**
+
+Turn the `Trip` slice into something a person can actually use.
+
+- [x] `GET /api/trips` lists every trip, ordered by start date and then by name
+- [x] List screen with distinct loading, empty, loaded and error states
+- [x] Create-trip form with per-field validation and inline messages
+- [x] Trip detail screen at `/trips/:id`, with a distinct not-found state
+- [x] Shared `TripCard` component reused by the list and the detail screen
+- [x] Date rule shared between the form and the domain, and unit tested on its own
+- [x] Fixed a defect where `takeUntilDestroyed()` was called outside an injection
+      context, which broke the Home refresh button and both trip forms
+
+**Exit criteria:** a trip can be listed, created and opened from the browser, and every
+state of every screen is covered by a test.
+
+---
+
 ## Phase 1 — Accounts, trips and membership
 
 *Planned.* Everything downstream needs to know who the participants are.

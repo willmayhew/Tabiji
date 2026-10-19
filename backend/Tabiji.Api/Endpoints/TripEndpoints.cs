@@ -36,6 +36,18 @@ public static class TripEndpoints
             .WithSummary("Creates a new trip.");
 
         group.MapGet(
+            "/",
+            async (TripService tripService, CancellationToken cancellationToken) =>
+            {
+                var trips = await tripService.ListAsync(cancellationToken);
+
+                IResult result = Results.Ok(trips);
+                return result;
+            })
+            .WithName("ListTrips")
+            .WithSummary("Lists every trip, ordered by start date and then by name.");
+
+        group.MapGet(
             "/{id:guid}",
             async (
                 Guid id,

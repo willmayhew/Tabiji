@@ -8,6 +8,10 @@ import { CreateTrip, Trip } from '../models/trip';
 export class TripsService {
   private readonly http = inject(HttpClient);
 
+  list(): Observable<Trip[]> {
+    return this.http.get<Trip[]>(`${environment.apiBaseUrl}/api/trips`);
+  }
+
   create(request: CreateTrip): Observable<Trip> {
     return this.http.post<Trip>(`${environment.apiBaseUrl}/api/trips`, request);
   }

@@ -16,4 +16,12 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
     {
         return dbContext.Trips.SingleOrDefaultAsync(trip => trip.Id == id, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Trip>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Trips
+            .OrderBy(trip => trip.StartsOn)
+            .ThenBy(trip => trip.Name)
+            .ToListAsync(cancellationToken);
+    }
 }

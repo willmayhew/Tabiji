@@ -165,6 +165,10 @@ readable and adding an enum member cannot silently change the meaning of existin
 against the `ITripRepository` abstraction, so the composition root is the only place that
 knows the concrete implementation.
 
+`ITripRepository.ListAsync` returns every trip ordered by start date and then by name.
+The ordering is part of the port's contract, and the repository produces it with a SQL
+`ORDER BY` rather than sorting in memory.
+
 ### 5.4 API
 
 `Program.cs` is a thin composition root. It calls `AddApplication()`,
@@ -175,6 +179,7 @@ Endpoints:
 
 | Method | Route | Behaviour |
 |---|---|---|
+| `GET` | `/api/trips` | Lists every trip, ordered by start date and then by name. |
 | `POST` | `/api/trips` | Creates a trip. `201` with the trip, `400` on invalid input. |
 | `GET` | `/api/trips/{id}` | Returns a trip, or `404`. |
 | `GET` | `/health` | Liveness. Never touches the database. |
@@ -210,12 +215,13 @@ frontend/src/app/
 ├── app.config.ts                    providers: router, HttpClient
 ├── app.routes.ts                    lazy-loaded routes
 ├── core/
-│   ├── api/                         HealthService, TripsService
+│   ├── api/                         HealthService, TripsService, http-error
 │   └── models/                      HealthReport, Trip
 ├── features/
 │   ├── home/                        backend status
-│   └── trips/                       create and look up a trip
-└── shared/ui/                       reusable presentational components
+│   ├── trips/                       trip list and create form
+│   └── trip-detail/                 a single trip
+└── shared/ui/                       StatusBadge, TripCard
 ```
 
 The rules:
@@ -225,6 +231,17 @@ The rules:
 - `features/` holds one folder per screen. A feature may use `core/` and `shared/`.
 - `shared/` holds presentational components with no feature knowledge.
 - Features are lazy-loaded, so the initial bundle stays small.
+
+Every screen keeps one signal per state — `loading`, `error` and the payload — rather
+than a single union, because Angular's template type checker cannot narrow a union that
+is reached through a signal call. `Home` established that pattern and the trip screens
+follow it.
+
+Form validation is owned by the feature, not by a library. `trip-date-range.ts` holds a
+pure `validateTripDates` function and the `ValidatorFn` that wraps it, so the rule that
+the end date cannot precede the start date can be unit tested on its own. The rule
+itself lives in the domain; the form mirrors it so the user gets immediate feedback,
+and the API remains the authority.
 
 In development the Angular dev server proxies `/api` and `/health` to
 `http://localhost:5080` (`proxy.conf.json`). The browser therefore only ever talks to
@@ -271,13 +288,19 @@ developer and every build uses the same compiler.
 
 | Suite | Location | Scope | Needs a database? |
 |---|---|---|---|
-| Domain and use-case tests | `backend/Tabiji.Tests/TripTests.cs` | Invariants, validation, the service | No |
-| API integration tests | `backend/Tabiji.Tests/HealthEndpointTests.cs` | The HTTP surface, via `WebApplicationFactory` | No |
-| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | The root component and the API clients | No |
+| Domain and use-case tests | `backend/Tabiji.Tests/TripTests.cs` | Invariants, validation, the service, the list order | No |
+| Health endpoint tests | `backend/Tabiji.Tests/HealthEndpointTests.cs` | The health probes, via `WebApplicationFactory` | No |
+| Trip endpoint tests | `backend/Tabiji.Tests/TripEndpointTests.cs` | The trip HTTP surface, via `WebApplicationFactory` | No |
+| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the date rule | No |
 
 `TabijiWebApplicationFactory` starts the real host in memory and supplies a connection
 string, but no connection is opened. The suite therefore passes on a machine with no SQL
 Server, which matters for CI.
+
+`TripApiFactory` derives from it and replaces the trip repository with an in-memory
+fake, so the trip endpoint tests exercise real routing, status codes and JSON without a
+database. `TabijiWebApplicationFactory` is left open for that reason, with a
+`ConfigureServices` hook for the override.
 
 ## 9. Configuration and secrets
 

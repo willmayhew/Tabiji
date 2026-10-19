@@ -9,6 +9,7 @@ public sealed class TripTests
     private static readonly DateOnly StartsOn = new(2027, 4, 1);
     private static readonly DateOnly EndsOn = new(2027, 4, 14);
     private static readonly DateTimeOffset CreatedAt = new(2026, 10, 19, 9, 0, 0, TimeSpan.Zero);
+    private static readonly string[] ExpectedListOrder = ["Hakone", "Tokyo", "Kyoto"];
 
     [Fact]
     public void Create_TrimsValuesAndStartsInPlanning()
@@ -128,5 +129,52 @@ public sealed class TripTests
         var response = await service.GetAsync(Guid.NewGuid());
 
         Assert.Null(response);
+    }
+
+    [Fact]
+    public async Task ListAsync_ReturnsTripsOrderedByStartDateThenName()
+    {
+        var repository = new FakeTripRepository(
+        [
+            Trip.Create("Kyoto", "Kansai", new DateOnly(2027, 4, 10), new DateOnly(2027, 4, 14), CreatedAt),
+            Trip.Create("Tokyo", "Kanto", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 8), CreatedAt),
+            Trip.Create("Hakone", "Kanto", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 3), CreatedAt)
+        ]);
+
+        var service = new TripService(repository, TimeProvider.System);
+
+        var trips = await service.ListAsync();
+
+        Assert.Equal(ExpectedListOrder, trips.Select(trip => trip.Name));
+    }
+
+    [Fact]
+    public async Task ListAsync_ReturnsAnEmptyListWhenThereAreNoTrips()
+    {
+        var service = new TripService(new FakeTripRepository(), TimeProvider.System);
+
+        var trips = await service.ListAsync();
+
+        Assert.Empty(trips);
+    }
+
+    [Fact]
+    public async Task ListAsync_MapsEveryTripToAResponse()
+    {
+        var repository = new FakeTripRepository(
+        [
+            Trip.Create("Tokyo & Kyoto", "Japan", StartsOn, EndsOn, CreatedAt)
+        ]);
+
+        var service = new TripService(repository, TimeProvider.System);
+
+        var trips = await service.ListAsync();
+
+        var trip = Assert.Single(trips);
+        Assert.Equal("Tokyo & Kyoto", trip.Name);
+        Assert.Equal("Japan", trip.Destination);
+        Assert.Equal(StartsOn, trip.StartsOn);
+        Assert.Equal(EndsOn, trip.EndsOn);
+        Assert.Equal(TripStatus.Planning, trip.Status);
     }
 }

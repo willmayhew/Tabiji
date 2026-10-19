@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { catchError, forkJoin, of } from 'rxjs';
 import { HealthService } from '../../core/api/health.service';
@@ -14,6 +14,7 @@ import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 })
 export class Home {
   private readonly healthService = inject(HealthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly liveness = signal<HealthReport | null>(null);
   protected readonly readiness = signal<HealthReport | null>(null);
@@ -32,7 +33,7 @@ export class Home {
       liveness: this.healthService.getLiveness().pipe(catchError(() => of(null))),
       readiness: this.healthService.getReadiness().pipe(catchError(() => of(null))),
     })
-      .pipe(takeUntilDestroyed())
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(({ liveness, readiness }) => {
         this.liveness.set(liveness);
         this.readiness.set(readiness);

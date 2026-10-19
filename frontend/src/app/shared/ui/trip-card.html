@@ -1,0 +1,14 @@
+<article class="trip-card">
+  <header class="trip-card__header">
+    <h3 class="trip-card__name">{{ trip().name }}</h3>
+    <app-status-badge [label]="trip().status" [tone]="toneFor(trip().status)" />
+  </header>
+
+  <p class="trip-card__destination">{{ trip().destination }}</p>
+
+  <p class="trip-card__dates">
+    <span>{{ trip().startsOn }}</span>
+    <span aria-hidden="true">&rarr;</span>
+    <span>{{ trip().endsOn }}</span>
+  </p>
+</article>

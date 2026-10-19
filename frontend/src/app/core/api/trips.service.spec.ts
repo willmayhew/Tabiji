@@ -18,6 +18,27 @@ describe('TripsService', () => {
 
   afterEach(() => http.verify());
 
+  it('should list every trip', () => {
+    let names: string[] = [];
+
+    service.list().subscribe((trips) => (names = trips.map((trip) => trip.name)));
+
+    const request = http.expectOne('/api/trips');
+    expect(request.request.method).toBe('GET');
+    request.flush([
+      {
+        id: '5f2b1c4e-0000-0000-0000-000000000000',
+        name: 'Tokyo',
+        destination: 'Japan',
+        startsOn: '2027-04-01',
+        endsOn: '2027-04-14',
+        status: 'Planning',
+      },
+    ]);
+
+    expect(names).toEqual(['Tokyo']);
+  });
+
   it('should post a new trip', () => {
     let name: string | undefined;
 

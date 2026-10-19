@@ -1,0 +1,51 @@
+<form class="form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <label class="field">
+    <span>Name</span>
+    <input type="text" formControlName="name" [attr.maxlength]="nameMaxLength" />
+    @if (errorFor('name'); as message) {
+      <p class="field-error">{{ message }}</p>
+    }
+  </label>
+
+  <label class="field">
+    <span>Destination</span>
+    <input type="text" formControlName="destination" [attr.maxlength]="destinationMaxLength" />
+    @if (errorFor('destination'); as message) {
+      <p class="field-error">{{ message }}</p>
+    }
+  </label>
+
+  <div class="form-row">
+    <label class="field">
+      <span>Starts on</span>
+      <input type="date" formControlName="startsOn" />
+      @if (errorFor('startsOn'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+
+    <label class="field">
+      <span>Ends on</span>
+      <input type="date" formControlName="endsOn" />
+      @if (errorFor('endsOn'); as message) {
+        <p class="field-error">{{ message }}</p>
+      }
+    </label>
+  </div>
+
+  @if (dateRangeError(); as message) {
+    <p class="field-error">{{ message }}</p>
+  }
+
+  @if (error(); as message) {
+    <p class="field-error field-error--api">{{ message }}</p>
+  }
+
+  @if (success(); as message) {
+    <p class="field-success">{{ message }}</p>
+  }
+
+  <button type="submit" class="button" [disabled]="submitting()">
+    {{ submitting() ? 'Creating…' : 'Create trip' }}
+  </button>
+</form>

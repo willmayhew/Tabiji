@@ -162,9 +162,29 @@ Base URL in development: `http://localhost:5080`.
 |---|---|---|
 | `GET` | `/health` | Liveness probe. Does not touch the database. |
 | `GET` | `/health/ready` | Readiness probe. Verifies the database is reachable. |
+| `GET` | `/api/trips` | Lists every trip, ordered by start date and then by name. |
 | `POST` | `/api/trips` | Creates a trip. |
 | `GET` | `/api/trips/{id}` | Returns a single trip. |
 | `GET` | `/openapi/v1.json` | The OpenAPI document. |
+
+List the trips:
+
+```bash
+curl http://localhost:5080/api/trips
+```
+
+```json
+[
+  {
+    "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
+    "name": "Tokyo & Kyoto",
+    "destination": "Japan",
+    "startsOn": "2027-04-01",
+    "endsOn": "2027-04-14",
+    "status": "Planning"
+  }
+]
+```
 
 Create a trip:
 
@@ -230,8 +250,8 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 13 tests
-cd frontend && npm test           # 6 tests
+dotnet test backend/Tabiji.sln   # 23 tests
+cd frontend && npm test           # 36 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that

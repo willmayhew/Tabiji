@@ -12,5 +12,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/trips/trips').then((m) => m.Trips),
     title: 'Tabiji — Trips',
   },
+  {
+    path: 'trips/:id',
+    loadComponent: () => import('./features/trip-detail/trip-detail').then((m) => m.TripDetail),
+    title: 'Tabiji — Trip',
+  },
   { path: '**', redirectTo: '' },
 ];
