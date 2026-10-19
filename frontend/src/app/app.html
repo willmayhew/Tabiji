@@ -1,0 +1,15 @@
+<header class="app-header">
+  <a class="brand" routerLink="/">
+    <span class="brand-mark" aria-hidden="true">旅</span>
+    <span class="brand-name">Tabiji</span>
+  </a>
+
+  <nav class="app-nav" aria-label="Main">
+    <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">Overview</a>
+    <a routerLink="/trips" routerLinkActive="is-active">Trips</a>
+  </nav>
+</header>
+
+<main class="app-main">
+  <router-outlet />
+</main>

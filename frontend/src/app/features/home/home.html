@@ -1,0 +1,51 @@
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h1>Backend status</h1>
+      <p class="panel-subtitle">Live responses from the Tabiji API.</p>
+    </div>
+    <button type="button" class="button" (click)="refresh()" [disabled]="loading()">Refresh</button>
+  </div>
+
+  @if (loading()) {
+    <p class="muted">Checking the API&hellip;</p>
+  } @else if (error(); as message) {
+    <div class="callout callout--danger">
+      <app-status-badge label="Unreachable" tone="danger" />
+      <p>{{ message }}</p>
+    </div>
+  } @else {
+    <div class="cards">
+      <article class="card">
+        <header class="card-header">
+          <h2>Liveness</h2>
+          <code>GET /health</code>
+        </header>
+        @if (liveness(); as report) {
+          <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
+          <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
+        } @else {
+          <app-status-badge label="Unreachable" tone="danger" />
+          <p class="muted">The liveness probe did not answer.</p>
+        }
+      </article>
+
+      <article class="card">
+        <header class="card-header">
+          <h2>Readiness</h2>
+          <code>GET /health/ready</code>
+        </header>
+        @if (readiness(); as report) {
+          <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
+          <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
+          @for (check of report.checks; track check.name) {
+            <p class="muted">{{ check.name }}: {{ check.description }}</p>
+          }
+        } @else {
+          <app-status-badge label="Unreachable" tone="danger" />
+          <p class="muted">The readiness probe did not answer.</p>
+        }
+      </article>
+    </div>
+  }
+</section>

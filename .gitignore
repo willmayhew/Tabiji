@@ -1,0 +1,90 @@
+# ---------------------------------------------------------------------------
+# .NET
+# ---------------------------------------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+[Rr]elease|[Ll]inux/
+Publish/
+artifacts/
+TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.dotsettings
+*.nupkg
+*.snupkg
+*.dbmdl
+*.dbcontext
+*.jfm
+project.lock.json
+project.fragment.lock.json
+.vs/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# ---------------------------------------------------------------------------
+# Node / Angular
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+tmp/
+out-tsc/
+bazel-out/
+.angular/
+coverage/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.sass-cache/
+.typings/
+__screenshots__/
+
+# ---------------------------------------------------------------------------
+# Configuration and secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+*.pfx
+*.p12
+*.key
+*.pem
+
+# ---------------------------------------------------------------------------
+# IDEs and editors
+# ---------------------------------------------------------------------------
+.idea/
+*.swp
+*.sublime-workspace
+*.sublime-project
+.history/
+*.launch
+
+# ---------------------------------------------------------------------------
+# Operating system
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------------------------------------------------------------------------
+# Local tooling
+# ---------------------------------------------------------------------------
+.commandcode/

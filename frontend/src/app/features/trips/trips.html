@@ -1,0 +1,83 @@
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h1>Trips</h1>
+      <p class="panel-subtitle">Create a trip and look it up again.</p>
+    </div>
+  </div>
+
+  @if (error(); as message) {
+    <div class="callout callout--danger">{{ message }}</div>
+  }
+
+  <div class="cards">
+    <article class="card">
+      <header class="card-header">
+        <h2>Create a trip</h2>
+        <code>POST /api/trips</code>
+      </header>
+
+      <form class="form" (ngSubmit)="createTrip()">
+        <label>
+          <span>Name</span>
+          <input name="name" type="text" [(ngModel)]="name" required maxlength="100" />
+        </label>
+
+        <label>
+          <span>Destination</span>
+          <input name="destination" type="text" [(ngModel)]="destination" required maxlength="200" />
+        </label>
+
+        <div class="form-row">
+          <label>
+            <span>Starts on</span>
+            <input name="startsOn" type="date" [(ngModel)]="startsOn" required />
+          </label>
+
+          <label>
+            <span>Ends on</span>
+            <input name="endsOn" type="date" [(ngModel)]="endsOn" required />
+          </label>
+        </div>
+
+        <button type="submit" class="button" [disabled]="busy()">Create trip</button>
+      </form>
+
+      @if (created(); as trip) {
+        <dl class="summary">
+          <div><dt>Id</dt><dd><code>{{ trip.id }}</code></dd></div>
+          <div><dt>Name</dt><dd>{{ trip.name }}</dd></div>
+          <div><dt>Destination</dt><dd>{{ trip.destination }}</dd></div>
+          <div><dt>Dates</dt><dd>{{ trip.startsOn }} &rarr; {{ trip.endsOn }}</dd></div>
+          <div><dt>Status</dt><dd>{{ trip.status }}</dd></div>
+        </dl>
+      }
+    </article>
+
+    <article class="card">
+      <header class="card-header">
+        <h2>Find a trip</h2>
+        <code>GET /api/trips/&#123;id&#125;</code>
+      </header>
+
+      <form class="form" (ngSubmit)="findTrip()">
+        <label>
+          <span>Trip id</span>
+          <input name="tripId" type="text" [(ngModel)]="tripId" required />
+        </label>
+
+        <button type="submit" class="button" [disabled]="busy()">Look up trip</button>
+      </form>
+
+      @if (found(); as trip) {
+        <dl class="summary">
+          <div><dt>Id</dt><dd><code>{{ trip.id }}</code></dd></div>
+          <div><dt>Name</dt><dd>{{ trip.name }}</dd></div>
+          <div><dt>Destination</dt><dd>{{ trip.destination }}</dd></div>
+          <div><dt>Dates</dt><dd>{{ trip.startsOn }} &rarr; {{ trip.endsOn }}</dd></div>
+          <div><dt>Status</dt><dd>{{ trip.status }}</dd></div>
+        </dl>
+      }
+    </article>
+  </div>
+</section>

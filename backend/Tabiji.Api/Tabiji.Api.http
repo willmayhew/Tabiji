@@ -1,0 +1,28 @@
+@Tabiji.Api_HostAddress = http://localhost:5080
+
+### Liveness probe
+GET {{Tabiji.Api_HostAddress}}/health
+Accept: application/json
+
+### Readiness probe (checks the database)
+GET {{Tabiji.Api_HostAddress}}/health/ready
+Accept: application/json
+
+### Create a trip
+POST {{Tabiji.Api_HostAddress}}/api/trips
+Content-Type: application/json
+
+{
+  "name": "Tokyo & Kyoto",
+  "destination": "Japan",
+  "startsOn": "2027-04-01",
+  "endsOn": "2027-04-14"
+}
+
+### Get a trip by id
+GET {{Tabiji.Api_HostAddress}}/api/trips/00000000-0000-0000-0000-000000000000
+Accept: application/json
+
+### OpenAPI document
+GET {{Tabiji.Api_HostAddress}}/openapi/v1.json
+Accept: application/json
