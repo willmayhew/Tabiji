@@ -18,6 +18,12 @@ import { DestinationPhoto } from './destination-photo';
 export class TripCard {
   readonly trip = input.required<Trip>();
 
+  /**
+   * Whether the photograph loads lazily. The first card on a page is the
+   * largest contentful paint, so it should not be deferred.
+   */
+  readonly lazy = input(true);
+
   protected readonly dates = computed(() => formatTripDates(this.trip().startsOn, this.trip().endsOn));
 
   protected toneFor(status: TripStatus): BadgeTone {

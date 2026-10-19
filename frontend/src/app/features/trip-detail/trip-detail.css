@@ -32,9 +32,9 @@
 }
 
 /**
- * The scrim keeps the type legible over any photograph, and it is dark
- * enough at the foot of the plate that white text always clears the
- * contrast threshold.
+ * The scrim keeps the type legible over any photograph. It is dark enough
+ * at the foot of the plate that white text clears the contrast threshold
+ * even where the photograph underneath is pure white.
  */
 .detail__hero::after {
   content: '';
@@ -42,9 +42,9 @@
   inset: 0;
   background: linear-gradient(
     to top,
-    rgb(12 18 15 / 90%) 0%,
-    rgb(12 18 15 / 62%) 42%,
-    rgb(12 18 15 / 8%) 100%
+    rgb(12 18 15 / 94%) 0%,
+    rgb(12 18 15 / 72%) 55%,
+    rgb(12 18 15 / 10%) 100%
   );
   pointer-events: none;
 }

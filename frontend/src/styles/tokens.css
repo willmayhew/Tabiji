@@ -27,9 +27,9 @@
   --color-rule-strong: #c7bda6;
 
   /* Ink --------------------------------------------------------------- */
-  --color-ink: #1c1a16;
-  --color-ink-soft: #4a453c;
-  --color-ink-faint: #6f675a;
+  --color-ink: #1c1a16; /* primary text              15.7:1 on paper  */
+  --color-ink-soft: #4a453c; /* secondary text             8.6:1 on paper  */
+  --color-ink-faint: #6a6255; /* meta / captions            5.4:1 on paper  */
 
   /* Brand ------------------------------------------------------------- */
   --color-forest: #1f4034;

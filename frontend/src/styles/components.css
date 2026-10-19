@@ -298,6 +298,12 @@
   line-height: var(--leading-relaxed);
 }
 
+/* The button rule aligns itself to the start, which is right in a form but
+   wrong in a centred empty state. */
+.empty-state .button {
+  align-self: center;
+}
+
 /* Loading skeleton ---------------------------------------------------- */
 
 .skeleton {

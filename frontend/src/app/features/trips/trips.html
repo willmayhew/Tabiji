@@ -42,11 +42,12 @@
       <a class="button" routerLink="/trips/new">Plan your first trip</a>
     </div>
   } @else if (!error()) {
+    <h2 class="visually-hidden">Trips</h2>
     <ul class="trip-grid">
-      @for (trip of trips(); track trip.id) {
+      @for (trip of trips(); track trip.id; let first = $first) {
         <li>
           <a class="trip-link" [routerLink]="['/trips', trip.id]">
-            <app-trip-card [trip]="trip" />
+            <app-trip-card [trip]="trip" [lazy]="!first" />
           </a>
         </li>
       }
