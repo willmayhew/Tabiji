@@ -13,7 +13,7 @@
  */
 
 /** A photograph that is committed to the repository. */
-export interface DestinationPhoto {
+export interface DestinationPhotoAsset {
   /** Stable identifier, also the file name stem. */
   readonly slug: string;
   /** Describes the photograph for someone who cannot see it. */
@@ -133,7 +133,7 @@ function earliestPosition(haystack: string, entry: PhotoEntry): number {
   return earliest;
 }
 
-function toPhoto(entry: PhotoEntry): DestinationPhoto {
+function toPhoto(entry: PhotoEntry): DestinationPhotoAsset {
   return {
     slug: entry.slug,
     alt: entry.alt,
@@ -149,7 +149,9 @@ function toPhoto(entry: PhotoEntry): DestinationPhoto {
  * matches. A region such as "Kanto" or an unfamiliar place resolves to `null`
  * so the caller can show the monogram fallback rather than a misleading image.
  */
-export function resolveDestinationPhoto(destination: string | null | undefined): DestinationPhoto | null {
+export function resolveDestinationPhoto(
+  destination: string | null | undefined,
+): DestinationPhotoAsset | null {
   if (!destination) {
     return null;
   }

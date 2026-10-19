@@ -30,8 +30,28 @@ describe('TripCard', () => {
 
     expect(element.querySelector('.trip-card__name')?.textContent).toContain('Tokyo & Kyoto');
     expect(element.querySelector('.trip-card__destination')?.textContent).toContain('Japan');
-    expect(element.querySelector('.trip-card__dates')?.textContent).toContain('2027-04-01');
-    expect(element.querySelector('.trip-card__dates')?.textContent).toContain('2027-04-14');
+    expect(element.querySelector('.trip-card__dates')?.textContent).toContain('1 Apr – 14 Apr 2027');
+  });
+
+  it('should keep the machine readable dates on the time elements', () => {
+    fixture.componentRef.setInput('trip', confirmed);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const times = element.querySelectorAll('.trip-card__dates time');
+
+    expect(times.length).toBe(2);
+    expect(times[0].getAttribute('datetime')).toBe('2027-04-01');
+    expect(times[1].getAttribute('datetime')).toBe('2027-04-14');
+  });
+
+  it('should show the length of the trip', () => {
+    fixture.componentRef.setInput('trip', confirmed);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('.trip-card__duration')?.textContent).toContain('14 days');
   });
 
   it('should show the status as a badge', () => {

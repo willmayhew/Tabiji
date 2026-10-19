@@ -1,14 +1,33 @@
 <article class="trip-card">
-  <header class="trip-card__header">
-    <h3 class="trip-card__name">{{ trip().name }}</h3>
-    <app-status-badge [label]="trip().status" [tone]="toneFor(trip().status)" />
-  </header>
+  <app-destination-photo
+    class="trip-card__plate"
+    [destination]="trip().destination"
+    sizes="(min-width: 64rem) 21rem, (min-width: 40rem) 45vw, 92vw"
+  />
 
-  <p class="trip-card__destination">{{ trip().destination }}</p>
+  <div class="trip-card__body">
+    <header class="trip-card__header">
+      <h3 class="trip-card__name">{{ trip().name }}</h3>
+      <app-status-badge [label]="trip().status" [tone]="toneFor(trip().status)" />
+    </header>
 
-  <p class="trip-card__dates">
-    <span>{{ trip().startsOn }}</span>
-    <span aria-hidden="true">&rarr;</span>
-    <span>{{ trip().endsOn }}</span>
-  </p>
+    <p class="trip-card__destination">
+      <span>{{ trip().destination }}</span>
+      @if (dates(); as range) {
+        <span class="trip-card__duration">{{ range.duration }}</span>
+      }
+    </p>
+
+    <p class="trip-card__dates">
+      @if (dates(); as range) {
+        <time [attr.datetime]="trip().startsOn">{{ range.start }}</time>
+        <span class="trip-card__dash" aria-hidden="true"> – </span>
+        <time [attr.datetime]="trip().endsOn">{{ range.end }}</time>
+      } @else {
+        <time [attr.datetime]="trip().startsOn">{{ trip().startsOn }}</time>
+        <span class="trip-card__dash" aria-hidden="true"> – </span>
+        <time [attr.datetime]="trip().endsOn">{{ trip().endsOn }}</time>
+      }
+    </p>
+  </div>
 </article>

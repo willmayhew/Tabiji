@@ -69,7 +69,20 @@ describe('TripDetail', () => {
 
     expect(element().textContent).toContain('Tokyo');
     expect(element().textContent).toContain('Kanto');
-    expect(element().textContent).toContain('2027-04-01');
+    expect(element().textContent).toContain('1 Apr – 8 Apr 2027');
+  });
+
+  it('should keep the machine readable dates on the time elements', () => {
+    createComponent(trip.id);
+
+    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
+    fixture.detectChanges();
+
+    const times = element().querySelectorAll('time');
+
+    expect(times.length).toBe(2);
+    expect(times[0].getAttribute('datetime')).toBe('2027-04-01');
+    expect(times[1].getAttribute('datetime')).toBe('2027-04-08');
   });
 
   it('should show a not found state for an unknown trip', () => {

@@ -11,4 +11,6 @@ export type BadgeTone = 'healthy' | 'warning' | 'danger' | 'neutral';
 export class StatusBadge {
   readonly label = input.required<string>();
   readonly tone = input<BadgeTone>('neutral');
+  /** For a badge that sits on a dark plate, such as the trip detail hero. */
+  readonly inverse = input(false);
 }

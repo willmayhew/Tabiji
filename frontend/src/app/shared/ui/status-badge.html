@@ -1,1 +1,4 @@
-<span class="badge" [class]="'badge badge--' + tone()">{{ label() }}</span>
+<span [class]="'badge badge--' + tone() + (inverse() ? ' badge--inverse' : '')">
+  <span class="badge__dot" aria-hidden="true"></span>
+  {{ label() }}
+</span>
