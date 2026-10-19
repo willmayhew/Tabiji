@@ -1,0 +1,37 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.form .field {
+  gap: var(--space-2xs);
+}
+
+.form .field-hint {
+  order: 2;
+}
+
+.form input {
+  width: 100%;
+}
+
+.form .field-error {
+  order: 3;
+}
+
+.form .button {
+  margin-top: var(--space-2xs);
+}
+
+@media (max-width: 40rem) {
+  .form-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

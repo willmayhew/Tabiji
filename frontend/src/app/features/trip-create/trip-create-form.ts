@@ -100,4 +100,14 @@ export class TripCreateForm {
 
     return typeof message === 'string' ? message : null;
   }
+
+  /**
+   * The elements that describe a date field: its own hint, plus the shared
+   * date range error when there is one.
+   */
+  protected dateDescribedBy(field: 'startsOn' | 'endsOn'): string {
+    const hint = field === 'startsOn' ? 'trip-starts-on-hint' : 'trip-ends-on-hint';
+
+    return this.dateRangeError() ? `trip-dates-error ${hint}` : hint;
+  }
 }

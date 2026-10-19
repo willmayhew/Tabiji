@@ -13,6 +13,11 @@ export const routes: Routes = [
     title: 'Tabiji — Trips',
   },
   {
+    path: 'trips/new',
+    loadComponent: () => import('./features/trip-create/trip-create').then((m) => m.TripCreate),
+    title: 'Tabiji — New trip',
+  },
+  {
     path: 'trips/:id',
     loadComponent: () => import('./features/trip-detail/trip-detail').then((m) => m.TripDetail),
     title: 'Tabiji — Trip',

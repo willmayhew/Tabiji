@@ -1,0 +1,26 @@
+<section class="panel">
+  <a class="back-link" routerLink="/trips">&larr; All trips</a>
+
+  <div class="create">
+    <div class="create__lead">
+      <p class="eyebrow">New trip</p>
+      <h1>Where to next?</h1>
+      <p class="create__lede">
+        A trip starts with a name, a place and the dates you have in mind. Nothing is locked in, so
+        you can change the details later.
+      </p>
+    </div>
+
+    <div class="create__form">
+      <app-trip-create-form (created)="onCreated($event)" />
+    </div>
+
+    <aside class="create__aside">
+      <span class="create__mark" aria-hidden="true">旅</span>
+      <p class="create__note">
+        Name the place precisely, such as <em>Kyoto</em> or <em>Kanto</em>. Tabiji uses it to find a
+        photograph that matches the trip.
+      </p>
+    </aside>
+  </div>
+</section>

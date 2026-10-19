@@ -7,6 +7,7 @@
     </div>
 
     <div class="panel-header__actions">
+      <a class="button" routerLink="/trips/new">New trip</a>
       <button type="button" class="button button--secondary" (click)="load()" [disabled]="loading()">
         Refresh
       </button>
@@ -38,6 +39,7 @@
       <p class="empty-state__body">
         Create the first one. Give it a name, a destination and the dates you have in mind.
       </p>
+      <a class="button" routerLink="/trips/new">Plan your first trip</a>
     </div>
   } @else if (!error()) {
     <ul class="trip-grid">
