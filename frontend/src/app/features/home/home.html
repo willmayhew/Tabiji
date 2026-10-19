@@ -1,51 +1,111 @@
 <section class="panel">
-  <div class="panel-header">
-    <div>
-      <h1>Backend status</h1>
-      <p class="panel-subtitle">Live responses from the Tabiji API.</p>
+  <section class="hero">
+    <div class="hero__plate">
+      <app-destination-photo
+        class="hero__image"
+        destination="Kyoto"
+        [lazy]="false"
+        sizes="100vw"
+      />
+      <span class="hero__mark" aria-hidden="true">旅</span>
     </div>
-    <button type="button" class="button" (click)="refresh()" [disabled]="loading()">Refresh</button>
-  </div>
 
-  @if (loading()) {
-    <p class="muted">Checking the API&hellip;</p>
-  } @else if (error(); as message) {
-    <div class="callout callout--danger">
-      <app-status-badge label="Unreachable" tone="danger" />
-      <p>{{ message }}</p>
+    <div class="hero__body">
+      <div class="hero__lead">
+        <p class="eyebrow">Collaborative Japan trip planner</p>
+        <h1>Plan Japan together.</h1>
+        <p class="hero__lede">
+          One place for a group of friends to agree on where to go, what to do and when. Start a
+          trip, gather everyone, and settle the details side by side.
+        </p>
+        <div class="hero__actions">
+          <a class="button" routerLink="/trips/new">Plan a trip</a>
+          <a class="button button--secondary" routerLink="/trips">See your trips</a>
+        </div>
+      </div>
+
+      <ol class="hero__steps">
+        <li class="hero__step">
+          <span class="hero__step-number">01</span>
+          <div>
+            <h2>Create a trip</h2>
+            <p>Name it, choose the destination, set the dates everyone is free.</p>
+          </div>
+        </li>
+        <li class="hero__step">
+          <span class="hero__step-number">02</span>
+          <div>
+            <h2>Gather your people</h2>
+            <p>Everyone sees the same trip, the same dates and the same plan.</p>
+          </div>
+        </li>
+        <li class="hero__step">
+          <span class="hero__step-number">03</span>
+          <div>
+            <h2>Decide together</h2>
+            <p>Propose activities, vote on them, settle on a shared itinerary.</p>
+          </div>
+        </li>
+      </ol>
     </div>
-  } @else {
-    <div class="cards">
-      <article class="card">
-        <header class="card-header">
-          <h2>Liveness</h2>
-          <code>GET /health</code>
-        </header>
-        @if (liveness(); as report) {
-          <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
-          <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
-        } @else {
-          <app-status-badge label="Unreachable" tone="danger" />
-          <p class="muted">The liveness probe did not answer.</p>
-        }
-      </article>
 
-      <article class="card">
-        <header class="card-header">
-          <h2>Readiness</h2>
-          <code>GET /health/ready</code>
-        </header>
-        @if (readiness(); as report) {
-          <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
-          <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
-          @for (check of report.checks; track check.name) {
-            <p class="muted">{{ check.name }}: {{ check.description }}</p>
+    <p class="hero__note">
+      A trip can be created today. Invitations, proposals and voting are on the way.
+    </p>
+  </section>
+
+  <section class="status">
+    <div class="panel-header">
+      <div>
+        <p class="eyebrow">Service status</p>
+        <h2>API health</h2>
+        <p class="panel-subtitle">Live responses from the Tabiji API.</p>
+      </div>
+      <button type="button" class="button button--secondary" (click)="refresh()" [disabled]="loading()">
+        Refresh
+      </button>
+    </div>
+
+    @if (loading()) {
+      <p class="muted">Checking the API&hellip;</p>
+    } @else if (error(); as message) {
+      <div class="callout callout--danger">
+        <app-status-badge label="Unreachable" tone="danger" />
+        <p>{{ message }}</p>
+      </div>
+    } @else {
+      <div class="probes">
+        <article class="probe">
+          <header class="probe__header">
+            <h3>Liveness</h3>
+            <code>GET /health</code>
+          </header>
+          @if (liveness(); as report) {
+            <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
+            <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
+          } @else {
+            <app-status-badge label="Unreachable" tone="danger" />
+            <p class="muted">The liveness probe did not answer.</p>
           }
-        } @else {
-          <app-status-badge label="Unreachable" tone="danger" />
-          <p class="muted">The readiness probe did not answer.</p>
-        }
-      </article>
-    </div>
-  }
+        </article>
+
+        <article class="probe">
+          <header class="probe__header">
+            <h3>Readiness</h3>
+            <code>GET /health/ready</code>
+          </header>
+          @if (readiness(); as report) {
+            <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
+            <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
+            @for (check of report.checks; track check.name) {
+              <p class="muted">{{ check.name }}: {{ check.description }}</p>
+            }
+          } @else {
+            <app-status-badge label="Unreachable" tone="danger" />
+            <p class="muted">The readiness probe did not answer.</p>
+          }
+        </article>
+      </div>
+    }
+  </section>
 </section>

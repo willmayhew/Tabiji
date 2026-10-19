@@ -1,13 +1,15 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 import { HealthService } from '../../core/api/health.service';
 import { HealthReport, HealthStatus } from '../../core/models/health-status';
+import { DestinationPhoto } from '../../shared/ui/destination-photo';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 @Component({
   selector: 'app-home',
-  imports: [StatusBadge],
+  imports: [DestinationPhoto, RouterLink, StatusBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.html',
   styleUrl: './home.css',
