@@ -1,12 +1,14 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { catchError, map, of, switchMap, tap } from 'rxjs';
+import { catchError, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
-import { Trip } from '../../core/models/trip';
-import { TripCard } from '../../shared/ui/trip-card';
+import { Trip, TripStatus } from '../../core/models/trip';
+import { formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
+import { DestinationPhoto } from '../../shared/ui/destination-photo';
+import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 interface TripDetailResult {
   trip: Trip | null;
@@ -16,7 +18,7 @@ interface TripDetailResult {
 
 @Component({
   selector: 'app-trip-detail',
-  imports: [RouterLink, TripCard],
+  imports: [DestinationPhoto, RouterLink, StatusBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-detail.html',
   styleUrl: './trip-detail.css',
@@ -25,6 +27,9 @@ export class TripDetail {
   private readonly tripsService = inject(TripsService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** Emits when the reader asks to try the request again. */
+  private readonly retry = new Subject<void>();
 
   readonly trip = signal<Trip | null>(null);
   readonly loading = signal(true);
@@ -42,14 +47,19 @@ export class TripDetail {
         }),
         map((params) => params.get('id') ?? ''),
         switchMap((id) =>
-          this.tripsService.getById(id).pipe(
-            map((trip): TripDetailResult => ({ trip, error: null, notFound: false })),
-            catchError((failure: HttpErrorResponse) =>
-              of<TripDetailResult>({
-                trip: null,
-                error: describeHttpError(failure),
-                notFound: failure.status === 404,
-              }),
+          this.retry.pipe(
+            startWith(undefined),
+            switchMap(() =>
+              this.tripsService.getById(id).pipe(
+                map((trip): TripDetailResult => ({ trip, error: null, notFound: false })),
+                catchError((failure: HttpErrorResponse) =>
+                  of<TripDetailResult>({
+                    trip: null,
+                    error: describeHttpError(failure),
+                    notFound: failure.status === 404,
+                  }),
+                ),
+              ),
             ),
           ),
         ),
@@ -61,5 +71,40 @@ export class TripDetail {
         this.notFound.set(result.notFound);
         this.loading.set(false);
       });
+  }
+
+  protected retryLoad(): void {
+    this.loading.set(true);
+    this.error.set(null);
+    this.retry.next();
+  }
+
+  protected readonly dates = computed(() => {
+    const found = this.trip();
+
+    return found === null ? null : formatTripDates(found.startsOn, found.endsOn);
+  });
+
+  protected readonly startDate = computed(() => {
+    const found = this.trip();
+
+    return found === null ? null : formatTripDate(found.startsOn);
+  });
+
+  protected readonly endDate = computed(() => {
+    const found = this.trip();
+
+    return found === null ? null : formatTripDate(found.endsOn);
+  });
+
+  protected toneFor(status: TripStatus): BadgeTone {
+    switch (status) {
+      case 'Confirmed':
+        return 'healthy';
+      case 'Cancelled':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
   }
 }

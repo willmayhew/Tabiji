@@ -29,3 +29,14 @@
   line-height: 1;
   user-select: none;
 }
+
+/**
+ * On a plate that carries a dark scrim, the fallback is a deep forest
+ * surface rather than a pale one, so the type over it keeps its contrast.
+ */
+.destination-photo__fallback--dark {
+  background:
+    radial-gradient(circle at 50% 38%, var(--color-forest) 0%, var(--color-forest-deep) 72%);
+  color: rgb(255 253 248 / 22%);
+  font-size: 6rem;
+}

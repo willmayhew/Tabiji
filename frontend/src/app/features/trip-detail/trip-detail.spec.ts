@@ -78,11 +78,16 @@ describe('TripDetail', () => {
     http.expectOne(`/api/trips/${trip.id}`).flush(trip);
     fixture.detectChanges();
 
-    const times = element().querySelectorAll('time');
+    const hero = element().querySelectorAll('.detail__meta time');
+    const details = element().querySelectorAll('.detail__list time');
 
-    expect(times.length).toBe(2);
-    expect(times[0].getAttribute('datetime')).toBe('2027-04-01');
-    expect(times[1].getAttribute('datetime')).toBe('2027-04-08');
+    expect(hero.length).toBe(2);
+    expect(hero[0].getAttribute('datetime')).toBe('2027-04-01');
+    expect(hero[1].getAttribute('datetime')).toBe('2027-04-08');
+
+    expect(details.length).toBe(2);
+    expect(details[0].getAttribute('datetime')).toBe('2027-04-01');
+    expect(details[1].getAttribute('datetime')).toBe('2027-04-08');
   });
 
   it('should show a not found state for an unknown trip', () => {
@@ -105,6 +110,27 @@ describe('TripDetail', () => {
     fixture.detectChanges();
 
     expect(element().textContent).toContain('Server error');
+  });
+
+  it('should try the request again after an error', () => {
+    createComponent(trip.id);
+
+    http
+      .expectOne(`/api/trips/${trip.id}`)
+      .flush({ title: 'Server error', status: 500 }, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Server error');
+
+    const retry = element().querySelector('.empty-state button') as HTMLButtonElement;
+    retry.click();
+    fixture.detectChanges();
+
+    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Tokyo');
+    expect(element().textContent).not.toContain('Server error');
   });
 
   it('should link back to the trips list', () => {

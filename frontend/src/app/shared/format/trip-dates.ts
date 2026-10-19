@@ -52,6 +52,18 @@ function parseIsoDate(value: string): Date | null {
 }
 
 /**
+ * Formats a single `YYYY-MM-DD` date for display, as "1 Apr 2027".
+ *
+ * Returns `null` when the value is not a plain date, so the caller can fall
+ * back to showing the raw string rather than inventing a date.
+ */
+export function formatTripDate(value: string): string | null {
+  const date = parseIsoDate(value);
+
+  return date === null ? null : dayMonthYear.format(date);
+}
+
+/**
  * Formats a trip's start and end dates for display.
  *
  * Returns `null` when either date is not a plain `YYYY-MM-DD` value, so the

@@ -4,18 +4,99 @@
   @if (loading()) {
     <p class="muted">Loading trip&hellip;</p>
   } @else if (notFound()) {
-    <div class="callout callout--danger">
-      <p>That trip could not be found. It may have been removed.</p>
+    <div class="empty-state">
+      <span class="empty-state__monogram" aria-hidden="true">旅</span>
+      <h1 class="empty-state__title">This trip has wandered off</h1>
+      <p class="empty-state__body">That trip could not be found. It may have been removed.</p>
+      <a class="button" routerLink="/trips">Back to your trips</a>
     </div>
   } @else if (error(); as message) {
-    <div class="callout callout--danger">
-      <p>{{ message }}</p>
+    <div class="empty-state empty-state--danger">
+      <span class="empty-state__monogram" aria-hidden="true">旅</span>
+      <h1 class="empty-state__title">Something went wrong</h1>
+      <p class="empty-state__body">{{ message }}</p>
+      <button type="button" class="button" (click)="retryLoad()">Try again</button>
     </div>
   } @else if (trip(); as found) {
-    <article class="card">
-      <app-trip-card [trip]="found" />
+    <article class="detail">
+      <header class="detail__hero">
+        <app-destination-photo
+          class="detail__plate"
+          [destination]="found.destination"
+          [lazy]="false"
+          tone="dark"
+          sizes="100vw"
+        />
+        <div class="detail__hero-body">
+          <p class="eyebrow detail__eyebrow">{{ found.destination }}</p>
+          <h1 class="detail__name">{{ found.name }}</h1>
+          <p class="detail__meta">
+            @if (dates(); as range) {
+              <time [attr.datetime]="found.startsOn">{{ range.start }}</time>
+              <span aria-hidden="true"> – </span>
+              <time [attr.datetime]="found.endsOn">{{ range.end }}</time>
+              <span class="detail__duration">{{ range.duration }}</span>
+            } @else {
+              <time [attr.datetime]="found.startsOn">{{ found.startsOn }}</time>
+              <span aria-hidden="true"> – </span>
+              <time [attr.datetime]="found.endsOn">{{ found.endsOn }}</time>
+            }
+          </p>
+          <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" [inverse]="true" />
+        </div>
+      </header>
 
-      <p class="muted">Id: <code>{{ found.id }}</code></p>
+      <div class="detail__body">
+        <div class="detail__details">
+          <h2 class="detail__heading">Details</h2>
+          <dl class="detail__list">
+            <div class="detail__row">
+              <dt>Destination</dt>
+              <dd>{{ found.destination }}</dd>
+            </div>
+            <div class="detail__row">
+              <dt>Starts</dt>
+              <dd>
+                @if (startDate(); as value) {
+                  <time [attr.datetime]="found.startsOn">{{ value }}</time>
+                } @else {
+                  {{ found.startsOn }}
+                }
+              </dd>
+            </div>
+            <div class="detail__row">
+              <dt>Ends</dt>
+              <dd>
+                @if (endDate(); as value) {
+                  <time [attr.datetime]="found.endsOn">{{ value }}</time>
+                } @else {
+                  {{ found.endsOn }}
+                }
+              </dd>
+            </div>
+            @if (dates(); as range) {
+              <div class="detail__row">
+                <dt>Length</dt>
+                <dd>{{ range.duration }}</dd>
+              </div>
+            }
+          </dl>
+          <p class="detail__id">Id: <code>{{ found.id }}</code></p>
+        </div>
+
+        <aside class="detail__aside">
+          <h2 class="detail__heading">Coming next</h2>
+          <p class="detail__aside-text">
+            This trip is the start of something bigger. These are on the way, so the whole group can
+            shape it together:
+          </p>
+          <ul class="detail__roadmap">
+            <li>Invitations, so everyone joins the same trip</li>
+            <li>Activity proposals and voting</li>
+            <li>A shared itinerary</li>
+          </ul>
+        </aside>
+      </div>
     </article>
   }
 </section>

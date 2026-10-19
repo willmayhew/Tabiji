@@ -22,6 +22,12 @@ export class DestinationPhoto {
   /** Whether the browser should load the image lazily. */
   readonly lazy = input(true);
 
+  /**
+   * The tone of the fallback plate. Use `dark` when the plate sits under a
+   * dark scrim, such as the trip detail hero.
+   */
+  readonly tone = input<'light' | 'dark'>('light');
+
   protected readonly photo = computed<DestinationPhotoAsset | null>(() =>
     resolveDestinationPhoto(this.destination()),
   );

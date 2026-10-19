@@ -12,5 +12,10 @@
     [attr.decoding]="lazy() ? 'async' : 'sync'"
   />
 } @else {
-  <span class="destination-photo__fallback" aria-hidden="true">旅</span>
+  <span
+    class="destination-photo__fallback"
+    [class.destination-photo__fallback--dark]="tone() === 'dark'"
+    aria-hidden="true"
+    >旅</span
+  >
 }
