@@ -1,15 +1,32 @@
-<header class="app-header">
-  <a class="brand" routerLink="/">
-    <span class="brand-mark" aria-hidden="true">旅</span>
-    <span class="brand-name">Tabiji</span>
-  </a>
+<a class="skip-link" href="#main-content">Skip to main content</a>
 
-  <nav class="app-nav" aria-label="Main">
-    <a routerLink="/" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">Overview</a>
-    <a routerLink="/trips" routerLinkActive="is-active">Trips</a>
-  </nav>
+<header class="app-header">
+  <div class="app-header__inner">
+    <a class="brand" routerLink="/">
+      <span class="brand-mark" aria-hidden="true">旅</span>
+      <span class="brand-name">Tabiji</span>
+    </a>
+
+    <nav class="app-nav" aria-label="Main">
+      <a
+        routerLink="/"
+        routerLinkActive="is-active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        ariaCurrentWhenActive="page"
+        >Overview</a
+      >
+      <a routerLink="/trips" routerLinkActive="is-active" ariaCurrentWhenActive="page">Trips</a>
+    </nav>
+  </div>
 </header>
 
-<main class="app-main">
+<main class="app-main" id="main-content" tabindex="-1">
   <router-outlet />
 </main>
+
+<footer class="app-footer">
+  <div class="app-footer__inner">
+    <span class="app-footer__mark" aria-hidden="true">旅</span>
+    <p class="app-footer__note">A collaborative Japan trip planner.</p>
+  </div>
+</footer>
