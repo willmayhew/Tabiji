@@ -13,8 +13,8 @@
 
 .card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
   padding: 1.1rem;
   display: flex;
   flex-direction: column;
@@ -44,14 +44,14 @@
 .trip-link {
   display: block;
   padding: 0.75rem 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
   text-decoration: none;
   color: inherit;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .trip-link:hover {
-  border-color: var(--color-accent);
-  background: var(--color-muted-soft);
+  border-color: var(--color-forest);
+  background: var(--color-surface-sunk);
 }

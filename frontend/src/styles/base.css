@@ -1,0 +1,178 @@
+/**
+ * Base layer: element defaults, typography and the focus system.
+ *
+ * Everything here is either a reset, a typographic default for a native
+ * element, or a rule that applies across every route.
+ */
+
+/* Fonts are self-hosted so the app makes no third-party request. */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 400 700;
+  font-stretch: normal;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin-var.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin-var.woff2') format('woff2-variations');
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-display);
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--text-3xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+h2 {
+  font-size: var(--text-2xl);
+}
+
+h3 {
+  font-size: var(--text-xl);
+}
+
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--color-forest);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: from-font;
+}
+
+a:hover {
+  color: var(--color-forest-deep);
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.8125em;
+  color: var(--color-ink-soft);
+}
+
+button {
+  font: inherit;
+}
+
+/**
+ * The focus ring. A single rule covers every interactive element, so a
+ * control can never ship without one. 2px of forest at 2px offset clears
+ * 3:1 against both the paper and the surface.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-forest);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+::selection {
+  background: var(--color-terracotta-tint);
+  color: var(--color-ink);
+}
+
+/* Form controls ------------------------------------------------------- */
+
+input,
+select,
+textarea {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-base);
+  line-height: 1.4;
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-ink-faint);
+}
+
+input:hover:not(:disabled),
+select:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--color-ink-faint);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--color-forest);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-forest-tint);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--color-surface-sunk);
+  color: var(--color-ink-faint);
+  cursor: not-allowed;
+}
+
+/* Date inputs keep the platform picker but inherit the type scale. */
+input[type='date'] {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}

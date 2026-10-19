@@ -20,7 +20,7 @@
 
 .trip-card__destination {
   margin: 0;
-  color: var(--color-muted);
+  color: var(--color-ink-soft);
   font-size: 0.875rem;
 }
 
@@ -30,6 +30,6 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.8rem;
-  color: var(--color-muted);
+  color: var(--color-ink-soft);
   font-variant-numeric: tabular-nums;
 }

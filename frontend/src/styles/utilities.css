@@ -1,0 +1,47 @@
+/**
+ * Utilities.
+ *
+ * A deliberately small set of single-purpose helpers. Anything that appears
+ * more than once as a layout pattern belongs in components.css instead.
+ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.u-measure {
+  max-width: var(--measure);
+}
+
+.u-measure-tight {
+  max-width: var(--measure-tight);
+}
+
+.u-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.u-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.u-full-bleed {
+  margin-inline: calc(50% - 50vw);
+}
+
+.u-hide {
+  display: none;
+}
