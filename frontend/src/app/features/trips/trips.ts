@@ -6,11 +6,10 @@ import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
 import { Trip } from '../../core/models/trip';
 import { TripCard } from '../../shared/ui/trip-card';
-import { TripCreateForm } from './trip-create-form';
 
 @Component({
   selector: 'app-trips',
-  imports: [RouterLink, TripCard, TripCreateForm],
+  imports: [RouterLink, TripCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trips.html',
   styleUrl: './trips.css',
@@ -22,6 +21,9 @@ export class Trips {
   readonly trips = signal<Trip[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+
+  /** Placeholder cards shown while the list is loading. */
+  protected readonly skeletonSlots = [0, 1, 2];
 
   constructor() {
     this.load();
@@ -44,9 +46,5 @@ export class Trips {
           this.loading.set(false);
         },
       });
-  }
-
-  protected onTripCreated(): void {
-    this.load();
   }
 }

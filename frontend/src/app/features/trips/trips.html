@@ -1,12 +1,16 @@
 <section class="panel">
   <div class="panel-header">
     <div>
-      <h1>Trips</h1>
+      <p class="eyebrow">The workspace</p>
+      <h1>Your trips</h1>
       <p class="panel-subtitle">Every trip in this workspace, ordered by start date.</p>
     </div>
-    <button type="button" class="button button--secondary" (click)="load()" [disabled]="loading()">
-      Refresh
-    </button>
+
+    <div class="panel-header__actions">
+      <button type="button" class="button button--secondary" (click)="load()" [disabled]="loading()">
+        Refresh
+      </button>
+    </div>
   </div>
 
   @if (error(); as message) {
@@ -16,39 +20,34 @@
     </div>
   }
 
-  <div class="layout">
-    <section class="card">
-      <header class="card-header">
-        <h2>Existing trips</h2>
-        <code>GET /api/trips</code>
-      </header>
-
-      @if (loading()) {
-        <p class="muted">Loading trips&hellip;</p>
-      } @else if (error()) {
-        <p class="muted">The trips could not be loaded.</p>
-      } @else if (trips().length === 0) {
-        <p class="muted">No trips yet. Create the first one.</p>
-      } @else {
-        <ul class="trip-list">
-          @for (trip of trips(); track trip.id) {
-            <li>
-              <a class="trip-link" [routerLink]="['/trips', trip.id]">
-                <app-trip-card [trip]="trip" />
-              </a>
-            </li>
-          }
-        </ul>
+  @if (loading()) {
+    <p class="visually-hidden">Loading trips</p>
+    <ul class="trip-grid" aria-busy="true">
+      @for (slot of skeletonSlots; track slot) {
+        <li class="trip-skeleton">
+          <span class="skeleton trip-skeleton__plate"></span>
+          <span class="skeleton trip-skeleton__line"></span>
+          <span class="skeleton trip-skeleton__line trip-skeleton__line--short"></span>
+        </li>
       }
-    </section>
-
-    <section class="card">
-      <header class="card-header">
-        <h2>Create a trip</h2>
-        <code>POST /api/trips</code>
-      </header>
-
-      <app-trip-create-form (created)="onTripCreated()" />
-    </section>
-  </div>
+    </ul>
+  } @else if (!error() && trips().length === 0) {
+    <div class="empty-state">
+      <span class="empty-state__monogram" aria-hidden="true">旅</span>
+      <h2 class="empty-state__title">No trips yet</h2>
+      <p class="empty-state__body">
+        Create the first one. Give it a name, a destination and the dates you have in mind.
+      </p>
+    </div>
+  } @else if (!error()) {
+    <ul class="trip-grid">
+      @for (trip of trips(); track trip.id) {
+        <li>
+          <a class="trip-link" [routerLink]="['/trips', trip.id]">
+            <app-trip-card [trip]="trip" />
+          </a>
+        </li>
+      }
+    </ul>
+  }
 </section>

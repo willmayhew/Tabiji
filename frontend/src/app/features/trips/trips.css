@@ -1,57 +1,71 @@
-.layout {
+.panel-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+/* Trip grid ------------------------------------------------------------ */
+
+.trip-grid {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
-  align-items: start;
-}
-
-@media screen and (max-width: 60rem) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  padding: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
-.card-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.card-header h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.trip-list {
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-md);
   margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
 }
 
 .trip-link {
   display: block;
-  padding: 0.75rem 0.85rem;
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  text-decoration: none;
+  height: 100%;
   color: inherit;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition:
+    --trip-card-border var(--dur-normal) var(--ease-standard),
+    --trip-card-shadow var(--dur-normal) var(--ease-standard),
+    --plate-scale var(--dur-slow) var(--ease-standard);
 }
 
+/**
+ * The card owns its own borders, so the hover treatment is passed down as
+ * custom properties rather than by restyling a child's internals.
+ */
 .trip-link:hover {
-  border-color: var(--color-forest);
-  background: var(--color-surface-sunk);
+  --trip-card-border: var(--color-forest);
+  --trip-card-shadow: var(--shadow-md);
+  --plate-scale: 1.04;
+}
+
+.trip-link:focus-visible {
+  --trip-card-border: var(--color-forest);
+}
+
+/* Loading skeletons ----------------------------------------------------- */
+
+.trip-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.trip-skeleton__plate {
+  display: block;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+}
+
+.trip-skeleton__line {
+  display: block;
+  height: 0.85rem;
+  width: 70%;
+}
+
+.trip-skeleton__line--short {
+  width: 40%;
 }

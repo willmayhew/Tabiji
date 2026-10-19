@@ -3,13 +3,14 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border: 1px solid var(--color-rule);
+  border: 1px solid var(--trip-card-border, var(--color-rule));
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  box-shadow: var(--trip-card-shadow, none);
   transition:
     border-color var(--dur-normal) var(--ease-standard),
-    transform var(--dur-normal) var(--ease-standard),
-    box-shadow var(--dur-normal) var(--ease-standard);
+    box-shadow var(--dur-normal) var(--ease-standard),
+    transform var(--dur-normal) var(--ease-standard);
 }
 
 .trip-card__plate {

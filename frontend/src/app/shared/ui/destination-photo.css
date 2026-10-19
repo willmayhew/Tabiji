@@ -10,6 +10,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transform: scale(var(--plate-scale, 1));
+  transition: transform var(--dur-slow) var(--ease-standard);
 }
 
 .destination-photo__fallback {
