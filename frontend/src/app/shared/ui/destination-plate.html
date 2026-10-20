@@ -1,0 +1,21 @@
+<div [class]="plateClass()" aria-hidden="true">
+  <svg class="plate__motif" [attr.viewBox]="viewBox()" focusable="false">
+    <path class="plate__graticule" [attr.d]="motif().graticule" />
+    <path class="plate__route" [attr.d]="motif().path" />
+    @for (node of motif().nodes; track $index) {
+      <circle
+        class="plate__node"
+        [class.plate__node--start]="$first"
+        [attr.cx]="node.x"
+        [attr.cy]="node.y"
+        r="1.4"
+      />
+    }
+  </svg>
+
+  <span class="plate__destination">{{ destination() }}</span>
+
+  @if (indexLabel(); as label) {
+    <span class="plate__index">{{ label }}</span>
+  }
+</div>

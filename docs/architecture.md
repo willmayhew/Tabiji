@@ -2,8 +2,14 @@
 
 ## 1. What Tabiji is
 
-Tabiji is a collaborative Japan trip planner. Friends create a trip, get invited into it,
-propose activities, vote on those proposals, discuss them, and settle on a shared itinerary.
+Tabiji is a collaborative travel planner. Friends create a trip, get invited into it,
+propose activities, vote on those proposals, discuss them, and settle on a shared
+itinerary.
+
+The product plans trips anywhere in the world. Its *identity* is Japanese travel
+editorial — the Tabiji name, the 旅 monogram, Fraunces and Inter, warm paper and forest
+green — but no part of the data or the domain assumes a trip is in Japan. The `destination`
+is free text and has always been free text; see §5.1.
 
 This document describes the technical foundation of the project. It describes what exists
 today, not the finished product.
@@ -128,6 +134,13 @@ Invariants, all enforced in the domain and all covered by unit tests:
 - the trip cannot end before it starts;
 - a new trip always starts in `Planning`.
 
+**The destination is free text and is treated as such.** It is trimmed, checked for
+blankness and length, and then stored as-is. Nothing in the domain, the DTOs, the
+persistence mapping or the API parses it, splits it or compares it against a list of
+countries, so a trip may be to `"Rome, Italy"`, `"Reykjavík, Ísland"` or `"東京, 日本"`
+without anything else changing. The `nvarchar(200)` column holds any Unicode, and there
+is no check constraint or foreign key on it.
+
 Invalid input raises `ArgumentException` with the offending parameter name. The API maps
 that to a `400` with an RFC 7807 problem document.
 
@@ -224,14 +237,14 @@ frontend/src/
     │   ├── api/                         HealthService, TripsService, http-error
     │   └── models/                      HealthReport, Trip
     ├── features/
-    │   ├── home/                        the landing page and the service status
+    │   ├── home/                        the landing page, the journey index and the status strip
     │   ├── trips/                       the trip list
     │   ├── trip-create/                 the create trip form and its page
     │   └── trip-detail/                 a single trip
     └── shared/
         ├── format/                      pure formatting helpers
-        ├── media/                       the destination photograph lookup
-        └── ui/                          StatusBadge, TripCard, DestinationPhoto
+        ├── media/                       the route motif generator
+        └── ui/                          StatusBadge, TripCard, DestinationPlate
 ```
 
 The rules:
@@ -259,11 +272,35 @@ surface. `--color-terracotta` is 4.4:1 on paper, so it is reserved for large tex
 and indicators, and `--color-terracotta-deep` exists for small text. `--color-sage` is
 3.1:1 and is never used for text at all.
 
-**Photography is a lookup, not a guess.** `Trip` has no image, so
-`resolveDestinationPhoto` maps the free text destination onto one of the photographs
-committed under `public/photos/`. A destination it does not recognise — a region such as
-"Kanto", say — resolves to nothing and the 旅 monogram is shown, because a photograph of
-the wrong place would be worse than no photograph.
+**There is no photography in the product.** The image policy is a hard rule, and it is
+enforced by the design as much as by the code:
+
+- no permanent decorative photograph anywhere, including the home page and the shared
+  components;
+- no *default destination image* — nothing is chosen by guessing from free text, and
+  there is no table mapping a destination to an asset of any kind;
+- no image asset is committed to the repository, and the application issues zero image
+  requests at runtime;
+- a trip renders a **plate**: a drawn panel carrying a ground, a faint graticule, a
+  route motif and the destination set in type.
+
+**A plate is drawn from the trip's id, never from its destination.**
+`shared/media/route-motif.ts` hashes the id into a route that travels across the plate
+and passes through three to six waypoints, and into the ground the plate is drawn on. The
+same trip always draws the same plate, and because the motif says nothing about the
+place, it can never be wrong about where the trip is. The plate is `aria-hidden`; the
+destination and the index are repeated as real text beside it, so a reader hears each
+fact exactly once.
+
+The contrast of a plate is fixed by its ground, because the ink is fixed by the ground:
+`--plate-ink-light` on the paper, sage and clay grounds (14.25:1, 13.47:1 and 13.53:1)
+and `--plate-ink-dark` on the forest ground (10.30:1). The route is drawn strongly
+enough to read as a line at around 4.8:1; the graticule is decoration and is allowed to
+stay faint. The destination carries a soft halo in the ground colour, so the route never
+cuts the type in half.
+
+**The trip detail page has no scrim, and no image-dependent contrast risk.** Its cover
+is a forest-ground band, so the type over it is always the same two colours.
 
 Form validation is owned by the feature, not by a library. In `features/trip-create/`,
 `trip-date-range.ts` holds a pure `validateTripDates` function and the `ValidatorFn` that
@@ -281,8 +318,8 @@ its own origin and there is no CORS preflight in the common path. A CORS policy 
 configured on the API for direct cross-origin calls.
 
 **The app makes no third party request at runtime.** Fraunces and Inter are self hosted
-under the SIL Open Font License and the photographs are committed to the repository, so
-the browser only ever talks to this origin.
+under the SIL Open Font License, and there are no image assets at all, so the browser
+only ever talks to this origin.
 
 ## 7. Cross-cutting decisions
 
@@ -327,7 +364,7 @@ developer and every build uses the same compiler.
 | Domain and use-case tests | `backend/Tabiji.Tests/TripTests.cs` | Invariants, validation, the service, the list order | No |
 | Health endpoint tests | `backend/Tabiji.Tests/HealthEndpointTests.cs` | The health probes, via `WebApplicationFactory` | No |
 | Trip endpoint tests | `backend/Tabiji.Tests/TripEndpointTests.cs` | The trip HTTP surface, via `WebApplicationFactory` | No |
-| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the date rule | No |
+| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the date rule, the route motif, the destination plate | No |
 
 `TabijiWebApplicationFactory` starts the real host in memory and supplies a connection
 string, but no connection is opened. The suite therefore passes on a machine with no SQL

@@ -5,14 +5,24 @@
     <p class="muted">Loading trip&hellip;</p>
   } @else if (notFound()) {
     <div class="empty-state">
-      <span class="empty-state__monogram" aria-hidden="true">旅</span>
+      <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+        <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+        <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+        <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+        <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+      </svg>
       <h1 class="empty-state__title">This trip has wandered off</h1>
       <p class="empty-state__body">That trip could not be found. It may have been removed.</p>
       <a class="button" routerLink="/trips">Back to your trips</a>
     </div>
   } @else if (error(); as message) {
     <div class="empty-state empty-state--danger">
-      <span class="empty-state__monogram" aria-hidden="true">旅</span>
+      <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+        <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+        <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+        <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+        <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+      </svg>
       <h1 class="empty-state__title">Something went wrong</h1>
       <p class="empty-state__body">{{ message }}</p>
       <button type="button" class="button" (click)="retryLoad()">Try again</button>
@@ -20,16 +30,18 @@
   } @else if (trip(); as found) {
     <article class="detail">
       <header class="detail__hero">
-        <app-destination-photo
+        <app-destination-plate
           class="detail__plate"
+          [seed]="found.id"
           [destination]="found.destination"
-          [lazy]="false"
-          tone="dark"
-          sizes="100vw"
+          tone="forest"
+          aspect="band"
         />
-        <div class="detail__hero-body">
-          <p class="eyebrow detail__eyebrow">{{ found.destination }}</p>
-          <h1 class="detail__name">{{ found.name }}</h1>
+      </header>
+
+      <div class="detail__masthead">
+        <h1 class="detail__name">{{ found.name }}</h1>
+        <div class="detail__facts">
           <p class="detail__meta">
             @if (dates(); as range) {
               <time [attr.datetime]="found.startsOn">{{ range.start }}</time>
@@ -42,9 +54,9 @@
               <time [attr.datetime]="found.endsOn">{{ found.endsOn }}</time>
             }
           </p>
-          <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" [inverse]="true" />
+          <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" />
         </div>
-      </header>
+      </div>
 
       <div class="detail__body">
         <div class="detail__details">
@@ -90,11 +102,20 @@
             This trip is the start of something bigger. These are on the way, so the whole group can
             shape it together:
           </p>
-          <ul class="detail__roadmap">
-            <li>Invitations, so everyone joins the same trip</li>
-            <li>Activity proposals and voting</li>
-            <li>A shared itinerary</li>
-          </ul>
+          <ol class="detail__roadmap">
+            <li>
+              <span class="detail__roadmap-index">01</span>
+              <span>Invitations, so everyone joins the same trip</span>
+            </li>
+            <li>
+              <span class="detail__roadmap-index">02</span>
+              <span>Activity proposals and voting</span>
+            </li>
+            <li>
+              <span class="detail__roadmap-index">03</span>
+              <span>A shared itinerary</span>
+            </li>
+          </ol>
         </aside>
       </div>
     </article>

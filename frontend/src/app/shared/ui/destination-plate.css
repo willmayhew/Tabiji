@@ -1,0 +1,6 @@
+/* The plate's own styling lives in the global stylesheet, because a shared
+   primitive that appears on more than one page belongs in one place. This
+   file holds the host box only. */
+:host {
+  display: block;
+}

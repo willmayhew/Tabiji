@@ -73,6 +73,39 @@ journal rather than an admin panel, built on the existing architecture.
 tests still pass, an axe audit reports no violations, and the type over
 the trip detail hero measures at least 4.5:1 against a white photograph.
 
+> **Superseded in part by Phase 0.8.** The ten curated Japan photographs and the
+> destination-to-photograph lookup introduced here have been removed. A trip is now drawn
+> as a plate generated from its id, so the product ships no image asset at all.
+
+---
+
+## Phase 0.8 — Worldwide travel and an image-free interface · **Done**
+
+Make Tabiji a planner for trips anywhere in the world, and give the interface a
+visual identity that does not depend on photographs. The brand stays Japanese; the data
+stops being Japanese.
+
+- [x] The destination confirmed to be free text end to end — domain, DTOs, EF mapping
+      and API — with no country list, no parsing and no constraint beyond its length
+- [x] The Japan-specific destination-to-photograph lookup removed, along with the ten
+      committed photographs and the `DestinationPhoto` component
+- [x] A plate system that replaces the photograph: a ground, a faint graticule, a route
+      motif and the destination set in type, drawn from the trip's id
+- [x] Every route rebuilt on the new system: a typographic home page with an original
+      SVG composition, an editorial trips grid with a featured leading entry, a
+      numbered create-trip form, and a trip detail spread with a forest-ground cover
+- [x] A journey index on the home page, fed by the real trips API
+- [x] The API health panel reduced to a quiet status strip
+- [x] Worldwide copy throughout, including the destination hint and the page titles
+- [x] The backend test fixtures generalised to a mixed worldwide set, with new tests
+      proving an international destination is accepted by the domain and the HTTP surface
+- [x] Accessibility: an axe audit reports zero violations on every route, one `h1` per
+      route, no horizontal overflow from 320px, and the focus ring verified in the browser
+
+**Exit criteria:** the product plans a trip to anywhere in the world, the repository
+contains no image asset, the application makes zero image requests, and the existing
+tests still pass.
+
 ---
 
 ## Phase 1 — Accounts, trips and membership

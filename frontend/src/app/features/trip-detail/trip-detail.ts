@@ -7,7 +7,7 @@ import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
 import { Trip, TripStatus } from '../../core/models/trip';
 import { formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
-import { DestinationPhoto } from '../../shared/ui/destination-photo';
+import { DestinationPlate } from '../../shared/ui/destination-plate';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 interface TripDetailResult {
@@ -18,7 +18,7 @@ interface TripDetailResult {
 
 @Component({
   selector: 'app-trip-detail',
-  imports: [DestinationPhoto, RouterLink, StatusBadge],
+  imports: [DestinationPlate, RouterLink, StatusBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-detail.html',
   styleUrl: './trip-detail.css',

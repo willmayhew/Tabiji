@@ -1,19 +1,9 @@
 <section class="panel">
   <section class="hero">
-    <div class="hero__plate">
-      <app-destination-photo
-        class="hero__image"
-        destination="Kyoto"
-        [lazy]="false"
-        sizes="100vw"
-      />
-      <span class="hero__mark" aria-hidden="true">旅</span>
-    </div>
-
     <div class="hero__body">
       <div class="hero__lead">
-        <p class="eyebrow">Collaborative Japan trip planner</p>
-        <h1>Plan Japan together.</h1>
+        <p class="eyebrow">A collaborative travel planner</p>
+        <h1>Plan the trip together.</h1>
         <p class="hero__lede">
           One place for a group of friends to agree on where to go, what to do and when. Start a
           trip, gather everyone, and settle the details side by side.
@@ -24,88 +14,144 @@
         </div>
       </div>
 
-      <ol class="hero__steps">
-        <li class="hero__step">
-          <span class="hero__step-number">01</span>
-          <div>
-            <h2>Create a trip</h2>
-            <p>Name it, choose the destination, set the dates everyone is free.</p>
-          </div>
-        </li>
-        <li class="hero__step">
-          <span class="hero__step-number">02</span>
-          <div>
-            <h2>Gather your people</h2>
-            <p>Everyone sees the same trip, the same dates and the same plan.</p>
-          </div>
-        </li>
-        <li class="hero__step">
-          <span class="hero__step-number">03</span>
-          <div>
-            <h2>Decide together</h2>
-            <p>Propose activities, vote on them, settle on a shared itinerary.</p>
-          </div>
-        </li>
-      </ol>
+      <div class="hero__composition">
+        <svg class="hero__map" viewBox="0 0 200 140" focusable="false" aria-hidden="true">
+          <path
+            class="hero__graticule"
+            d="M 32 0 L 32 140 M 68 0 L 68 140 M 104 0 L 104 140 M 140 0 L 140 140 M 176 0 L 176 140 M 0 34 L 200 34 M 0 70 L 200 70 M 0 106 L 200 106"
+          />
+          <path class="hero__route" d="M 14 118 C 42 92 56 116 84 84 S 132 40 158 56 S 186 74 192 46" />
+          <circle class="hero__node" cx="14" cy="118" r="2.4" />
+          <circle class="hero__node hero__node--end" cx="192" cy="46" r="2.4" />
+        </svg>
+        <span class="hero__mark" aria-hidden="true">旅</span>
+      </div>
     </div>
+
+    <ol class="hero__steps">
+      <li class="hero__step">
+        <span class="hero__step-number">01</span>
+        <div>
+          <h2>Create a trip</h2>
+          <p>Name it, choose the destination, set the dates everyone is free.</p>
+        </div>
+      </li>
+      <li class="hero__step">
+        <span class="hero__step-number">02</span>
+        <div>
+          <h2>Gather your people</h2>
+          <p>Everyone sees the same trip, the same dates and the same plan.</p>
+        </div>
+      </li>
+      <li class="hero__step">
+        <span class="hero__step-number">03</span>
+        <div>
+          <h2>Decide together</h2>
+          <p>Propose activities, vote on them, settle on a shared itinerary.</p>
+        </div>
+      </li>
+    </ol>
 
     <p class="hero__note">
       A trip can be created today. Invitations, proposals and voting are on the way.
     </p>
   </section>
 
-  <section class="status">
-    <div class="panel-header">
-      <div>
-        <p class="eyebrow">Service status</p>
-        <h2>API health</h2>
-        <p class="panel-subtitle">Live responses from the Tabiji API.</p>
+  <section class="journeys">
+    <div class="section-head">
+      <h2>Your journeys</h2>
+      @if (!tripsLoading() && !tripsError() && trips().length > 0) {
+        <p class="section-head__meta">The next three, earliest first</p>
+      }
+    </div>
+
+    @if (tripsLoading()) {
+      <p class="visually-hidden">Loading journeys</p>
+      <ul class="journey-list" aria-busy="true">
+        @for (slot of [0, 1, 2]; track slot) {
+          <li class="journey-list__row">
+            <span class="skeleton journey-list__skeleton-index"></span>
+            <span class="skeleton journey-list__skeleton-body"></span>
+            <span class="skeleton journey-list__skeleton-when"></span>
+          </li>
+        }
+      </ul>
+    } @else if (tripsError(); as message) {
+      <p class="muted">{{ message }}</p>
+    } @else if (trips().length === 0) {
+      <div class="journeys__empty">
+        <p class="muted">No journeys yet. The first one takes a name, a place and a pair of dates.</p>
+        <a class="link-arrow" routerLink="/trips/new">Plan your first trip</a>
       </div>
+    } @else {
+      <ul class="journey-list">
+        @for (trip of trips(); track trip.id; let index = $index) {
+          <li>
+            <a class="journey-list__row" [routerLink]="['/trips', trip.id]">
+              <span class="journey-list__index">{{ index + 1 < 10 ? '0' + (index + 1) : index + 1 }}</span>
+              <span class="journey-list__body">
+                <span class="journey-list__name">{{ trip.name }}</span>
+                <span class="journey-list__where">{{ trip.destination }}</span>
+              </span>
+              <span class="journey-list__when">
+                @if (dateRange(trip); as range) {
+                  {{ range }}
+                } @else {
+                  {{ trip.startsOn }}
+                }
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+      <p class="journeys__more">
+        <a class="link-arrow" routerLink="/trips">See every trip</a>
+      </p>
+    }
+  </section>
+
+  <section class="status">
+    <div class="status-strip">
+      <span class="status-strip__label eyebrow">API status</span>
+
+      @if (loading()) {
+        <span class="status-strip__item">Checking the API&hellip;</span>
+      } @else if (error(); as message) {
+        <app-status-badge label="Unreachable" tone="danger" />
+        <span class="status-strip__item">{{ message }}</span>
+      } @else {
+        @if (liveness(); as report) {
+          <span class="status-strip__item">
+            <code class="status-strip__endpoint">/health</code>
+            <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
+            <span class="status-strip__timing">{{ report.totalDurationMilliseconds }} ms</span>
+          </span>
+        } @else {
+          <span class="status-strip__item">
+            <code class="status-strip__endpoint">/health</code>
+            <app-status-badge label="Unreachable" tone="danger" />
+          </span>
+        }
+
+        @if (readiness(); as report) {
+          <span class="status-strip__item">
+            <code class="status-strip__endpoint">/health/ready</code>
+            <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
+            <span class="status-strip__timing">{{ report.totalDurationMilliseconds }} ms</span>
+          </span>
+        } @else {
+          <span class="status-strip__item">
+            <code class="status-strip__endpoint">/health/ready</code>
+            <app-status-badge label="Unreachable" tone="danger" />
+          </span>
+        }
+      }
+
+      <span class="status-strip__spacer"></span>
+
       <button type="button" class="button button--secondary" (click)="refresh()" [disabled]="loading()">
         Refresh
       </button>
     </div>
-
-    @if (loading()) {
-      <p class="muted">Checking the API&hellip;</p>
-    } @else if (error(); as message) {
-      <div class="callout callout--danger">
-        <app-status-badge label="Unreachable" tone="danger" />
-        <p>{{ message }}</p>
-      </div>
-    } @else {
-      <div class="probes">
-        <article class="probe">
-          <header class="probe__header">
-            <h3>Liveness</h3>
-            <code>GET /health</code>
-          </header>
-          @if (liveness(); as report) {
-            <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
-            <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
-          } @else {
-            <app-status-badge label="Unreachable" tone="danger" />
-            <p class="muted">The liveness probe did not answer.</p>
-          }
-        </article>
-
-        <article class="probe">
-          <header class="probe__header">
-            <h3>Readiness</h3>
-            <code>GET /health/ready</code>
-          </header>
-          @if (readiness(); as report) {
-            <app-status-badge [label]="report.status" [tone]="toneFor(report.status)" />
-            <p class="muted">Responded in {{ report.totalDurationMilliseconds }} ms.</p>
-            @for (check of report.checks; track check.name) {
-              <p class="muted">{{ check.name }}: {{ check.description }}</p>
-            }
-          } @else {
-            <app-status-badge label="Unreachable" tone="danger" />
-            <p class="muted">The readiness probe did not answer.</p>
-          }
-        </article>
-      </div>
-    }
   </section>
 </section>

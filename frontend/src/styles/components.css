@@ -282,6 +282,37 @@
   color: var(--color-rule-strong);
 }
 
+/* The route motif that stands in for a picture in an empty state. */
+.empty-state__motif {
+  width: 100%;
+  max-width: 16rem;
+  height: auto;
+  color: var(--color-rule-strong);
+}
+
+.empty-state__graticule {
+  fill: none;
+  stroke: var(--color-rule);
+  stroke-width: 0.4;
+}
+
+.empty-state__route {
+  fill: none;
+  stroke: var(--color-terracotta);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+
+.empty-state__node {
+  fill: var(--color-terracotta);
+  opacity: 0.8;
+}
+
+.empty-state__node--end {
+  fill: var(--color-forest);
+}
+
 .empty-state__title {
   margin: 0;
   font-family: var(--font-display);
@@ -337,4 +368,332 @@
   .skeleton::after {
     animation: none;
   }
+}
+
+/* Plates --------------------------------------------------------------
+   A plate is the image-free visual block that stands where a photograph
+   used to. It carries a ground, a faint graticule, a route motif and the
+   destination set in type.
+
+   The plate is decorative: its text is always repeated as real text
+   beside it, so the whole block is marked aria-hidden by the component
+   that renders it. The styles here therefore never carry information on
+   their own.                                                        */
+
+.plate {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  min-height: var(--plate-min-height);
+  background: var(--plate-ground);
+  color: var(--plate-ink);
+}
+
+.plate--paper {
+  --plate-ground: var(--plate-ground-paper);
+  --plate-ink: var(--plate-ink-light);
+  --plate-route: var(--plate-route-light);
+  --plate-rule: var(--plate-rule-light);
+}
+
+.plate--sage {
+  --plate-ground: var(--plate-ground-sage);
+  --plate-ink: var(--plate-ink-light);
+  --plate-route: var(--plate-route-light);
+  --plate-rule: var(--plate-rule-light);
+}
+
+.plate--clay {
+  --plate-ground: var(--plate-ground-clay);
+  --plate-ink: var(--plate-ink-light);
+  --plate-route: var(--plate-route-light);
+  --plate-rule: var(--plate-rule-light);
+}
+
+.plate--forest {
+  --plate-ground: var(--plate-ground-forest);
+  --plate-ink: var(--plate-ink-dark);
+  --plate-route: var(--plate-route-dark);
+  --plate-rule: var(--plate-rule-dark);
+}
+
+/* The shape of the plate. The view box in the component matches these
+   ratios exactly, so the drawing is never distorted. */
+.plate--card {
+  aspect-ratio: 4 / 3;
+}
+
+.plate--band {
+  aspect-ratio: 21 / 9;
+}
+
+.plate__motif {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The graticule: faint chart lines, never a real place. */
+.plate__graticule {
+  fill: none;
+  stroke: var(--plate-rule);
+  stroke-width: 0.3;
+  opacity: 0.55;
+}
+
+/* The route: the graphic signature of the plate. */
+.plate__route {
+  fill: none;
+  stroke: var(--plate-route);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
+}
+
+.plate__node {
+  fill: var(--plate-route);
+}
+
+.plate__node--start {
+  fill: var(--color-terracotta);
+}
+
+.plate__destination {
+  position: relative;
+  z-index: 1;
+  max-width: 90%;
+  padding-inline: var(--space-sm);
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 0.9rem + 1.6vw, 2.125rem);
+  font-weight: 600;
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-display);
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  /* A soft halo in the ground colour, so the route never cuts the
+     destination in half. The line stays a background, not a rule
+     through the type. */
+  text-shadow:
+    0 0 0.5rem var(--plate-ground),
+    0 0 1.1rem var(--plate-ground),
+    0 0 1.8rem var(--plate-ground);
+}
+
+.plate__index {
+  position: absolute;
+  top: var(--space-xs);
+  left: var(--space-xs);
+  z-index: 1;
+  font-family: var(--font-body);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--plate-route);
+}
+
+/* Index labels ------------------------------------------------------- */
+
+/* The small letterspaced number that marks a position in a sequence. */
+.index-label {
+  font-family: var(--font-body);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-terracotta-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section headings --------------------------------------------------- */
+
+/* A section opens with a hairline and a label, the way a printed page
+   opens a new movement. */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding-bottom: var(--space-2xs);
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.section-head__meta {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Journey list ------------------------------------------------------- */
+
+/* A ruled index of journeys, in the manner of a contents page. */
+.journey-list {
+  margin: 0;
+  padding: 0;
+  border-top: var(--rule-hairline) solid var(--color-rule);
+  list-style: none;
+}
+
+.journey-list__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
+  color: inherit;
+  text-decoration: none;
+}
+
+.journey-list__index {
+  color: var(--color-terracotta-deep);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-list__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4xs);
+  min-width: 0;
+}
+
+.journey-list__name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
+}
+
+.journey-list__where {
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.journey-list__when {
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* Status strip ------------------------------------------------------- */
+
+/* The API status, reduced to one hairline-ruled row. */
+.status-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding-block: var(--space-sm);
+  border-top: var(--rule-hairline) solid var(--color-rule);
+}
+
+.status-strip__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.status-strip__endpoint {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-ink-faint);
+}
+
+.status-strip__timing {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-strip__spacer {
+  flex: 1 1 auto;
+}
+
+/* Fieldsets ---------------------------------------------------------- */
+
+/* A numbered group of related fields. The index is a span, never a
+   label, so the count of labelled controls stays honest. */
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset__legend {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
+  padding: 0 0 var(--space-2xs);
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.fieldset__index {
+  color: var(--color-terracotta-deep);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  font-variant-numeric: tabular-nums;
+}
+
+.fieldset__hint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+/* Link arrows -------------------------------------------------------- */
+
+/* A text link that carries an arrow, for "see all" style actions. */
+.link-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  color: var(--color-forest);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.link-arrow::after {
+  content: '→';
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.link-arrow:hover::after {
+  transform: translateX(0.2em);
+}
+
+.link-arrow:hover {
+  color: var(--color-forest-deep);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }

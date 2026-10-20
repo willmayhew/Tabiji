@@ -113,4 +113,39 @@ describe('Trips', () => {
 
     expect(element().querySelectorAll('.trip-link')).toHaveLength(2);
   });
+
+  it('should promote the first trip to a feature band', () => {
+    fixture.detectChanges();
+
+    http.expectOne('/api/trips').flush([tokyo, kyoto]);
+    fixture.detectChanges();
+
+    const items = element().querySelectorAll('.trip-grid > li');
+
+    expect(items.length).toBe(2);
+    expect(items[0].classList.contains('trip-grid__item--feature')).toBe(true);
+    expect(items[1].classList.contains('trip-grid__item--feature')).toBe(false);
+  });
+
+  it('should number the trips from one', () => {
+    fixture.detectChanges();
+
+    http.expectOne('/api/trips').flush([tokyo, kyoto]);
+    fixture.detectChanges();
+
+    const indexes = element().querySelectorAll('.plate__index');
+
+    expect(indexes.length).toBe(2);
+    expect(indexes[0].textContent).toContain('No. 01');
+    expect(indexes[1].textContent).toContain('No. 02');
+  });
+
+  it('should not render an image in the grid', () => {
+    fixture.detectChanges();
+
+    http.expectOne('/api/trips').flush([tokyo, kyoto]);
+    fixture.detectChanges();
+
+    expect(element().querySelector('img')).toBeNull();
+  });
 });

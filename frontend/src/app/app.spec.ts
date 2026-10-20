@@ -52,4 +52,25 @@ describe('App', () => {
     expect(trips.getAttribute('aria-current')).toBe('page');
     expect(trips.classList.contains('is-active')).toBe(true);
   });
+
+  it('should offer a new trip action in the header', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const action = element.querySelector('.app-header__actions a') as HTMLAnchorElement;
+
+    expect(action).not.toBeNull();
+    expect(action.getAttribute('href')).toBe('/trips/new');
+  });
+
+  it('should keep the navigation free of the header action', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelectorAll('.app-nav a')).toHaveLength(2);
+    expect(element.querySelectorAll('.app-nav .button')).toHaveLength(0);
+  });
 });

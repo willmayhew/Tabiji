@@ -5,15 +5,22 @@
   gap: var(--space-2xs);
 }
 
-/* Trip grid ------------------------------------------------------------ */
+/* Trip grid ------------------------------------------------------------
+   The grid is deliberately uneven. The leading trip is set as a wide
+   band that spans two columns, and the rest follow as ordinary cards, so
+   the page reads as a composed spread rather than a wall of boxes. */
 
 .trip-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-md);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.trip-grid__item--feature {
+  grid-column: span 2;
 }
 
 .trip-link {
@@ -68,4 +75,23 @@
 
 .trip-skeleton__line--short {
   width: 40%;
+}
+
+/* Wider screens ------------------------------------------------------- */
+
+@media (max-width: 60rem) {
+  .trip-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 44rem) {
+  .trip-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* One column means the band has nothing to span across. */
+  .trip-grid__item--feature {
+    grid-column: span 1;
+  }
 }

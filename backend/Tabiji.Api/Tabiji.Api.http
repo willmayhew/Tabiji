@@ -13,8 +13,8 @@ POST {{Tabiji.Api_HostAddress}}/api/trips
 Content-Type: application/json
 
 {
-  "name": "Tokyo & Kyoto",
-  "destination": "Japan",
+  "name": "Rome & Amalfi",
+  "destination": "Italy",
   "startsOn": "2027-04-01",
   "endsOn": "2027-04-14"
 }

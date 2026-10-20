@@ -143,4 +143,27 @@ describe('TripDetail', () => {
 
     expect(back.getAttribute('href')).toBe('/trips');
   });
+
+  it('should render the header without an image', () => {
+    createComponent(trip.id);
+
+    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
+    fixture.detectChanges();
+
+    expect(element().querySelector('img')).toBeNull();
+    expect(element().querySelector('.detail__hero .plate')).not.toBeNull();
+  });
+
+  it('should show the trip name as the only heading', () => {
+    createComponent(trip.id);
+
+    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
+    fixture.detectChanges();
+
+    const headings = element().querySelectorAll('h1, h2, h3');
+
+    expect(element().querySelectorAll('h1')).toHaveLength(1);
+    expect(headings[0].tagName).toBe('H1');
+    expect(headings[0].textContent).toContain('Tokyo');
+  });
 });

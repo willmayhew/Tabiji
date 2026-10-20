@@ -6,31 +6,6 @@
   gap: var(--space-lg);
 }
 
-.hero__plate {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-sunk);
-}
-
-.hero__image {
-  aspect-ratio: 21 / 9;
-  min-height: 14rem;
-}
-
-.hero__mark {
-  position: absolute;
-  bottom: -0.12em;
-  left: 0.04em;
-  color: rgb(255 255 255 / 16%);
-  font-family: var(--font-display);
-  font-size: 9rem;
-  font-weight: 600;
-  line-height: 1;
-  pointer-events: none;
-  user-select: none;
-}
-
 .hero__body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -66,20 +41,76 @@
   margin-top: var(--space-2xs);
 }
 
+/* The composition that stands where a hero photograph used to. It is
+   drawn entirely in the browser: a chart grid, a route and a watermark. */
+.hero__composition {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 14rem;
+  padding: var(--space-lg);
+  overflow: hidden;
+  border: var(--rule-hairline) solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunk);
+}
+
+.hero__map {
+  width: 100%;
+  max-width: 26rem;
+  height: auto;
+}
+
+.hero__graticule {
+  fill: none;
+  stroke: var(--color-rule-strong);
+  stroke-width: 0.4;
+  opacity: 0.6;
+}
+
+.hero__route {
+  fill: none;
+  stroke: var(--color-forest);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.65;
+}
+
+.hero__node {
+  fill: var(--color-terracotta);
+}
+
+.hero__node--end {
+  fill: var(--color-forest);
+}
+
+.hero__mark {
+  position: absolute;
+  right: var(--space-sm);
+  bottom: -0.18em;
+  color: var(--color-rule);
+  font-family: var(--font-display);
+  font-size: 7rem;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+
 .hero__steps {
   display: flex;
   flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--color-rule);
+  border-top: var(--rule-hairline) solid var(--color-rule);
 }
 
 .hero__step {
   display: flex;
   gap: var(--space-sm);
   padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--color-rule);
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
 }
 
 .hero__step-number {
@@ -113,53 +144,56 @@
   letter-spacing: 0.02em;
 }
 
-/* Service status ------------------------------------------------------- */
+/* Journeys ------------------------------------------------------------ */
+
+.journeys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.journeys__empty {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  padding-block: var(--space-sm);
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
+}
+
+.journeys__more {
+  margin: 0;
+}
+
+/* Skeletons ------------------------------------------------------------ */
+
+.journey-list__skeleton-index {
+  display: block;
+  width: 1.25rem;
+  height: 0.7rem;
+}
+
+.journey-list__skeleton-body {
+  display: block;
+  width: 60%;
+  height: 1.1rem;
+}
+
+.journey-list__skeleton-when {
+  display: block;
+  width: 7rem;
+  height: 0.85rem;
+}
+
+/* Status --------------------------------------------------------------- */
 
 .status {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--color-rule);
+  padding-top: var(--space-md);
 }
 
-.status .panel-header h2 {
-  margin: var(--space-3xs) 0 0;
-  font-size: var(--text-xl);
-}
-
-.status .panel-subtitle {
-  margin-top: var(--space-3xs);
-  font-size: var(--text-sm);
-}
-
-.probes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
-  gap: var(--space-md);
-}
-
-.probe {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2xs);
-  padding: var(--space-md);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.probe__header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3xs);
-  margin-bottom: var(--space-3xs);
-}
-
-.probe__header h3 {
+.status-strip__label {
   margin: 0;
-  font-size: var(--text-lg);
 }
 
 /* Wider screens ------------------------------------------------------- */
@@ -168,16 +202,10 @@
   .hero__body {
     grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
     gap: var(--space-3xl);
-    align-items: start;
+    align-items: center;
   }
 
   .hero__steps {
     margin-top: var(--space-2xs);
-  }
-}
-
-@media (min-width: 72rem) {
-  .hero__image {
-    aspect-ratio: 21 / 8;
   }
 }

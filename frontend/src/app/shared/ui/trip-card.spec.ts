@@ -81,4 +81,38 @@ describe('TripCard', () => {
 
     expect(badge?.classList.contains('badge--neutral')).toBe(true);
   });
+
+  it('should not render an image', () => {
+    fixture.componentRef.setInput('trip', confirmed);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('img')).toBeNull();
+  });
+
+  it('should draw the plate from the trip id', () => {
+    fixture.componentRef.setInput('trip', confirmed);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const route = element.querySelector('.plate__route')?.getAttribute('d');
+
+    expect(route).toContain('M ');
+
+    fixture.componentRef.setInput('trip', { ...confirmed, id: 'a-different-trip-id' });
+    fixture.detectChanges();
+
+    expect(element.querySelector('.plate__route')?.getAttribute('d')).not.toBe(route);
+  });
+
+  it('should show the index on the plate', () => {
+    fixture.componentRef.setInput('trip', confirmed);
+    fixture.componentRef.setInput('index', 2);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('.plate__index')?.textContent).toContain('No. 02');
+  });
 });

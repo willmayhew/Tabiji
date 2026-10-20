@@ -1,13 +1,17 @@
 # Tabiji
 
-A collaborative Japan trip planner. Create a trip, invite your friends, propose
+A collaborative travel planner. Create a trip, invite your friends, propose
 activities, vote on them, discuss the details, and settle on a shared itinerary.
+
+Tabiji plans trips anywhere in the world. Its visual identity is Japanese travel
+editorial — warm paper, forest green, a Fraunces display serif and the 旅 monogram —
+and it is drawn entirely in type and line, with no photography anywhere in the product.
 
 This repository contains a .NET 10 modular monolith, an Angular 22 standalone SPA and a
 SQL Server database. The `Trip` slice is complete end to end: a trip can be created from the
 browser, listed, and opened, with an editorial interface built around it.
 
-> **Status:** Phase 0.75 of the roadmap. See [`docs/roadmap.md`](docs/roadmap.md) for what
+> **Status:** Phase 0.8 of the roadmap. See [`docs/roadmap.md`](docs/roadmap.md) for what
 > comes next and [`docs/architecture.md`](docs/architecture.md) for how the code is put
 > together.
 
@@ -177,8 +181,8 @@ curl http://localhost:5080/api/trips
 [
   {
     "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
-    "name": "Tokyo & Kyoto",
-    "destination": "Japan",
+    "name": "Rome & Amalfi",
+    "destination": "Italy",
     "startsOn": "2027-04-01",
     "endsOn": "2027-04-14",
     "status": "Planning"
@@ -191,19 +195,22 @@ Create a trip:
 ```bash
 curl -X POST http://localhost:5080/api/trips \
   -H "Content-Type: application/json" \
-  -d '{"name":"Tokyo & Kyoto","destination":"Japan","startsOn":"2027-04-01","endsOn":"2027-04-14"}'
+  -d '{"name":"Rome & Amalfi","destination":"Italy","startsOn":"2027-04-01","endsOn":"2027-04-14"}'
 ```
 
 ```json
 {
   "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
-  "name": "Tokyo & Kyoto",
-  "destination": "Japan",
+  "name": "Rome & Amalfi",
+  "destination": "Italy",
   "startsOn": "2027-04-01",
   "endsOn": "2027-04-14",
   "status": "Planning"
 }
 ```
+
+`destination` is free text of up to 200 characters. It is never parsed and never
+compared against a list of countries, so any place in the world is accepted.
 
 ---
 
@@ -250,8 +257,8 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 23 tests
-cd frontend && npm test           # 76 tests
+dotnet test backend/Tabiji.sln   # 28 tests
+cd frontend && npm test           # 100 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that
@@ -259,8 +266,8 @@ boot the real host in memory. **No test needs a running database** — the liven
 performs no I/O by design, and the readiness test asserts a well-formed report rather than
 a specific outcome.
 
-The frontend suite covers the root component and the two API clients with
-`HttpTestingController`.
+The frontend suite covers the root component, the two API clients, the date rule, the
+route motif, the destination plate and every screen.
 
 ---
 

@@ -1,9 +1,10 @@
-<article class="trip-card">
-  <app-destination-photo
+<article class="trip-card" [class.trip-card--band]="aspect() === 'band'">
+  <app-destination-plate
     class="trip-card__plate"
+    [seed]="trip().id"
     [destination]="trip().destination"
-    [lazy]="lazy()"
-    sizes="(min-width: 64rem) 21rem, (min-width: 40rem) 45vw, 92vw"
+    [index]="index()"
+    [aspect]="aspect()"
   />
 
   <div class="trip-card__body">

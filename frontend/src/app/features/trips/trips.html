@@ -3,7 +3,13 @@
     <div>
       <p class="eyebrow">The workspace</p>
       <h1>Your trips</h1>
-      <p class="panel-subtitle">Every trip in this workspace, ordered by start date.</p>
+      <p class="panel-subtitle">
+        @if (loading()) {
+          Every journey in this workspace, earliest first.
+        } @else {
+          {{ trips().length }} {{ trips().length === 1 ? 'journey' : 'journeys' }}, earliest first.
+        }
+      </p>
     </div>
 
     <div class="panel-header__actions">
@@ -34,7 +40,12 @@
     </ul>
   } @else if (!error() && trips().length === 0) {
     <div class="empty-state">
-      <span class="empty-state__monogram" aria-hidden="true">旅</span>
+      <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+        <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+        <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+        <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+        <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+      </svg>
       <h2 class="empty-state__title">No trips yet</h2>
       <p class="empty-state__body">
         Create the first one. Give it a name, a destination and the dates you have in mind.
@@ -45,9 +56,13 @@
     <h2 class="visually-hidden">Trips</h2>
     <ul class="trip-grid">
       @for (trip of trips(); track trip.id; let first = $first) {
-        <li>
+        <li [class.trip-grid__item--feature]="first">
           <a class="trip-link" [routerLink]="['/trips', trip.id]">
-            <app-trip-card [trip]="trip" [lazy]="!first" />
+            <app-trip-card
+              [trip]="trip"
+              [index]="$index + 1"
+              [aspect]="first ? 'band' : 'card'"
+            />
           </a>
         </li>
       }

@@ -2,7 +2,27 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { Trip } from '../../core/models/trip';
 import { Home } from './home';
+
+const journeys: Trip[] = [
+  {
+    id: '11111111-1111-1111-1111-111111111111',
+    name: 'Rome & Amalfi',
+    destination: 'Italy',
+    startsOn: '2027-05-01',
+    endsOn: '2027-05-12',
+    status: 'Planning',
+  },
+  {
+    id: '22222222-2222-2222-2222-222222222222',
+    name: 'Reykjavík & the Ring Road',
+    destination: 'Iceland',
+    startsOn: '2027-06-02',
+    endsOn: '2027-06-08',
+    status: 'Confirmed',
+  },
+];
 
 describe('Home', () => {
   let fixture: ComponentFixture<Home>;
@@ -35,10 +55,15 @@ describe('Home', () => {
     });
   }
 
+  function expectTrips(trips: Trip[] = []): void {
+    http.expectOne('/api/trips').flush(trips);
+  }
+
   it('should load the health reports', () => {
     fixture.detectChanges();
 
     expectHealthRequests();
+    expectTrips();
     fixture.detectChanges();
 
     expect(element().textContent).toContain('Healthy');
@@ -48,6 +73,7 @@ describe('Home', () => {
     fixture.detectChanges();
 
     expectHealthRequests();
+    expectTrips();
     fixture.detectChanges();
 
     const refresh = element().querySelector('button') as HTMLButtonElement;
@@ -65,8 +91,41 @@ describe('Home', () => {
 
     http.expectOne('/health').error(new ProgressEvent('error'), { status: 0 });
     http.expectOne('/health/ready').error(new ProgressEvent('error'), { status: 0 });
+    http.expectOne('/api/trips').error(new ProgressEvent('error'), { status: 0 });
     fixture.detectChanges();
 
     expect(element().textContent).toContain('The Tabiji API is not reachable');
+  });
+
+  it('should list the journeys', () => {
+    fixture.detectChanges();
+
+    expectHealthRequests();
+    expectTrips(journeys);
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Rome & Amalfi');
+    expect(element().textContent).toContain('Iceland');
+    expect(element().querySelectorAll('.journey-list__row')).toHaveLength(2);
+  });
+
+  it('should show an empty state when there are no journeys', () => {
+    fixture.detectChanges();
+
+    expectHealthRequests();
+    expectTrips();
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('No journeys yet');
+  });
+
+  it('should render no image', () => {
+    fixture.detectChanges();
+
+    expectHealthRequests();
+    expectTrips(journeys);
+    fixture.detectChanges();
+
+    expect(element().querySelector('img')).toBeNull();
   });
 });

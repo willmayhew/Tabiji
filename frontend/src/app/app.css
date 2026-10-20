@@ -108,6 +108,14 @@
   font-weight: 600;
 }
 
+/* The header action sits outside the navigation so the nav stays a list of
+   places rather than a list of places and a button. */
+.app-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
 /* Main ---------------------------------------------------------------- */
 
 .app-main {
@@ -144,7 +152,7 @@
   font-family: var(--font-display);
   font-size: var(--text-md);
   font-weight: 600;
-  color: var(--color-rule-strong);
+  color: var(--color-ink-faint);
   line-height: 1;
 }
 
@@ -162,5 +170,12 @@
 
   .app-nav {
     gap: var(--space-sm);
+  }
+
+  /* At this width the brand, the two links and an action crowd the bar.
+     Every page carries its own create action, so the header one steps
+     aside rather than squeeze the navigation. */
+  .app-header__actions {
+    display: none;
   }
 }

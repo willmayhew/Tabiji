@@ -1,21 +1,26 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 import { HealthService } from '../../core/api/health.service';
+import { describeHttpError } from '../../core/api/http-error';
+import { TripsService } from '../../core/api/trips.service';
 import { HealthReport, HealthStatus } from '../../core/models/health-status';
-import { DestinationPhoto } from '../../shared/ui/destination-photo';
+import { Trip } from '../../core/models/trip';
+import { formatTripDates } from '../../shared/format/trip-dates';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 @Component({
   selector: 'app-home',
-  imports: [DestinationPhoto, RouterLink, StatusBadge],
+  imports: [RouterLink, StatusBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './home.html',
   styleUrl: './home.css',
 })
 export class Home {
   private readonly healthService = inject(HealthService);
+  private readonly tripsService = inject(TripsService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly liveness = signal<HealthReport | null>(null);
@@ -23,8 +28,14 @@ export class Home {
   protected readonly error = signal<string | null>(null);
   protected readonly loading = signal(true);
 
+  /** The journeys in the workspace, for the index under the masthead. */
+  protected readonly trips = signal<Trip[]>([]);
+  protected readonly tripsLoading = signal(true);
+  protected readonly tripsError = signal<string | null>(null);
+
   constructor() {
     this.refresh();
+    this.loadTrips();
   }
 
   protected refresh(): void {
@@ -46,6 +57,37 @@ export class Home {
         );
         this.loading.set(false);
       });
+  }
+
+  /**
+   * Loads the journeys shown in the index.
+   *
+   * The index is a separate concern from the health probes, so it has its
+   * own state. A failure here never takes the status strip down with it.
+   */
+  protected loadTrips(): void {
+    this.tripsLoading.set(true);
+    this.tripsError.set(null);
+
+    this.tripsService
+      .list()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (trips) => {
+          this.trips.set(trips.slice(0, 3));
+          this.tripsLoading.set(false);
+        },
+        error: (failure: HttpErrorResponse) => {
+          this.tripsError.set(describeHttpError(failure));
+          this.tripsLoading.set(false);
+        },
+      });
+  }
+
+  protected dateRange(trip: Trip): string | null {
+    const range = formatTripDates(trip.startsOn, trip.endsOn);
+
+    return range === null ? null : range.label;
   }
 
   protected toneFor(status: HealthStatus): BadgeTone {

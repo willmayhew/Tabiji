@@ -1,64 +1,90 @@
 <form class="form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-  <div class="field">
-    <label class="field-label" for="trip-name">Name</label>
-    <input
-      id="trip-name"
-      type="text"
-      formControlName="name"
-      [attr.maxlength]="nameMaxLength"
-      autocomplete="off"
-      [attr.aria-invalid]="errorFor('name') ? 'true' : null"
-      [attr.aria-describedby]="errorFor('name') ? 'trip-name-error' : null"
-    />
-    @if (errorFor('name'); as message) {
-      <p class="field-error" id="trip-name-error">{{ message }}</p>
-    }
-  </div>
-
-  <div class="field">
-    <label class="field-label" for="trip-destination">Destination</label>
-    <input
-      id="trip-destination"
-      type="text"
-      formControlName="destination"
-      [attr.maxlength]="destinationMaxLength"
-      autocomplete="off"
-      [attr.aria-invalid]="errorFor('destination') ? 'true' : null"
-      [attr.aria-describedby]="errorFor('destination') ? 'trip-destination-error' : 'trip-destination-hint'"
-    />
-    <p class="field-hint" id="trip-destination-hint">The place you are going, such as Kyoto.</p>
-    @if (errorFor('destination'); as message) {
-      <p class="field-error" id="trip-destination-error">{{ message }}</p>
-    }
-  </div>
-
-  <div class="form-row">
-    <div class="field">
-      <label class="field-label" for="trip-starts-on">Starts on</label>
-      <input
-        id="trip-starts-on"
-        type="date"
-        formControlName="startsOn"
-        [attr.aria-describedby]="dateDescribedBy('startsOn')"
-      />
-      <p class="field-hint" id="trip-starts-on-hint">First day</p>
-    </div>
+  <fieldset class="fieldset">
+    <legend class="fieldset__legend">
+      <span class="fieldset__index">01</span>
+      <span>Name</span>
+      <span class="fieldset__hint">What you will call this trip</span>
+    </legend>
 
     <div class="field">
-      <label class="field-label" for="trip-ends-on">Ends on</label>
+      <label class="field-label" for="trip-name">Trip name</label>
       <input
-        id="trip-ends-on"
-        type="date"
-        formControlName="endsOn"
-        [attr.aria-describedby]="dateDescribedBy('endsOn')"
+        id="trip-name"
+        type="text"
+        formControlName="name"
+        [attr.maxlength]="nameMaxLength"
+        autocomplete="off"
+        [attr.aria-invalid]="errorFor('name') ? 'true' : null"
+        [attr.aria-describedby]="errorFor('name') ? 'trip-name-error' : null"
       />
-      <p class="field-hint" id="trip-ends-on-hint">Last day</p>
+      @if (errorFor('name'); as message) {
+        <p class="field-error" id="trip-name-error">{{ message }}</p>
+      }
     </div>
-  </div>
+  </fieldset>
 
-  @if (dateRangeError(); as message) {
-    <p class="field-error" id="trip-dates-error">{{ message }}</p>
-  }
+  <fieldset class="fieldset">
+    <legend class="fieldset__legend">
+      <span class="fieldset__index">02</span>
+      <span>Destination</span>
+      <span class="fieldset__hint">A city, a region or a country</span>
+    </legend>
+
+    <div class="field">
+      <label class="field-label" for="trip-destination">Where to</label>
+      <input
+        id="trip-destination"
+        type="text"
+        formControlName="destination"
+        [attr.maxlength]="destinationMaxLength"
+        autocomplete="off"
+        [attr.aria-invalid]="errorFor('destination') ? 'true' : null"
+        [attr.aria-describedby]="errorFor('destination') ? 'trip-destination-error' : 'trip-destination-hint'"
+      />
+      <p class="field-hint" id="trip-destination-hint">
+        The place you are going, such as Rome, Patagonia or Iceland.
+      </p>
+      @if (errorFor('destination'); as message) {
+        <p class="field-error" id="trip-destination-error">{{ message }}</p>
+      }
+    </div>
+  </fieldset>
+
+  <fieldset class="fieldset">
+    <legend class="fieldset__legend">
+      <span class="fieldset__index">03</span>
+      <span>Dates</span>
+      <span class="fieldset__hint">The first and the last day</span>
+    </legend>
+
+    <div class="form-row">
+      <div class="field">
+        <label class="field-label" for="trip-starts-on">Starts on</label>
+        <input
+          id="trip-starts-on"
+          type="date"
+          formControlName="startsOn"
+          [attr.aria-describedby]="dateDescribedBy('startsOn')"
+        />
+        <p class="field-hint" id="trip-starts-on-hint">First day</p>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="trip-ends-on">Ends on</label>
+        <input
+          id="trip-ends-on"
+          type="date"
+          formControlName="endsOn"
+          [attr.aria-describedby]="dateDescribedBy('endsOn')"
+        />
+        <p class="field-hint" id="trip-ends-on-hint">Last day</p>
+      </div>
+    </div>
+
+    @if (dateRangeError(); as message) {
+      <p class="field-error" id="trip-dates-error">{{ message }}</p>
+    }
+  </fieldset>
 
   @if (error(); as message) {
     <p class="field-error field-error--api" role="alert">{{ message }}</p>

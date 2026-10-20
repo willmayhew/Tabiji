@@ -2,8 +2,13 @@
 
 ## Project overview
 
-Tabiji is a collaborative Japan trip planner: users create trips, invite friends, propose
+Tabiji is a collaborative travel planner: users create trips, invite friends, propose
 activities, vote on proposals, discuss them, and build a shared itinerary.
+
+The product plans trips anywhere in the world. The *identity* is Japanese travel
+editorial — the Tabiji name, the 旅 monogram, Fraunces and Inter, warm paper and forest
+green — but nothing in the data or the domain assumes a trip is in Japan. `destination`
+is free text of up to 200 characters and is never parsed or matched against a list.
 
 This repository is a **monorepo** containing a .NET 10 backend and an Angular 22
 frontend. The backend is a **modular monolith**: one deployable API, split into four
@@ -154,6 +159,11 @@ npm test
   Pin the package to a patched version instead.
 - Do not build out the roadmap features ahead of their phase. See `docs/roadmap.md`.
 - Do not deploy anything or provision cloud resources from this repository.
+- Do not add photography, decorative imagery, or a destination-to-asset lookup. The
+  product ships no image asset and makes zero image requests; a trip is drawn as a plate
+  by `shared/media/route-motif.ts`, generated from the trip's id. See the image policy in
+  `docs/architecture.md`.
+- Do not assume a trip is in Japan. The `destination` is free text and must stay that way.
 
 ## Before opening a pull request
 

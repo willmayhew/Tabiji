@@ -26,7 +26,7 @@ src/
 ├── styles/
 │   ├── tokens.css        design tokens: colour, type, space, radius, shadow
 │   ├── base.css          element defaults, focus ring, reduced motion
-│   ├── components.css    shared primitives: .button, .field, .card, .callout
+│   ├── components.css    shared primitives: .button, .field, .card, .callout, .plate
 │   └── utilities.css     a small set of single purpose helpers
 ├── app/
 │   ├── core/
@@ -35,11 +35,10 @@ src/
 │   ├── features/          home/, trips/, trip-create/, trip-detail/ — one folder per screen
 │   └── shared/
 │       ├── format/        pure formatting helpers, e.g. trip dates
-│       ├── media/         the destination photograph lookup
+│       ├── media/         the route motif generator
 │       └── ui/            reusable presentational components
 └── public/
-    ├── fonts/             self hosted Fraunces and Inter, with their OFL licences
-    └── photos/            the Japan photographs, with CREDITS.md
+    └── fonts/             self hosted Fraunces and Inter, with their OFL licences
 ```
 
 The design system lives in the global stylesheets rather than in component
@@ -57,10 +56,11 @@ stylesheet is for that component's layout; anything shared belongs in
 - **Fonts are self hosted.** Fraunces for display, Inter for body, both
   under the SIL Open Font License. The app makes no request to a third
   party at runtime.
-- **Photographs come from the destination.** `resolveDestinationPhoto` maps
-  a trip's free text destination to one of the committed photographs, and
-  falls back to the 旅 monogram when it cannot. It never guesses, so a
-  region such as "Kanto" gets no photograph rather than a misleading one.
+- **There is no photography.** The product ships no image asset and makes
+  zero image requests. A trip is drawn as a *plate* — a ground, a faint
+  graticule, a route motif and the destination set in type — generated from
+  the trip's id by `route-motif.ts`. Nothing selects media by guessing from
+  the destination text, and there is no destination-to-asset table.
 
 ## Scripts
 

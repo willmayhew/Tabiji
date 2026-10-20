@@ -59,6 +59,20 @@ describe('TripCreate', () => {
     }
   });
 
+  it('should number the field groups', () => {
+    const indexes = [...element().querySelectorAll('.fieldset__index')] as HTMLElement[];
+
+    expect(indexes.length).toBe(3);
+    expect(indexes.map((index) => index.textContent?.trim())).toEqual(['01', '02', '03']);
+  });
+
+  it('should not assume the trip is in Japan', () => {
+    const hint = element().querySelector('#trip-destination-hint')?.textContent ?? '';
+
+    expect(hint).toContain('Rome');
+    expect(hint).not.toContain('Kyoto');
+  });
+
   it('should link back to the trips list', () => {
     const back = element().querySelector('.back-link') as HTMLAnchorElement;
 

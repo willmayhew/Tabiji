@@ -10,7 +10,7 @@ namespace Tabiji.Tests;
 
 public sealed class TripEndpointTests : IDisposable
 {
-    private static readonly string[] ExpectedListOrder = ["Hakone", "Tokyo", "Kyoto"];
+    private static readonly string[] ExpectedListOrder = ["Reykjavík", "Rome", "Kyoto"];
 
     // The API serialises enums as strings, so the test client needs the same options.
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -50,13 +50,13 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListAsync()).First(trip => trip.Name == "Tokyo").Id;
+        var id = (await _factory.Repository.ListAsync()).First(trip => trip.Name == "Rome").Id;
 
         var trip = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
 
         Assert.NotNull(trip);
-        Assert.Equal("Tokyo", trip.Name);
-        Assert.Equal("Kanto", trip.Destination);
+        Assert.Equal("Rome", trip.Name);
+        Assert.Equal("Italy", trip.Destination);
     }
 
     [Fact]
@@ -75,8 +75,8 @@ public sealed class TripEndpointTests : IDisposable
         using var client = _factory.CreateClient();
 
         var request = new CreateTripRequest(
-            "Osaka",
-            "Kansai",
+            "Lisbon",
+            "Portugal",
             new DateOnly(2027, 5, 1),
             new DateOnly(2027, 5, 3));
 
@@ -88,7 +88,8 @@ public sealed class TripEndpointTests : IDisposable
         Assert.NotNull(payload);
 
         var created = payload!;
-        Assert.Equal("Osaka", created.Name);
+        Assert.Equal("Lisbon", created.Name);
+        Assert.Equal("Portugal", created.Destination);
         Assert.Equal(TripStatus.Planning, created.Status);
 
         var trips = await client.GetFromJsonAsync<TripResponse[]>("/api/trips", JsonOptions);
@@ -97,16 +98,38 @@ public sealed class TripEndpointTests : IDisposable
         Assert.Contains(trips, trip => trip.Id == created.Id);
     }
 
+    [Fact]
+    public async Task Create_AcceptsAnInternationalDestination()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Rome & Amalfi",
+            "Rome, Italy",
+            new DateOnly(2027, 6, 1),
+            new DateOnly(2027, 6, 12));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(payload);
+
+        Assert.Equal("Rome & Amalfi", payload!.Name);
+        Assert.Equal("Rome, Italy", payload.Destination);
+    }
+
     [Theory]
     [InlineData("   ", "2027-05-01", "2027-05-03")]
-    [InlineData("Osaka", "2027-05-03", "2027-05-01")]
+    [InlineData("Lisbon", "2027-05-03", "2027-05-01")]
     public async Task Create_ReturnsBadRequestForAnInvalidTrip(string name, string startsOn, string endsOn)
     {
         using var client = _factory.CreateClient();
 
         var request = new CreateTripRequest(
             name,
-            "Kansai",
+            "Portugal",
             DateOnly.Parse(startsOn, CultureInfo.InvariantCulture),
             DateOnly.Parse(endsOn, CultureInfo.InvariantCulture));
 

@@ -37,10 +37,15 @@ internal sealed class TripApiFactory : TabijiWebApplicationFactory
         });
     }
 
+    /// <summary>
+    /// The seed trips. They deliberately travel to more than one country, so the
+    /// ordering rule and the destination rules are exercised against a set that
+    /// does not assume every trip is in Japan.
+    /// </summary>
     private static Trip[] DefaultSeed =>
     [
-        Trip.Create("Kyoto", "Kansai", new DateOnly(2027, 4, 10), new DateOnly(2027, 4, 14), CreatedAt),
-        Trip.Create("Tokyo", "Kanto", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 8), CreatedAt),
-        Trip.Create("Hakone", "Kanto", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 3), CreatedAt)
+        Trip.Create("Kyoto", "Japan", new DateOnly(2027, 4, 10), new DateOnly(2027, 4, 14), CreatedAt),
+        Trip.Create("Rome", "Italy", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 8), CreatedAt),
+        Trip.Create("Reykjavík", "Iceland", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 3), CreatedAt)
     ];
 }
