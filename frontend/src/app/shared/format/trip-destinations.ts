@@ -7,16 +7,6 @@ import { TripDestination } from '../../core/models/trip';
 export const ROUTE_SEPARATOR = '→';
 
 /**
- * The first stop of a route, which is where the journey starts.
- *
- * Returns null for a trip that has no stops, which can happen for a trip
- * whose legacy destination was blank.
- */
-export function firstDestination(destinations: readonly TripDestination[]): string | null {
-  return destinations.length === 0 ? null : destinations[0].name;
-}
-
-/**
  * The route as one line: "Rome → Amalfi → Naples".
  *
  * Past `max` stops the rest are counted rather than listed, so a long route

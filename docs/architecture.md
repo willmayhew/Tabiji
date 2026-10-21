@@ -568,14 +568,13 @@ place, it can never be wrong about where the trip is. The plate is `aria-hidden`
 label and the index are repeated as real text beside it, so a reader hears each
 fact exactly once.
 
-**A plate carries a label.** On a card the label is the **title of the trip**, so that a list
-says which journey each card is at a glance. On the trip page the label is the **first stop**,
-because the plate's route motif is the beginning of the journey and the body beside it sets out
-the whole route.
+**A plate carries a label: the title of the trip.** On a card it says which journey each
+card is at a glance, and on the trip page it titles the cover band. The motif is drawn from
+the trip's id and says nothing about the place, so the label can be the trip's own name
+without the plate ever being wrong about where the trip is.
 
-A trip with no stops at all — a legacy trip whose destination was blank — renders the motif
-with no label on the trip page and an explicit *"No destinations recorded"* line, never a blank
-gap.
+A trip with no stops at all — a legacy trip whose destination was blank — still renders the
+motif with a label and an explicit *"No destinations recorded"* line, never a blank gap.
 
 **The route is one list, used twice.** The `.route` primitives in `components.css` draw a
 numbered stop joined to the next by a hairline. The editor uses them to *build* a route

@@ -208,6 +208,29 @@ describe('TripDetail', () => {
     expect(headings[0].textContent).toContain('Rome & Amalfi');
   });
 
+  it('should label the plate with the title of the trip', () => {
+    showTrip();
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('.detail__plate .plate__label')?.textContent).toContain(
+      'Rome & Amalfi',
+    );
+  });
+
+  it('should follow the name in the editor', () => {
+    startEditing();
+
+    const name = element().querySelector('#trip-name') as HTMLInputElement;
+    name.value = 'Italia';
+    name.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(element().querySelector('.detail__plate .plate__label')?.textContent).toContain(
+      'Italia',
+    );
+  });
+
   it('should let the reader change the trip', () => {
     startEditing();
 

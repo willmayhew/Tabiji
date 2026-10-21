@@ -15,7 +15,7 @@ import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
 import { Trip, TripDestination, TripStatus } from '../../core/models/trip';
 import { formatDestinationDates, formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
-import { firstDestination, routeSummary } from '../../shared/format/trip-destinations';
+import { routeSummary } from '../../shared/format/trip-destinations';
 import { TripForm } from '../../shared/form/trip-form';
 import { DestinationPlate } from '../../shared/ui/destination-plate';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
@@ -139,26 +139,26 @@ export class TripDetail {
   });
 
   /**
-   * Where the journey starts, which is what the cover band is labelled with.
+   * The title of the trip, which is what the cover band is labelled with.
    *
-   * While the trip is being changed the label follows the first stop in the
-   * editor, so the plate keeps up with the reader.
+   * While the trip is being changed the label follows the name in the
+   * editor, so the plate keeps up with the reader. A form control is not a
+   * signal, so this is a method rather than a computed: it is asked again on
+   * every pass of change detection.
    */
-  protected readonly origin = computed(() => {
+  protected title(): string | null {
     const form = this.tripForm();
 
     if (this.editing() && form) {
-      const name = form.form.controls.destinations.at(0)?.controls.name.value.trim();
+      const name = form.form.controls.name.value.trim();
 
       if (name) {
         return name;
       }
     }
 
-    const found = this.trip();
-
-    return found === null ? null : firstDestination(found.destinations);
-  });
+    return this.trip()?.name ?? null;
+  }
 
   /** How many stops the route has, in words. */
   protected readonly routeSummary = computed(() => {

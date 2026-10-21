@@ -1,21 +1,11 @@
 import { TripDestination } from '../../core/models/trip';
-import { firstDestination, routeLabel, routeSummary } from './trip-destinations';
+import { routeLabel, routeSummary } from './trip-destinations';
 
 const route: TripDestination[] = [
   { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null },
   { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
   { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null },
 ];
-
-describe('firstDestination', () => {
-  it('should give the first stop', () => {
-    expect(firstDestination(route)).toBe('Rome');
-  });
-
-  it('should give nothing when there are no stops', () => {
-    expect(firstDestination([])).toBeNull();
-  });
-});
 
 describe('routeLabel', () => {
   it('should join the stops with an arrow', () => {
