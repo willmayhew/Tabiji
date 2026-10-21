@@ -27,3 +27,30 @@ SELECT t.[Name] AS Trip, t.[Destination] AS LegacyValue, d.[SortOrder], d.[Name]
 FROM [Trips] t
 LEFT JOIN [TripDestinations] d ON d.[TripId] = t.[Id]
 ORDER BY t.[StartsOn], t.[Name], d.[SortOrder];
+
+PRINT '--- 5. Stops whose dates fall outside their trip (expected: 0 rows) ---';
+SELECT t.[Name] AS Trip, d.[Name] AS Stop, d.[StartsOn], d.[EndsOn]
+FROM [TripDestinations] d
+JOIN [Trips] t ON t.[Id] = d.[TripId]
+WHERE (d.[StartsOn] IS NOT NULL AND (d.[StartsOn] < t.[StartsOn] OR d.[StartsOn] > t.[EndsOn]))
+   OR (d.[EndsOn]   IS NOT NULL AND (d.[EndsOn]   < t.[StartsOn] OR d.[EndsOn]   > t.[EndsOn]));
+
+PRINT '--- 6. Stops that end before they start (expected: 0 rows) ---';
+SELECT t.[Name] AS Trip, d.[Name] AS Stop, d.[StartsOn], d.[EndsOn]
+FROM [TripDestinations] d
+JOIN [Trips] t ON t.[Id] = d.[TripId]
+WHERE d.[StartsOn] IS NOT NULL AND d.[EndsOn] IS NOT NULL AND d.[EndsOn] < d.[StartsOn];
+
+PRINT '--- 7. Stops whose dates contradict the order of the route (expected: 0 rows) ---';
+WITH [Ranked] AS (
+    SELECT d.[TripId], d.[Name], d.[SortOrder], d.[StartsOn], d.[EndsOn],
+           MAX(ISNULL(d.[EndsOn], d.[StartsOn])) OVER (
+               PARTITION BY d.[TripId]
+               ORDER BY d.[SortOrder]
+               ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS [Floor]
+    FROM [TripDestinations] d
+)
+SELECT t.[Name] AS Trip, r.[Name] AS Stop, r.[StartsOn], r.[EndsOn], r.[Floor]
+FROM [Ranked] r
+JOIN [Trips] t ON t.[Id] = r.[TripId]
+WHERE r.[Floor] IS NOT NULL AND r.[StartsOn] IS NOT NULL AND r.[StartsOn] < r.[Floor];

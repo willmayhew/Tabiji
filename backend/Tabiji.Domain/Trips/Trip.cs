@@ -54,7 +54,7 @@ public sealed class Trip
 
     public static Trip Create(
         string name,
-        IReadOnlyList<string> destinations,
+        IReadOnlyList<TripDestinationDraft> destinations,
         DateOnly startsOn,
         DateOnly endsOn,
         DateTimeOffset createdAt)
@@ -64,12 +64,21 @@ public sealed class Trip
 
         EnsureEndIsNotBeforeStart(startsOn, endsOn);
 
+        TripSchedule.EnsureChronological(startsOn, endsOn, validatedDestinations);
+
         var trip = new Trip(Guid.NewGuid(), validatedName, startsOn, endsOn, createdAt);
 
         for (var index = 0; index < validatedDestinations.Count; index += 1)
         {
+            var destination = validatedDestinations[index];
+
             trip._destinations.Add(
-                TripDestination.Create(trip.Id, validatedDestinations[index], index));
+                TripDestination.Create(
+                    trip.Id,
+                    destination.Name,
+                    destination.StartsOn,
+                    destination.EndsOn,
+                    index));
         }
 
         return trip;
@@ -89,13 +98,83 @@ public sealed class Trip
     }
 
     /// <summary>
+    /// Applies a whole new route to the trip: its name, its dates and its
+    /// ordered stops, with their names and their optional dates.
+    ///
+    /// Everything is checked first. Nothing is changed until the whole route
+    /// has been accepted, so a rejected update leaves the trip exactly as it
+    /// was.
+    ///
+    /// A draft that names a stop keeps that stop and its identity. A draft
+    /// with no identity is a new stop. A stop the drafts leave out is
+    /// removed.
+    /// </summary>
+    public void ApplyRoute(
+        string name,
+        DateOnly startsOn,
+        DateOnly endsOn,
+        IReadOnlyList<TripDestinationDraft> destinations)
+    {
+        var validatedName = ValidateName(name);
+        var validatedDestinations = ValidateDestinations(destinations);
+
+        EnsureEndIsNotBeforeStart(startsOn, endsOn);
+
+        TripSchedule.EnsureChronological(startsOn, endsOn, validatedDestinations);
+
+        var existing = _destinations.ToDictionary(destination => destination.Id);
+
+        // A draft that names a stop this trip does not have is a mistake, not
+        // a new stop: the caller asked to change a stop that has gone.
+        foreach (var destination in validatedDestinations)
+        {
+            if (destination.Id is Guid id && !existing.ContainsKey(id))
+            {
+                throw new ArgumentException(
+                    "The trip does not have that destination.",
+                    nameof(destinations));
+            }
+        }
+
+        // Only now is anything changed.
+        Name = validatedName;
+        StartsOn = startsOn;
+        EndsOn = endsOn;
+
+        var route = new List<TripDestination>(validatedDestinations.Count);
+
+        foreach (var destination in validatedDestinations)
+        {
+            if (destination.Id is Guid id && existing.TryGetValue(id, out var kept))
+            {
+                kept.Rename(destination.Name);
+                kept.Schedule(destination.StartsOn, destination.EndsOn);
+                route.Add(kept);
+                continue;
+            }
+
+            route.Add(
+                TripDestination.Create(
+                    Id,
+                    destination.Name,
+                    destination.StartsOn,
+                    destination.EndsOn,
+                    route.Count));
+        }
+
+        _destinations.Clear();
+        _destinations.AddRange(route);
+        Renumber();
+    }
+
+    /// <summary>
     /// Appends a stop to the end of the route.
     /// </summary>
     public void AddDestination(string name)
     {
         EnsureThereIsRoomForAnotherDestination();
 
-        _destinations.Add(TripDestination.Create(Id, name, _destinations.Count));
+        _destinations.Add(TripDestination.Create(Id, name, null, null, _destinations.Count));
     }
 
     /// <summary>
@@ -198,12 +277,14 @@ public sealed class Trip
 
     /// <summary>
     /// Checks the route as a whole: there must be at least one stop, there
-    /// must not be too many, and no stop may be blank.
+    /// must not be too many, no stop may be blank, and no stop may be named
+    /// twice.
     ///
     /// The same place may appear twice. A route that visits Rome on the way
     /// out and again on the way home is a round trip, not a mistake.
     /// </summary>
-    private static List<string> ValidateDestinations(IReadOnlyList<string> destinations)
+    private static List<TripDestinationDraft> ValidateDestinations(
+        IReadOnlyList<TripDestinationDraft> destinations)
     {
         if (destinations is null || destinations.Count == 0)
         {
@@ -217,16 +298,24 @@ public sealed class Trip
                 nameof(destinations));
         }
 
-        var validated = new List<string>(destinations.Count);
+        var seen = new HashSet<Guid>();
+        var validated = new List<TripDestinationDraft>(destinations.Count);
 
         foreach (var destination in destinations)
         {
-            if (string.IsNullOrWhiteSpace(destination))
+            if (destination.Id is Guid id && !seen.Add(id))
+            {
+                throw new ArgumentException(
+                    "A destination may appear only once.",
+                    nameof(destinations));
+            }
+
+            if (string.IsNullOrWhiteSpace(destination.Name))
             {
                 throw new ArgumentException("The trip destination name is required.", nameof(destinations));
             }
 
-            var trimmed = destination.Trim();
+            var trimmed = destination.Name.Trim();
 
             if (trimmed.Length > TripDestination.NameMaxLength)
             {
@@ -235,7 +324,7 @@ public sealed class Trip
                     nameof(destinations));
             }
 
-            validated.Add(trimmed);
+            validated.Add(destination with { Name = trimmed });
         }
 
         return validated;

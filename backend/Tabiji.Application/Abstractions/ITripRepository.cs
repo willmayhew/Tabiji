@@ -17,4 +17,10 @@ public interface ITripRepository
     /// then by name.
     /// </summary>
     Task<IReadOnlyList<Trip>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Writes the trip and its route back, in one go, so that a trip is never
+    /// left half changed.
+    /// </summary>
+    Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default);
 }

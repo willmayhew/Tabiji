@@ -6,6 +6,10 @@ namespace Tabiji.Domain.Trips;
 /// A destination belongs to exactly one trip and carries its place in that
 /// trip's order. The name is free text so that any place in the world can be
 /// named; it is never parsed and never compared against a list of countries.
+///
+/// The dates describe the planned stay at the stop. Both are optional: a
+/// stop can be added long before its dates are known, and either one can be
+/// left out on its own.
 /// </summary>
 public sealed class TripDestination
 {
@@ -15,11 +19,19 @@ public sealed class TripDestination
     {
     }
 
-    private TripDestination(Guid id, Guid tripId, string name, int sortOrder)
+    private TripDestination(
+        Guid id,
+        Guid tripId,
+        string name,
+        DateOnly? startsOn,
+        DateOnly? endsOn,
+        int sortOrder)
     {
         Id = id;
         TripId = tripId;
         Name = name;
+        StartsOn = startsOn;
+        EndsOn = endsOn;
         SortOrder = sortOrder;
     }
 
@@ -28,6 +40,18 @@ public sealed class TripDestination
     public Guid TripId { get; private set; }
 
     public string Name { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// The planned first day at this stop. Null when the day has not been
+    /// decided yet.
+    /// </summary>
+    public DateOnly? StartsOn { get; private set; }
+
+    /// <summary>
+    /// The planned last day at this stop. Null when the day has not been
+    /// decided yet.
+    /// </summary>
+    public DateOnly? EndsOn { get; private set; }
 
     /// <summary>
     /// The position of this stop on its trip's route, counting from zero.
@@ -39,7 +63,12 @@ public sealed class TripDestination
     /// allowed to make one, and it is the only thing that can give it a place
     /// on a route.
     /// </summary>
-    internal static TripDestination Create(Guid tripId, string name, int sortOrder)
+    internal static TripDestination Create(
+        Guid tripId,
+        string name,
+        DateOnly? startsOn,
+        DateOnly? endsOn,
+        int sortOrder)
     {
         if (sortOrder < 0)
         {
@@ -48,7 +77,32 @@ public sealed class TripDestination
                 nameof(sortOrder));
         }
 
-        return new TripDestination(Guid.NewGuid(), tripId, ValidateName(name), sortOrder);
+        return new TripDestination(
+            Guid.NewGuid(),
+            tripId,
+            ValidateName(name),
+            startsOn,
+            endsOn,
+            sortOrder);
+    }
+
+    /// <summary>
+    /// Gives this stop a new name. Internal because only the owning trip
+    /// decides what its stops are called.
+    /// </summary>
+    internal void Rename(string name)
+    {
+        Name = ValidateName(name);
+    }
+
+    /// <summary>
+    /// Sets the planned stay at this stop. Either date may be left out.
+    /// Internal because only the owning trip decides the schedule.
+    /// </summary>
+    internal void Schedule(DateOnly? startsOn, DateOnly? endsOn)
+    {
+        StartsOn = startsOn;
+        EndsOn = endsOn;
     }
 
     /// <summary>

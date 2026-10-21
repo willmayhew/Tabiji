@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Tabiji.Domain.Trips;
 using Tabiji.Infrastructure.Persistence;
 
@@ -96,6 +98,42 @@ public sealed class TripDestinationConfigurationTests
         Assert.Equal(
             [nameof(TripDestination.TripId), nameof(TripDestination.SortOrder)],
             index.Properties.Select(property => property.Name));
+    }
+
+    [Theory]
+    [InlineData(nameof(TripDestination.StartsOn))]
+    [InlineData(nameof(TripDestination.EndsOn))]
+    public void TripDestination_DatesAreOptional(string propertyName)
+    {
+        using var context = CreateContext();
+
+        var entity = context.Model.FindEntityType(typeof(TripDestination));
+        var property = entity?.FindProperty(propertyName);
+
+        // A stop may be added before its dates are known, and either date
+        // may be left out on its own.
+        Assert.NotNull(property);
+        Assert.True(property.IsNullable);
+        Assert.Equal("date", property.GetColumnType());
+    }
+
+    [Fact]
+    public void TripDestination_CannotEndBeforeItStarts()
+    {
+        using var context = CreateContext();
+
+        // The check constraints are not part of the runtime model, so the
+        // design time model is the one that holds them.
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var entity = model.FindEntityType(typeof(TripDestination));
+        var constraint = entity?.GetCheckConstraints()
+            .SingleOrDefault(candidate => candidate.Name == "CK_TripDestinations_Dates");
+
+        // A belt-and-braces guard on a single row. The domain is the
+        // authority on this, and the rule that spans the whole route cannot
+        // be written in SQL at all.
+        Assert.NotNull(constraint);
+        Assert.Contains("[EndsOn] >= [StartsOn]", constraint.Sql);
     }
 
     [Fact]

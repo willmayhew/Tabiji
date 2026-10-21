@@ -8,7 +8,15 @@ public sealed class TripDestinationConfiguration : IEntityTypeConfiguration<Trip
 {
     public void Configure(EntityTypeBuilder<TripDestination> builder)
     {
-        builder.ToTable("TripDestinations");
+        builder.ToTable("TripDestinations", table =>
+        {
+            // A belt-and-braces guard on a single row: a stop may not end
+            // before it starts. The domain is the authority on this, and the
+            // rule that spans the whole route cannot be written in SQL at all.
+            table.HasCheckConstraint(
+                "CK_TripDestinations_Dates",
+                "[StartsOn] IS NULL OR [EndsOn] IS NULL OR [EndsOn] >= [StartsOn]");
+        });
 
         builder.HasKey(destination => destination.Id);
 
@@ -24,6 +32,14 @@ public sealed class TripDestinationConfiguration : IEntityTypeConfiguration<Trip
 
         builder.Property(destination => destination.SortOrder)
             .IsRequired();
+
+        // The planned stay at the stop. Either date may be left out: a stop
+        // can be added long before its dates are known.
+        builder.Property(destination => destination.StartsOn)
+            .IsRequired(false);
+
+        builder.Property(destination => destination.EndsOn)
+            .IsRequired(false);
 
         // A trip can never hold two stops in the same position. The index also
         // covers the foreign key lookup, so one index does both jobs.

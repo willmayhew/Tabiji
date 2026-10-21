@@ -35,6 +35,39 @@ public static class TripEndpoints
             .WithName("CreateTrip")
             .WithSummary("Creates a new trip.");
 
+        group.MapPut(
+            "/{id:guid}",
+            async (
+                Guid id,
+                UpdateTripRequest request,
+                TripService tripService,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var trip = await tripService.UpdateAsync(id, request, cancellationToken);
+
+                    IResult result = trip is null
+                        ? Results.Problem(
+                            title: "Trip not found",
+                            statusCode: StatusCodes.Status404NotFound)
+                        : Results.Ok(trip);
+
+                    return result;
+                }
+                catch (ArgumentException exception)
+                {
+                    IResult result = Results.Problem(
+                        title: "Invalid trip",
+                        detail: exception.Message,
+                        statusCode: StatusCodes.Status400BadRequest);
+
+                    return result;
+                }
+            })
+            .WithName("UpdateTrip")
+            .WithSummary("Updates a trip and its route.");
+
         group.MapGet(
             "/",
             async (TripService tripService, CancellationToken cancellationToken) =>

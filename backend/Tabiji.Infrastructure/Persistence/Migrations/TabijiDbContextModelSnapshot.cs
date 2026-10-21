@@ -61,6 +61,9 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateOnly?>("EndsOn")
+                        .HasColumnType("date");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -68,6 +71,9 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
+
+                    b.Property<DateOnly?>("StartsOn")
+                        .HasColumnType("date");
 
                     b.Property<Guid>("TripId")
                         .HasColumnType("uniqueidentifier");
@@ -77,7 +83,10 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                     b.HasIndex("TripId", "SortOrder")
                         .IsUnique();
 
-                    b.ToTable("TripDestinations", (string)null);
+                    b.ToTable("TripDestinations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TripDestinations_Dates", "[StartsOn] IS NULL OR [EndsOn] IS NULL OR [EndsOn] >= [StartsOn]");
+                        });
                 });
 
             modelBuilder.Entity("Tabiji.Domain.Trips.TripDestination", b =>

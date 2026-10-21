@@ -9,14 +9,57 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         CreateTripRequest request,
         CancellationToken cancellationToken = default)
     {
+        var destinations = (request.Destinations ?? [])
+            .Select(destination => new TripDestinationDraft(
+                null,
+                destination.Name,
+                destination.StartsOn,
+                destination.EndsOn))
+            .ToArray();
+
         var trip = Trip.Create(
             request.Name,
-            request.Destinations ?? [],
+            destinations,
             request.StartsOn,
             request.EndsOn,
             timeProvider.GetUtcNow());
 
         await repository.AddAsync(trip, cancellationToken);
+
+        return ToResponse(trip);
+    }
+
+    /// <summary>
+    /// Applies a whole trip to an existing one.
+    ///
+    /// The route is checked in full before anything is changed, so a request
+    /// the domain refuses leaves the trip exactly as it was.
+    ///
+    /// Returns null when there is no such trip.
+    /// </summary>
+    public async Task<TripResponse?> UpdateAsync(
+        Guid id,
+        UpdateTripRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var trip = await repository.GetByIdAsync(id, cancellationToken);
+
+        if (trip is null)
+        {
+            return null;
+        }
+
+        var destinations = (request.Destinations ?? [])
+            .Select(destination => new TripDestinationDraft(
+                destination.Id,
+                destination.Name,
+                destination.StartsOn,
+                destination.EndsOn))
+            .ToArray();
+
+        trip.ApplyRoute(request.Name, request.StartsOn, request.EndsOn, destinations);
+
+        await repository.UpdateAsync(trip, cancellationToken);
 
         return ToResponse(trip);
     }
@@ -44,7 +87,12 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         trip.Name,
         trip.Destinations
             .OrderBy(destination => destination.SortOrder)
-            .Select(destination => new TripDestinationResponse(destination.Name, destination.SortOrder))
+            .Select(destination => new TripDestinationResponse(
+                destination.Id,
+                destination.Name,
+                destination.SortOrder,
+                destination.StartsOn,
+                destination.EndsOn))
             .ToArray(),
         trip.StartsOn,
         trip.EndsOn,

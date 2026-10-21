@@ -21,6 +21,8 @@ internal sealed class FakeTripRepository : ITripRepository
 
     public int AddCallCount { get; private set; }
 
+    public int UpdateCallCount { get; private set; }
+
     public Task AddAsync(Trip trip, CancellationToken cancellationToken = default)
     {
         _trips[trip.Id] = trip;
@@ -42,5 +44,13 @@ internal sealed class FakeTripRepository : ITripRepository
             .ToArray();
 
         return Task.FromResult<IReadOnlyList<Trip>>(ordered);
+    }
+
+    public Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default)
+    {
+        _trips[trip.Id] = trip;
+        UpdateCallCount++;
+
+        return Task.CompletedTask;
     }
 }

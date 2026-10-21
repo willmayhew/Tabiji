@@ -9,6 +9,6 @@ namespace Tabiji.Application.Trips;
 /// </summary>
 public sealed record CreateTripRequest(
     string Name,
-    IReadOnlyList<string>? Destinations,
+    IReadOnlyList<TripDestinationRequest>? Destinations,
     DateOnly StartsOn,
     DateOnly EndsOn);
