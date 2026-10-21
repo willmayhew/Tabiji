@@ -13,11 +13,11 @@
     }
   </svg>
 
-  @if (label(); as text) {
-    <span class="plate__destination">{{ text }}</span>
+  @if (text(); as caption) {
+    <span class="plate__label">{{ caption }}</span>
   }
 
-  @if (indexLabel(); as label) {
-    <span class="plate__index">{{ label }}</span>
+  @if (indexLabel(); as number) {
+    <span class="plate__index">{{ number }}</span>
   }
 </div>

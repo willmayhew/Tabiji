@@ -565,14 +565,17 @@ enforced by the design as much as by the code:
 and passes through three to six waypoints, and into the ground the plate is drawn on. The
 same trip always draws the same plate, and because the motif says nothing about the
 place, it can never be wrong about where the trip is. The plate is `aria-hidden`; the
-destination and the index are repeated as real text beside it, so a reader hears each
+label and the index are repeated as real text beside it, so a reader hears each
 fact exactly once.
 
-**A plate is labelled with the first stop.** The plate's route motif is the beginning of
-the journey, so it carries the first destination, and the body beside it sets out the
-whole route. A trip with no stops at all — a legacy trip whose destination was blank —
-renders the motif with no label and an explicit *"No destinations recorded"* line, never
-a blank gap.
+**A plate carries a label.** On a card the label is the **title of the trip**, so that a list
+says which journey each card is at a glance. On the trip page the label is the **first stop**,
+because the plate's route motif is the beginning of the journey and the body beside it sets out
+the whole route.
+
+A trip with no stops at all — a legacy trip whose destination was blank — renders the motif
+with no label on the trip page and an explicit *"No destinations recorded"* line, never a blank
+gap.
 
 **The route is one list, used twice.** The `.route` primitives in `components.css` draw a
 numbered stop joined to the next by a hairline. The editor uses them to *build* a route

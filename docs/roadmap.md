@@ -162,6 +162,8 @@ gives the traveller the pen.
       leaves a page with an unsaved change
 - [x] The schedule is read back honestly: a stop without dates says so, and the route
       says how much of it has been decided
+- [x] The plate on a card carries the title of the trip rather than the first stop, so
+      that a list of trips says which journey each card is
 
 **Exit criteria:** a stop can be given the days of its stay, a route that contradicts
 itself is refused with a message that says why, and a trip can be changed in place with

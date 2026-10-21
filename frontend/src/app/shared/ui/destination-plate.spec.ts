@@ -9,7 +9,7 @@ describe('DestinationPlate', () => {
   });
 
   function render(
-    destination: string | null,
+    label: string | null,
     options: {
       seed?: string;
       index?: number | null;
@@ -19,7 +19,7 @@ describe('DestinationPlate', () => {
   ): HTMLElement {
     const fixture = TestBed.createComponent(DestinationPlate);
     fixture.componentRef.setInput('seed', options.seed ?? 'a-trip-id');
-    fixture.componentRef.setInput('destination', destination);
+    fixture.componentRef.setInput('label', label);
 
     if (options.index !== undefined) {
       fixture.componentRef.setInput('index', options.index);
@@ -38,10 +38,10 @@ describe('DestinationPlate', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('should set the destination in type', () => {
+  it('should set the label in type', () => {
     const element = render('Kyoto');
 
-    expect(element.querySelector('.plate__destination')?.textContent).toContain('Kyoto');
+    expect(element.querySelector('.plate__label')?.textContent).toContain('Kyoto');
   });
 
   it('should draw the route motif', () => {
@@ -115,17 +115,17 @@ describe('DestinationPlate', () => {
     expect(render('Kyoto').querySelector('.plate')?.classList.contains('plate--card')).toBe(true);
   });
 
-  it('should show no label when there is no destination', () => {
+  it('should show no label when there is none', () => {
     const element = render(null);
 
-    expect(element.querySelector('.plate__destination')).toBeNull();
+    expect(element.querySelector('.plate__label')).toBeNull();
     expect(element.querySelector('.plate__route')).not.toBeNull();
   });
 
   it('should trim a very long label', () => {
     const element = render('x'.repeat(120));
 
-    const label = element.querySelector('.plate__destination')?.textContent ?? '';
+    const label = element.querySelector('.plate__label')?.textContent ?? '';
 
     expect(label.length).toBeLessThan(50);
     expect(label.endsWith('…')).toBe(true);

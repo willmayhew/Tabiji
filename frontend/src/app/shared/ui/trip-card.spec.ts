@@ -46,13 +46,13 @@ describe('TripCard', () => {
     expect(route?.textContent).toContain('Rome → Amalfi → Naples');
   });
 
-  it('should label the plate with the first stop', () => {
+  it('should label the plate with the title of the trip', () => {
     fixture.componentRef.setInput('trip', confirmed);
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector('.plate__destination')?.textContent).toContain('Rome');
+    expect(element.querySelector('.plate__label')?.textContent).toContain('Rome & Amalfi');
   });
 
   it('should count the stops it does not have room for', () => {
@@ -82,7 +82,7 @@ describe('TripCard', () => {
     expect(element.querySelector('.trip-card__route')?.textContent).toContain(
       'No destinations recorded',
     );
-    expect(element.querySelector('.plate__destination')).toBeNull();
+    expect(element.querySelector('.plate__label')?.textContent).toContain('Rome & Amalfi');
   });
 
   it('should keep the machine readable dates on the time elements', () => {

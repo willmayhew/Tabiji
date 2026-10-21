@@ -17,14 +17,16 @@ const MAX_LABEL_LENGTH = 48;
 /**
  * The plate that stands where a photograph used to.
  *
- * A plate carries a ground, a faint graticule, a route motif and the
- * destination set in type. The motif is derived from the seed — the trip's
- * id — so every trip draws its own and no trip can be shown a picture of the
- * wrong place.
+ * A plate carries a ground, a faint graticule, a route motif and a label set
+ * in type. The motif is derived from the seed — the trip's id — so every trip
+ * draws its own and no trip can be shown a picture of the wrong place.
  *
- * The whole block is decorative. The destination and the index are always
- * repeated as real text beside the plate, so the plate is marked
- * `aria-hidden` and the reader hears each fact exactly once.
+ * The label is whatever the page wants said: the first stop of the journey on
+ * the trip page, the title of the trip on a card.
+ *
+ * The whole block is decorative. The label and the index are always repeated
+ * as real text beside the plate, so the plate is marked `aria-hidden` and the
+ * reader hears each fact exactly once.
  */
 @Component({
   selector: 'app-destination-plate',
@@ -36,8 +38,8 @@ export class DestinationPlate {
   /** What the motif is drawn from — the trip's id. */
   readonly seed = input.required<string>();
 
-  /** The destination, set in type on the plate. */
-  readonly destination = input<string | null>(null);
+  /** The label, set in type on the plate. */
+  readonly label = input<string | null>(null);
 
   /** The position of the trip in a list, shown as "No. 03". */
   readonly index = input<number | null>(null);
@@ -70,16 +72,16 @@ export class DestinationPlate {
     () => `plate plate--${this.resolvedTone()} plate--${this.aspect()}`,
   );
 
-  protected readonly label = computed(() => {
-    const destination = this.destination();
+  protected readonly text = computed(() => {
+    const label = this.label();
 
-    if (destination === null || destination.length === 0) {
+    if (label === null || label.length === 0) {
       return null;
     }
 
-    return destination.length <= MAX_LABEL_LENGTH
-      ? destination
-      : `${destination.slice(0, MAX_LABEL_LENGTH - 1).trimEnd()}…`;
+    return label.length <= MAX_LABEL_LENGTH
+      ? label
+      : `${label.slice(0, MAX_LABEL_LENGTH - 1).trimEnd()}…`;
   });
 
   protected readonly indexLabel = computed(() => {
