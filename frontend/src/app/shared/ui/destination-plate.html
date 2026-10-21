@@ -13,7 +13,9 @@
     }
   </svg>
 
-  <span class="plate__destination">{{ destination() }}</span>
+  @if (label(); as text) {
+    <span class="plate__destination">{{ text }}</span>
+  }
 
   @if (indexLabel(); as label) {
     <span class="plate__index">{{ label }}</span>

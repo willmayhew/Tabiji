@@ -34,6 +34,21 @@ public sealed class TripEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task List_ReturnsTheDestinationsOfEveryTripInOrder()
+    {
+        using var client = _factory.CreateClient();
+
+        var trips = await client.GetFromJsonAsync<TripResponse[]>("/api/trips", JsonOptions);
+
+        Assert.NotNull(trips);
+
+        var rome = trips.Single(trip => trip.Name == "Rome");
+
+        Assert.Equal(["Rome", "Amalfi", "Naples"], rome.Destinations.Select(d => d.Name));
+        Assert.Equal([0, 1, 2], rome.Destinations.Select(d => d.SortOrder));
+    }
+
+    [Fact]
     public async Task List_ReturnsAnEmptyArrayWhenThereAreNoTrips()
     {
         using var emptyFactory = new TripApiFactory([]);
@@ -56,7 +71,7 @@ public sealed class TripEndpointTests : IDisposable
 
         Assert.NotNull(trip);
         Assert.Equal("Rome", trip.Name);
-        Assert.Equal("Italy", trip.Destination);
+        Assert.Equal(["Rome", "Amalfi", "Naples"], trip.Destinations.Select(d => d.Name));
     }
 
     [Fact]
@@ -76,7 +91,7 @@ public sealed class TripEndpointTests : IDisposable
 
         var request = new CreateTripRequest(
             "Lisbon",
-            "Portugal",
+            ["Lisbon", "Porto", "Faro"],
             new DateOnly(2027, 5, 1),
             new DateOnly(2027, 5, 3));
 
@@ -89,7 +104,7 @@ public sealed class TripEndpointTests : IDisposable
 
         var created = payload!;
         Assert.Equal("Lisbon", created.Name);
-        Assert.Equal("Portugal", created.Destination);
+        Assert.Equal(["Lisbon", "Porto", "Faro"], created.Destinations.Select(d => d.Name));
         Assert.Equal(TripStatus.Planning, created.Status);
 
         var trips = await client.GetFromJsonAsync<TripResponse[]>("/api/trips", JsonOptions);
@@ -105,7 +120,7 @@ public sealed class TripEndpointTests : IDisposable
 
         var request = new CreateTripRequest(
             "Rome & Amalfi",
-            "Rome, Italy",
+            ["Rome, Italy", "Amalfi, Italy"],
             new DateOnly(2027, 6, 1),
             new DateOnly(2027, 6, 12));
 
@@ -117,7 +132,7 @@ public sealed class TripEndpointTests : IDisposable
         Assert.NotNull(payload);
 
         Assert.Equal("Rome & Amalfi", payload!.Name);
-        Assert.Equal("Rome, Italy", payload.Destination);
+        Assert.Equal(["Rome, Italy", "Amalfi, Italy"], payload.Destinations.Select(d => d.Name));
     }
 
     [Theory]
@@ -129,9 +144,61 @@ public sealed class TripEndpointTests : IDisposable
 
         var request = new CreateTripRequest(
             name,
-            "Portugal",
+            ["Lisbon", "Porto"],
             DateOnly.Parse(startsOn, CultureInfo.InvariantCulture),
             DateOnly.Parse(endsOn, CultureInfo.InvariantCulture));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_ReturnsBadRequestWhenThereAreNoDestinations()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Lisbon",
+            [],
+            new DateOnly(2027, 5, 1),
+            new DateOnly(2027, 5, 3));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_ReturnsBadRequestWhenADestinationIsBlank()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Lisbon",
+            ["Lisbon", "   "],
+            new DateOnly(2027, 5, 1),
+            new DateOnly(2027, 5, 3));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_ReturnsBadRequestWhenThereAreTooManyDestinations()
+    {
+        using var client = _factory.CreateClient();
+
+        var destinations = Enumerable.Range(1, Trip.MaxDestinationCount + 1)
+            .Select(index => $"Stop {index}")
+            .ToArray();
+
+        var request = new CreateTripRequest(
+            "Too many stops",
+            destinations,
+            new DateOnly(2027, 5, 1),
+            new DateOnly(2027, 5, 3));
 
         var response = await client.PostAsJsonAsync("/api/trips", request);
 

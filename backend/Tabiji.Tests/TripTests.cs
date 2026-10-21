@@ -11,29 +11,37 @@ public sealed class TripTests
     private static readonly DateTimeOffset CreatedAt = new(2026, 10, 19, 9, 0, 0, TimeSpan.Zero);
     private static readonly string[] ExpectedListOrder = ["Reykjavík", "Rome", "Kyoto"];
 
+    private static readonly string[] Route = ["Rome", "Amalfi", "Naples"];
+
     [Fact]
     public void Create_TrimsValuesAndStartsInPlanning()
     {
-        var trip = Trip.Create("  Rome & Amalfi  ", "  Italy  ", StartsOn, EndsOn, CreatedAt);
+        var trip = Trip.Create("  Rome & Amalfi  ", ["  Italy  "], StartsOn, EndsOn, CreatedAt);
 
         Assert.Equal("Rome & Amalfi", trip.Name);
-        Assert.Equal("Italy", trip.Destination);
+        Assert.Equal("Italy", Assert.Single(trip.Destinations).Name);
         Assert.Equal(TripStatus.Planning, trip.Status);
         Assert.Equal(StartsOn, trip.StartsOn);
         Assert.Equal(EndsOn, trip.EndsOn);
         Assert.NotEqual(Guid.Empty, trip.Id);
     }
 
-    [Theory]
-    [InlineData("Rome, Italy")]
-    [InlineData("Reykjavík, Ísland")]
-    [InlineData("東京, 日本")]
-    [InlineData("Patagonia")]
-    public void Create_AcceptsAnyDestination(string destination)
+    [Fact]
+    public void Create_AddsTheDestinationsInOrder()
     {
-        var trip = Trip.Create("A journey", destination, StartsOn, EndsOn, CreatedAt);
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
 
-        Assert.Equal(destination, trip.Destination);
+        Assert.Equal(["Rome", "Amalfi", "Naples"], trip.Destinations.Select(d => d.Name));
+        Assert.Equal([0, 1, 2], trip.Destinations.Select(d => d.SortOrder));
+        Assert.All(trip.Destinations, destination => Assert.Equal(trip.Id, destination.TripId));
+    }
+
+    [Fact]
+    public void Create_TrimsEachDestinationName()
+    {
+        var trip = Trip.Create("Rome & Amalfi", ["  Rome  ", " Amalfi "], StartsOn, EndsOn, CreatedAt);
+
+        Assert.Equal(["Rome", "Amalfi"], trip.Destinations.Select(d => d.Name));
     }
 
     [Theory]
@@ -42,7 +50,7 @@ public sealed class TripTests
     public void Create_RejectsBlankName(string name)
     {
         var exception = Assert.Throws<ArgumentException>(
-            () => Trip.Create(name, "Italy", StartsOn, EndsOn, CreatedAt));
+            () => Trip.Create(name, Route, StartsOn, EndsOn, CreatedAt));
 
         Assert.Equal("name", exception.ParamName);
     }
@@ -53,33 +61,171 @@ public sealed class TripTests
         var name = new string('x', Trip.NameMaxLength + 1);
 
         var exception = Assert.Throws<ArgumentException>(
-            () => Trip.Create(name, "Italy", StartsOn, EndsOn, CreatedAt));
+            () => Trip.Create(name, Route, StartsOn, EndsOn, CreatedAt));
 
         Assert.Equal("name", exception.ParamName);
     }
 
     [Fact]
-    public void Create_RejectsBlankDestination()
+    public void Create_RejectsAnEmptyDestinationList()
     {
         var exception = Assert.Throws<ArgumentException>(
-            () => Trip.Create("Rome", "  ", StartsOn, EndsOn, CreatedAt));
+            () => Trip.Create("Rome & Amalfi", [], StartsOn, EndsOn, CreatedAt));
 
-        Assert.Equal("destination", exception.ParamName);
+        Assert.Equal("destinations", exception.ParamName);
+    }
+
+    [Fact]
+    public void Create_RejectsTooManyDestinations()
+    {
+        var destinations = Enumerable.Range(1, Trip.MaxDestinationCount + 1)
+            .Select(index => $"Stop {index}")
+            .ToArray();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => Trip.Create("Too many stops", destinations, StartsOn, EndsOn, CreatedAt));
+
+        Assert.Equal("destinations", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_RejectsABlankDestinationName(string destination)
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => Trip.Create("Rome & Amalfi", ["Rome", destination], StartsOn, EndsOn, CreatedAt));
+
+        Assert.Equal("destinations", exception.ParamName);
+    }
+
+    [Fact]
+    public void Create_RejectsADestinationNameLongerThanTheLimit()
+    {
+        var destination = new string('x', TripDestination.NameMaxLength + 1);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => Trip.Create("Rome & Amalfi", ["Rome", destination], StartsOn, EndsOn, CreatedAt));
+
+        Assert.Equal("destinations", exception.ParamName);
+    }
+
+    [Fact]
+    public void Create_AllowsTheSameDestinationTwice()
+    {
+        var trip = Trip.Create("A round trip", ["Rome", "Florence", "Rome"], StartsOn, EndsOn, CreatedAt);
+
+        Assert.Equal(["Rome", "Florence", "Rome"], trip.Destinations.Select(d => d.Name));
     }
 
     [Fact]
     public void Create_RejectsEndDateBeforeStartDate()
     {
         var exception = Assert.Throws<ArgumentException>(
-            () => Trip.Create("Rome", "Italy", EndsOn, StartsOn, CreatedAt));
+            () => Trip.Create("Rome & Amalfi", Route, EndsOn, StartsOn, CreatedAt));
 
         Assert.Equal("endsOn", exception.ParamName);
     }
 
     [Fact]
+    public void AddDestination_AppendsAtTheEnd()
+    {
+        var trip = Trip.Create("Rome & Amalfi", ["Rome"], StartsOn, EndsOn, CreatedAt);
+
+        trip.AddDestination("Naples");
+
+        Assert.Equal(["Rome", "Naples"], trip.Destinations.Select(d => d.Name));
+        Assert.Equal([0, 1], trip.Destinations.Select(d => d.SortOrder));
+    }
+
+    [Fact]
+    public void AddDestination_RejectsTooManyDestinations()
+    {
+        var destinations = Enumerable.Range(1, Trip.MaxDestinationCount)
+            .Select(index => $"Stop {index}")
+            .ToArray();
+
+        var trip = Trip.Create("At the limit", destinations, StartsOn, EndsOn, CreatedAt);
+
+        var exception = Assert.Throws<ArgumentException>(() => trip.AddDestination("One too many"));
+
+        Assert.Equal("destinations", exception.ParamName);
+    }
+
+    [Fact]
+    public void RemoveDestination_RenumbersTheRemainingStops()
+    {
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
+        var removed = trip.Destinations[1].Id;
+
+        trip.RemoveDestination(removed);
+
+        Assert.Equal(["Rome", "Naples"], trip.Destinations.Select(d => d.Name));
+        Assert.Equal([0, 1], trip.Destinations.Select(d => d.SortOrder));
+    }
+
+    [Fact]
+    public void RemoveDestination_RejectsRemovingTheLastOne()
+    {
+        var trip = Trip.Create("Rome & Amalfi", ["Rome"], StartsOn, EndsOn, CreatedAt);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => trip.RemoveDestination(trip.Destinations[0].Id));
+
+        Assert.Equal("destinationId", exception.ParamName);
+    }
+
+    [Fact]
+    public void RemoveDestination_RejectsAnUnknownDestination()
+    {
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => trip.RemoveDestination(Guid.NewGuid()));
+
+        Assert.Equal("destinationId", exception.ParamName);
+    }
+
+    [Fact]
+    public void ReorderDestinations_RewritesTheSortOrder()
+    {
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
+        var ids = trip.Destinations.Select(destination => destination.Id).ToArray();
+
+        trip.ReorderDestinations([ids[2], ids[0], ids[1]]);
+
+        Assert.Equal(["Naples", "Rome", "Amalfi"], trip.Destinations.Select(d => d.Name));
+        Assert.Equal([0, 1, 2], trip.Destinations.Select(d => d.SortOrder));
+    }
+
+    [Fact]
+    public void ReorderDestinations_RejectsAnOrderThatIsNotTheWholeRoute()
+    {
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
+        var ids = trip.Destinations.Select(destination => destination.Id).ToArray();
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => trip.ReorderDestinations([ids[0], ids[1]]));
+
+        Assert.Equal("orderedIds", exception.ParamName);
+    }
+
+    [Fact]
+    public void ReorderDestinations_RejectsAnUnknownDestination()
+    {
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
+        var ids = trip.Destinations.Select(d => d.Id).ToList();
+        ids[0] = Guid.NewGuid();
+
+        var exception = Assert.Throws<ArgumentException>(() => trip.ReorderDestinations(ids));
+
+        Assert.Equal("orderedIds", exception.ParamName);
+    }
+
+    [Fact]
     public void Reschedule_RejectsEndDateBeforeStartDate()
     {
-        var trip = Trip.Create("Rome", "Italy", StartsOn, EndsOn, CreatedAt);
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
 
         var exception = Assert.Throws<ArgumentException>(() => trip.Reschedule(EndsOn, StartsOn));
 
@@ -89,7 +235,7 @@ public sealed class TripTests
     [Fact]
     public void Reschedule_UpdatesDates()
     {
-        var trip = Trip.Create("Rome", "Italy", StartsOn, EndsOn, CreatedAt);
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
 
         var newStartsOn = StartsOn.AddDays(7);
         var newEndsOn = EndsOn.AddDays(7);
@@ -107,14 +253,25 @@ public sealed class TripTests
         var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
 
         var response = await service.CreateAsync(
-            new CreateTripRequest("Rome & Amalfi", "Italy", StartsOn, EndsOn));
+            new CreateTripRequest("Rome & Amalfi", Route, StartsOn, EndsOn));
 
         Assert.Equal(1, repository.AddCallCount);
         Assert.Equal("Rome & Amalfi", response.Name);
-        Assert.Equal("Italy", response.Destination);
+        Assert.Equal(Route, response.Destinations.Select(d => d.Name));
+        Assert.Equal([0, 1, 2], response.Destinations.Select(d => d.SortOrder));
         Assert.Equal(TripStatus.Planning, response.Status);
         Assert.Equal(StartsOn, response.StartsOn);
         Assert.Equal(EndsOn, response.EndsOn);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsATripWithoutDestinations()
+    {
+        var repository = new FakeTripRepository();
+        var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.CreateAsync(new CreateTripRequest("Rome & Amalfi", [], StartsOn, EndsOn)));
     }
 
     [Fact]
@@ -124,13 +281,14 @@ public sealed class TripTests
         var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
 
         var created = await service.CreateAsync(
-            new CreateTripRequest("Rome & Amalfi", "Italy", StartsOn, EndsOn));
+            new CreateTripRequest("Rome & Amalfi", Route, StartsOn, EndsOn));
 
         var fetched = await service.GetAsync(created.Id);
 
         Assert.NotNull(fetched);
         Assert.Equal(created.Id, fetched.Id);
         Assert.Equal(created.Name, fetched.Name);
+        Assert.Equal(Route, fetched.Destinations.Select(d => d.Name));
     }
 
     [Fact]
@@ -148,9 +306,9 @@ public sealed class TripTests
     {
         var repository = new FakeTripRepository(
         [
-            Trip.Create("Kyoto", "Japan", new DateOnly(2027, 4, 10), new DateOnly(2027, 4, 14), CreatedAt),
-            Trip.Create("Rome", "Italy", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 8), CreatedAt),
-            Trip.Create("Reykjavík", "Iceland", new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 3), CreatedAt)
+            Trip.Create("Kyoto", ["Kyoto", "Nara", "Osaka"], new DateOnly(2027, 4, 10), new DateOnly(2027, 4, 14), CreatedAt),
+            Trip.Create("Rome", ["Rome", "Amalfi", "Naples"], new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 8), CreatedAt),
+            Trip.Create("Reykjavík", ["Reykjavík", "Vík"], new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 3), CreatedAt)
         ]);
 
         var service = new TripService(repository, TimeProvider.System);
@@ -175,7 +333,7 @@ public sealed class TripTests
     {
         var repository = new FakeTripRepository(
         [
-            Trip.Create("Rome & Amalfi", "Italy", StartsOn, EndsOn, CreatedAt)
+            Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt)
         ]);
 
         var service = new TripService(repository, TimeProvider.System);
@@ -184,7 +342,7 @@ public sealed class TripTests
 
         var trip = Assert.Single(trips);
         Assert.Equal("Rome & Amalfi", trip.Name);
-        Assert.Equal("Italy", trip.Destination);
+        Assert.Equal(Route, trip.Destinations.Select(d => d.Name));
         Assert.Equal(StartsOn, trip.StartsOn);
         Assert.Equal(EndsOn, trip.EndsOn);
         Assert.Equal(TripStatus.Planning, trip.Status);

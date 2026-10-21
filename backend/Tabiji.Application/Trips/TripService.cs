@@ -11,7 +11,7 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
     {
         var trip = Trip.Create(
             request.Name,
-            request.Destination,
+            request.Destinations ?? [],
             request.StartsOn,
             request.EndsOn,
             timeProvider.GetUtcNow());
@@ -35,10 +35,17 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         return trips.Select(ToResponse).ToArray();
     }
 
+    /// <summary>
+    /// The stops are ordered by their sort order here, so the contract holds
+    /// whichever repository produced the trip.
+    /// </summary>
     private static TripResponse ToResponse(Trip trip) => new(
         trip.Id,
         trip.Name,
-        trip.Destination,
+        trip.Destinations
+            .OrderBy(destination => destination.SortOrder)
+            .Select(destination => new TripDestinationResponse(destination.Name, destination.SortOrder))
+            .ToArray(),
         trip.StartsOn,
         trip.EndsOn,
         trip.Status);

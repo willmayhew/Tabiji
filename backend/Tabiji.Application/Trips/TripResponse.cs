@@ -5,7 +5,7 @@ namespace Tabiji.Application.Trips;
 public sealed record TripResponse(
     Guid Id,
     string Name,
-    string Destination,
+    IReadOnlyList<TripDestinationResponse> Destinations,
     DateOnly StartsOn,
     DateOnly EndsOn,
     TripStatus Status);

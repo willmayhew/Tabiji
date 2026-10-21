@@ -31,9 +31,9 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("Destination")
-                        .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("Destination");
 
                     b.Property<DateOnly>("EndsOn")
                         .HasColumnType("date");
@@ -54,6 +54,44 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Trips", (string)null);
+                });
+
+            modelBuilder.Entity("Tabiji.Domain.Trips.TripDestination", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TripId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId", "SortOrder")
+                        .IsUnique();
+
+                    b.ToTable("TripDestinations", (string)null);
+                });
+
+            modelBuilder.Entity("Tabiji.Domain.Trips.TripDestination", b =>
+                {
+                    b.HasOne("Tabiji.Domain.Trips.Trip", null)
+                        .WithMany("Destinations")
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Tabiji.Domain.Trips.Trip", b =>
+                {
+                    b.Navigation("Destinations");
                 });
 #pragma warning restore 612, 618
         }

@@ -7,6 +7,7 @@ import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
 import { Trip, TripStatus } from '../../core/models/trip';
 import { formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
+import { firstDestination, routeSummary } from '../../shared/format/trip-destinations';
 import { DestinationPlate } from '../../shared/ui/destination-plate';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
@@ -95,6 +96,20 @@ export class TripDetail {
     const found = this.trip();
 
     return found === null ? null : formatTripDate(found.endsOn);
+  });
+
+  /** Where the journey starts, which is what the cover band is labelled with. */
+  protected readonly origin = computed(() => {
+    const found = this.trip();
+
+    return found === null ? null : firstDestination(found.destinations);
+  });
+
+  /** How many stops the route has, in words. */
+  protected readonly routeSummary = computed(() => {
+    const found = this.trip();
+
+    return found === null ? '' : routeSummary(found.destinations);
   });
 
   protected toneFor(status: TripStatus): BadgeTone {

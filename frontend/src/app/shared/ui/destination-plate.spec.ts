@@ -9,8 +9,13 @@ describe('DestinationPlate', () => {
   });
 
   function render(
-    destination: string,
-    options: { seed?: string; index?: number | null; tone?: 'paper' | 'sage' | 'clay' | 'forest' } = {},
+    destination: string | null,
+    options: {
+      seed?: string;
+      index?: number | null;
+      stops?: number;
+      tone?: 'paper' | 'sage' | 'clay' | 'forest';
+    } = {},
   ): HTMLElement {
     const fixture = TestBed.createComponent(DestinationPlate);
     fixture.componentRef.setInput('seed', options.seed ?? 'a-trip-id');
@@ -18,6 +23,10 @@ describe('DestinationPlate', () => {
 
     if (options.index !== undefined) {
       fixture.componentRef.setInput('index', options.index);
+    }
+
+    if (options.stops !== undefined) {
+      fixture.componentRef.setInput('stops', options.stops);
     }
 
     if (options.tone !== undefined) {
@@ -40,7 +49,15 @@ describe('DestinationPlate', () => {
     const route = element.querySelector('.plate__route');
 
     expect(route?.getAttribute('d')).toContain('M ');
-    expect(element.querySelectorAll('.plate__node').length).toBeGreaterThanOrEqual(3);
+    expect(element.querySelectorAll('.plate__node').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should draw a waypoint for each stop', () => {
+    expect(render('Kyoto', { stops: 6 }).querySelectorAll('.plate__node')).toHaveLength(6);
+  });
+
+  it('should draw two waypoints for a trip with a single stop', () => {
+    expect(render('Kyoto', { stops: 1 }).querySelectorAll('.plate__node')).toHaveLength(2);
   });
 
   it('should draw the graticule behind the route', () => {
@@ -96,5 +113,21 @@ describe('DestinationPlate', () => {
 
   it('should draw a card or a band', () => {
     expect(render('Kyoto').querySelector('.plate')?.classList.contains('plate--card')).toBe(true);
+  });
+
+  it('should show no label when there is no destination', () => {
+    const element = render(null);
+
+    expect(element.querySelector('.plate__destination')).toBeNull();
+    expect(element.querySelector('.plate__route')).not.toBeNull();
+  });
+
+  it('should trim a very long label', () => {
+    const element = render('x'.repeat(120));
+
+    const label = element.querySelector('.plate__destination')?.textContent ?? '';
+
+    expect(label.length).toBeLessThan(50);
+    expect(label.endsWith('…')).toBe(true);
   });
 });

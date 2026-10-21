@@ -7,8 +7,11 @@ import { TripCreate } from './trip-create';
 
 const created: Trip = {
   id: '5f2b1c4e-0000-0000-0000-000000000000',
-  name: 'Tokyo & Kyoto',
-  destination: 'Japan',
+  name: 'Rome & Amalfi',
+  destinations: [
+    { name: 'Rome', sortOrder: 0 },
+    { name: 'Amalfi', sortOrder: 1 },
+  ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-14',
   status: 'Planning',
@@ -42,7 +45,7 @@ describe('TripCreate', () => {
   it('should render the create form', () => {
     expect(element().querySelector('form')).not.toBeNull();
     expect(element().querySelector('#trip-name')).not.toBeNull();
-    expect(element().querySelector('#trip-destination')).not.toBeNull();
+    expect(element().querySelector('#trip-destination-0')).not.toBeNull();
     expect(element().querySelector('#trip-starts-on')).not.toBeNull();
     expect(element().querySelector('#trip-ends-on')).not.toBeNull();
   });
@@ -50,7 +53,10 @@ describe('TripCreate', () => {
   it('should label every field', () => {
     const labels = [...element().querySelectorAll('label')] as HTMLLabelElement[];
 
-    expect(labels.length).toBe(4);
+    // Three fixed fields, plus one for each stop of the route.
+    const stops = element().querySelectorAll('.route__row').length;
+
+    expect(labels.length).toBe(3 + stops);
 
     for (const label of labels) {
       const target = element().querySelector(`#${label.getAttribute('for')}`);
@@ -67,10 +73,10 @@ describe('TripCreate', () => {
   });
 
   it('should not assume the trip is in Japan', () => {
-    const hint = element().querySelector('#trip-destination-hint')?.textContent ?? '';
+    const note = element().querySelector('.create__note')?.textContent ?? '';
 
-    expect(hint).toContain('Rome');
-    expect(hint).not.toContain('Kyoto');
+    expect(note).toContain('Rome');
+    expect(note).not.toContain('Kyoto');
   });
 
   it('should link back to the trips list', () => {
@@ -89,8 +95,8 @@ describe('TripCreate', () => {
     input.value = created.name;
     input.dispatchEvent(new Event('input'));
 
-    const destination = element().querySelector('#trip-destination') as HTMLInputElement;
-    destination.value = created.destination;
+    const destination = element().querySelector('#trip-destination-0') as HTMLInputElement;
+    destination.value = created.destinations[0].name;
     destination.dispatchEvent(new Event('input'));
 
     const startsOn = element().querySelector('#trip-starts-on') as HTMLInputElement;

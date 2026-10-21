@@ -7,8 +7,11 @@ import { Trips } from './trips';
 
 const tokyo: Trip = {
   id: '11111111-1111-1111-1111-111111111111',
-  name: 'Tokyo',
-  destination: 'Kanto',
+  name: 'Rome & Amalfi',
+  destinations: [
+    { name: 'Rome', sortOrder: 0 },
+    { name: 'Amalfi', sortOrder: 1 },
+  ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-08',
   status: 'Planning',
@@ -16,8 +19,8 @@ const tokyo: Trip = {
 
 const kyoto: Trip = {
   id: '22222222-2222-2222-2222-222222222222',
-  name: 'Kyoto',
-  destination: 'Kansai',
+  name: 'Kyoto in spring',
+  destinations: [{ name: 'Kyoto', sortOrder: 0 }],
   startsOn: '2027-04-10',
   endsOn: '2027-04-14',
   status: 'Confirmed',
@@ -60,8 +63,8 @@ describe('Trips', () => {
     http.expectOne('/api/trips').flush([tokyo, kyoto]);
     fixture.detectChanges();
 
-    expect(element().textContent).toContain('Tokyo');
-    expect(element().textContent).toContain('Kyoto');
+    expect(element().textContent).toContain('Rome & Amalfi');
+    expect(element().textContent).toContain('Kyoto in spring');
     expect(element().querySelectorAll('.trip-link')).toHaveLength(2);
   });
 

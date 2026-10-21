@@ -8,8 +8,12 @@ import { TripDetail } from './trip-detail';
 
 const trip: Trip = {
   id: '11111111-1111-1111-1111-111111111111',
-  name: 'Tokyo',
-  destination: 'Kanto',
+  name: 'Rome & Amalfi',
+  destinations: [
+    { name: 'Rome', sortOrder: 0 },
+    { name: 'Amalfi', sortOrder: 1 },
+    { name: 'Naples', sortOrder: 2 },
+  ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-08',
   status: 'Planning',
@@ -67,9 +71,31 @@ describe('TripDetail', () => {
     request.flush(trip);
     fixture.detectChanges();
 
-    expect(element().textContent).toContain('Tokyo');
-    expect(element().textContent).toContain('Kanto');
+    expect(element().textContent).toContain('Rome & Amalfi');
+    expect(element().textContent).toContain('Rome');
     expect(element().textContent).toContain('1 Apr – 8 Apr 2027');
+  });
+
+  it('should set the route out in order', () => {
+    createComponent(trip.id);
+
+    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
+    fixture.detectChanges();
+
+    const names = [...element().querySelectorAll('.route__name')].map(
+      (node) => node.textContent?.trim(),
+    );
+
+    expect(names).toEqual(['Rome', 'Amalfi', 'Naples']);
+  });
+
+  it('should say so when a trip has no stops', () => {
+    createComponent(trip.id);
+
+    http.expectOne(`/api/trips/${trip.id}`).flush({ ...trip, destinations: [] });
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('No destinations recorded');
   });
 
   it('should keep the machine readable dates on the time elements', () => {
@@ -129,7 +155,7 @@ describe('TripDetail', () => {
     http.expectOne(`/api/trips/${trip.id}`).flush(trip);
     fixture.detectChanges();
 
-    expect(element().textContent).toContain('Tokyo');
+    expect(element().textContent).toContain('Rome & Amalfi');
     expect(element().textContent).not.toContain('Server error');
   });
 
@@ -164,6 +190,6 @@ describe('TripDetail', () => {
 
     expect(element().querySelectorAll('h1')).toHaveLength(1);
     expect(headings[0].tagName).toBe('H1');
-    expect(headings[0].textContent).toContain('Tokyo');
+    expect(headings[0].textContent).toContain('Rome & Amalfi');
   });
 });

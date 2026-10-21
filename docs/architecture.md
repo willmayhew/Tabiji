@@ -122,30 +122,59 @@ The composition root owns the wiring of the probe, which is exactly its job.
 and a small set of behaviours:
 
 ```csharp
-Trip.Create(name, destination, startsOn, endsOn, createdAt)
+Trip.Create(name, destinations, startsOn, endsOn, createdAt)
 trip.Rename(name)
 trip.Reschedule(startsOn, endsOn)
+trip.AddDestination(name)
+trip.RemoveDestination(destinationId)
+trip.ReorderDestinations(orderedIds)
 ```
 
 Invariants, all enforced in the domain and all covered by unit tests:
 
 - the name is required and at most 100 characters;
-- the destination is required and at most 200 characters;
+- a trip has at least one destination and at most twenty;
+- each destination name is required and at most 200 characters;
+- a destination's sort order cannot be negative;
 - the trip cannot end before it starts;
 - a new trip always starts in `Planning`.
 
-**The destination is free text and is treated as such.** It is trimmed, checked for
+**A trip's route is an ordered collection of `TripDestination` entities.** Each one has
+its own identity, a name and an explicit sort order:
+
+```csharp
+public sealed class TripDestination
+{
+    public const int NameMaxLength = 200;
+
+    public Guid Id { get; private set; }
+    public Guid TripId { get; private set; }
+    public string Name { get; private set; }
+    public int SortOrder { get; private set; }
+}
+```
+
+`TripDestination.Create` is `internal`, so the owning trip is the only thing that can make
+one, and it is the only thing that can put it on a route.
+
+**The names are free text and are treated as such.** Each one is trimmed, checked for
 blankness and length, and then stored as-is. Nothing in the domain, the DTOs, the
 persistence mapping or the API parses it, splits it or compares it against a list of
-countries, so a trip may be to `"Rome, Italy"`, `"Reykjavík, Ísland"` or `"東京, 日本"`
+countries, so a route may be to `"Rome, Italy"`, `"Reykjavík, Ísland"` or `"東京, 日本"`
 without anything else changing. The `nvarchar(200)` column holds any Unicode, and there
 is no check constraint or foreign key on it.
+
+**The same place may appear twice.** A route that visits Rome on the way out and again on
+the way home is a round trip, not a mistake, so duplicates are allowed. The domain rejects
+only blank and over-long names, as it always did.
 
 Invalid input raises `ArgumentException` with the offending parameter name. The API maps
 that to a `400` with an RFC 7807 problem document.
 
 The `Trip` type has a private parameterless constructor and private setters so that EF
-Core can materialise it without exposing a public mutation API.
+Core can materialise it without exposing a public mutation API. Its destinations live in a
+private list behind a read-only property, so nothing outside the aggregate can add a stop
+or change the order.
 
 ### 5.2 Application
 
@@ -154,25 +183,49 @@ Core can materialise it without exposing a public mutation API.
 deterministic in tests.
 
 `TripService` maps `Trip` to `TripResponse`. The response is a plain record, so no EF
-type ever crosses the layer boundary and the wire contract is explicit.
+type ever crosses the layer boundary and the wire contract is explicit. The stops are
+ordered by their sort order in the mapping, so the contract holds whichever repository
+produced the trip.
 
 ### 5.3 Infrastructure
 
-`TabijiDbContext` exposes `DbSet<Trip>` and applies the entity configurations found in
-its own assembly. `TripConfiguration` maps the aggregate to the `Trips` table:
+`TabijiDbContext` exposes `DbSet<Trip>` and `DbSet<TripDestination>` and applies the
+entity configurations found in its own assembly.
+
+`TripConfiguration` maps the aggregate to the `Trips` table:
 
 | Property | Column | Type |
 |---|---|---|
 | `Id` | `Id` | `uniqueidentifier` |
 | `Name` | `Name` | `nvarchar(100)` |
-| `Destination` | `Destination` | `nvarchar(200)` |
 | `StartsOn` | `StartsOn` | `date` |
 | `EndsOn` | `EndsOn` | `date` |
 | `Status` | `Status` | `nvarchar(30)` |
 | `CreatedAt` | `CreatedAt` | `datetimeoffset` |
+| `Destination` *(legacy)* | `Destination` | `nvarchar(200)`, nullable |
+
+`TripDestinationConfiguration` maps the stops to the `TripDestinations` table:
+
+| Property | Column | Type |
+|---|---|---|
+| `Id` | `Id` | `uniqueidentifier` |
+| `TripId` | `TripId` | `uniqueidentifier` |
+| `Name` | `Name` | `nvarchar(200)` |
+| `SortOrder` | `SortOrder` | `int` |
+
+The foreign key to `Trips` cascades, and a **unique** index on `(TripId, SortOrder)` makes
+it impossible for a trip to hold two stops in the same position. The same index covers the
+foreign-key lookup, so one index does both jobs.
 
 `Status` is stored as a string rather than an integer so that the stored value stays
 readable and adding an enum member cannot silently change the meaning of existing rows.
+
+**The legacy `Trips.Destination` column.** It held the only copy of a trip's destination
+before the route existed. It is now a nullable column that nothing reads or writes, and it
+is mapped in `TripConfiguration` as a *shadow property* so that the next migration does not
+drop it. The column is kept for one release, so that no data is lost, and it is removed by
+deleting those lines and running a migration of its own once the backfill has been
+verified.
 
 `TripRepository` is the only class that knows how a `Trip` is persisted. It is registered
 against the `ITripRepository` abstraction, so the composition root is the only place that
@@ -180,7 +233,33 @@ knows the concrete implementation.
 
 `ITripRepository.ListAsync` returns every trip ordered by start date and then by name.
 The ordering is part of the port's contract, and the repository produces it with a SQL
-`ORDER BY` rather than sorting in memory.
+`ORDER BY` rather than sorting in memory. The route of each trip is loaded with an
+*ordered* include, so the materialised aggregate is in the order its stops are visited.
+
+### 5.3.1 The migration that introduced the route
+
+`20261020201209_AddTripDestinations` is additive and non-destructive. It creates the
+table and the index, makes the legacy column nullable, and backfills every existing trip:
+
+```sql
+INSERT INTO [TripDestinations] ([Id], [TripId], [Name], [SortOrder])
+SELECT NEWID(), [Id], LTRIM(RTRIM([Destination])), 0
+FROM [Trips]
+WHERE [Destination] IS NOT NULL
+  AND LTRIM(RTRIM([Destination])) <> '';
+```
+
+Every existing destination becomes the **first stop** of its trip. A blank or
+whitespace-only destination produces no stop at all: making one up would invent data, and
+such a trip is rendered as an explicit empty state.
+
+The `Down` migration puts the scalar back before the route disappears, taking the first
+stop of each trip, and falls back to a placeholder for a trip that has none so that the
+column can be made non-nullable again.
+
+`backend/verify-migration.sql` holds the three queries that confirm the backfill is
+complete and faithful. They are the gate for dropping the legacy column, and they must
+return clean before that migration is written.
 
 ### 5.4 API
 
@@ -198,6 +277,38 @@ Endpoints:
 | `GET` | `/health` | Liveness. Never touches the database. |
 | `GET` | `/health/ready` | Readiness. Verifies the database is reachable. |
 | `GET` | `/openapi/v1.json` | The OpenAPI document. |
+
+**Creating a trip takes an ordered array of destination names.** The order of the array
+is the order of the stops, and the response returns them in that same order:
+
+```json
+{
+  "name": "Rome & Amalfi",
+  "destinations": ["Rome", "Amalfi", "Naples"],
+  "startsOn": "2027-04-01",
+  "endsOn": "2027-04-14"
+}
+```
+
+```json
+{
+  "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
+  "name": "Rome & Amalfi",
+  "destinations": [
+    { "name": "Rome", "sortOrder": 0 },
+    { "name": "Amalfi", "sortOrder": 1 },
+    { "name": "Naples", "sortOrder": 2 }
+  ],
+  "startsOn": "2027-04-01",
+  "endsOn": "2027-04-14",
+  "status": "Planning"
+}
+```
+
+The response carries the sort order explicitly because the domain has one, and the array
+is returned in that order too, so a client may rely on either. There is **no update
+endpoint**: `AddDestination`, `RemoveDestination` and `ReorderDestinations` exist on the
+aggregate, but editing a trip belongs to the Phase 1 "full trip CRUD" work.
 
 Enums are serialised as strings (`"Planning"`, not `0`) via a `JsonStringEnumConverter`,
 so the wire format is stable and readable. Errors use `AddProblemDetails()` from the
@@ -239,7 +350,7 @@ frontend/src/
     ├── features/
     │   ├── home/                        the landing page, the journey index and the status strip
     │   ├── trips/                       the trip list
-    │   ├── trip-create/                 the create trip form and its page
+    │   ├── trip-create/                 the route builder and its page
     │   └── trip-detail/                 a single trip
     └── shared/
         ├── format/                      pure formatting helpers
@@ -291,6 +402,27 @@ same trip always draws the same plate, and because the motif says nothing about 
 place, it can never be wrong about where the trip is. The plate is `aria-hidden`; the
 destination and the index are repeated as real text beside it, so a reader hears each
 fact exactly once.
+
+**A plate is labelled with the first stop.** The plate's route motif is the beginning of
+the journey, so it carries the first destination, and the body beside it sets out the
+whole route. A trip with no stops at all — a legacy trip whose destination was blank —
+renders the motif with no label and an explicit *"No destinations recorded"* line, never
+a blank gap.
+
+**The route is one list, used twice.** The `.route` primitives in `components.css` draw a
+numbered stop joined to the next by a hairline. The create form uses them to *build* a
+route and the trip page uses them to *read* one back, so the two always look the same.
+The hairline that joins the stops is the same device the destination plates draw their
+route with.
+
+**The create form is a route builder.** The stops live in a `FormArray`, so each one is
+validated on its own, and the whole route is validated by `trip-destinations.ts`, a pure
+function wrapped in a `ValidatorFn` exactly like the date rule beside it. The stops are
+moved with **move up and move down buttons** rather than by dragging, so reordering is
+keyboard-accessible without a library and without a pointer implementation. The template
+tracks each control rather than its position, so a moved row is moved in the document and
+**the focus follows it**. Adding or removing a stop moves the focus deliberately, and a
+polite live region says what happened.
 
 The contrast of a plate is fixed by its ground, because the ink is fixed by the ground:
 `--plate-ink-light` on the paper, sage and clay grounds (14.25:1, 13.47:1 and 13.53:1)

@@ -33,7 +33,8 @@
         <app-destination-plate
           class="detail__plate"
           [seed]="found.id"
-          [destination]="found.destination"
+          [destination]="origin()"
+          [stops]="found.destinations.length"
           tone="forest"
           aspect="band"
         />
@@ -60,40 +61,64 @@
 
       <div class="detail__body">
         <div class="detail__details">
-          <h2 class="detail__heading">Details</h2>
-          <dl class="detail__list">
-            <div class="detail__row">
-              <dt>Destination</dt>
-              <dd>{{ found.destination }}</dd>
+          <section class="detail__section">
+            <div class="section-head">
+              <h2>Route</h2>
+              @if (found.destinations.length > 0) {
+                <p class="section-head__meta">{{ routeSummary() }}</p>
+              }
             </div>
-            <div class="detail__row">
-              <dt>Starts</dt>
-              <dd>
-                @if (startDate(); as value) {
-                  <time [attr.datetime]="found.startsOn">{{ value }}</time>
-                } @else {
-                  {{ found.startsOn }}
+
+            @if (found.destinations.length === 0) {
+              <p class="muted">No destinations recorded.</p>
+            } @else {
+              <ol class="route route--readout">
+                @for (destination of found.destinations; track destination.sortOrder; let index = $index) {
+                  <li class="route__row">
+                    <span class="route__node" aria-hidden="true">
+                      {{ index + 1 < 10 ? '0' + (index + 1) : index + 1 }}
+                    </span>
+                    <span class="route__name">{{ destination.name }}</span>
+                  </li>
                 }
-              </dd>
-            </div>
-            <div class="detail__row">
-              <dt>Ends</dt>
-              <dd>
-                @if (endDate(); as value) {
-                  <time [attr.datetime]="found.endsOn">{{ value }}</time>
-                } @else {
-                  {{ found.endsOn }}
-                }
-              </dd>
-            </div>
-            @if (dates(); as range) {
-              <div class="detail__row">
-                <dt>Length</dt>
-                <dd>{{ range.duration }}</dd>
-              </div>
+              </ol>
             }
-          </dl>
-          <p class="detail__id">Id: <code>{{ found.id }}</code></p>
+          </section>
+
+          <section class="detail__section">
+            <div class="section-head">
+              <h2>Details</h2>
+            </div>
+            <dl class="detail__list">
+              <div class="detail__row">
+                <dt>Starts</dt>
+                <dd>
+                  @if (startDate(); as value) {
+                    <time [attr.datetime]="found.startsOn">{{ value }}</time>
+                  } @else {
+                    {{ found.startsOn }}
+                  }
+                </dd>
+              </div>
+              <div class="detail__row">
+                <dt>Ends</dt>
+                <dd>
+                  @if (endDate(); as value) {
+                    <time [attr.datetime]="found.endsOn">{{ value }}</time>
+                  } @else {
+                    {{ found.endsOn }}
+                  }
+                </dd>
+              </div>
+              @if (dates(); as range) {
+                <div class="detail__row">
+                  <dt>Length</dt>
+                  <dd>{{ range.duration }}</dd>
+                </div>
+              }
+            </dl>
+            <p class="detail__id">Id: <code>{{ found.id }}</code></p>
+          </section>
         </div>
 
         <aside class="detail__aside">

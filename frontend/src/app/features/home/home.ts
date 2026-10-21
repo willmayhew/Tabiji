@@ -9,6 +9,7 @@ import { TripsService } from '../../core/api/trips.service';
 import { HealthReport, HealthStatus } from '../../core/models/health-status';
 import { Trip } from '../../core/models/trip';
 import { formatTripDates } from '../../shared/format/trip-dates';
+import { routeLabel } from '../../shared/format/trip-destinations';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 @Component({
@@ -88,6 +89,13 @@ export class Home {
     const range = formatTripDates(trip.startsOn, trip.endsOn);
 
     return range === null ? null : range.label;
+  }
+
+  /** The route of a journey, as one line. */
+  protected route(trip: Trip): string {
+    const label = routeLabel(trip.destinations);
+
+    return label.length > 0 ? label : 'No destinations recorded';
   }
 
   protected toneFor(status: HealthStatus): BadgeTone {

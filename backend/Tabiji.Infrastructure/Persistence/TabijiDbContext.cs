@@ -7,6 +7,8 @@ public sealed class TabijiDbContext(DbContextOptions<TabijiDbContext> options) :
 {
     public DbSet<Trip> Trips => Set<Trip>();
 
+    public DbSet<TripDestination> TripDestinations => Set<TripDestination>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TabijiDbContext).Assembly);

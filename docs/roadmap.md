@@ -108,6 +108,34 @@ tests still pass.
 
 ---
 
+## Phase 0.9 — A route of many destinations · **Done**
+
+Let a trip hold more than one place, in a deliberate order. The product already planned
+trips anywhere in the world; this is about the *shape* of a trip rather than where it
+goes.
+
+- [x] A `TripDestination` entity with its own identity, a free-text name and an explicit
+      sort order, owned by the trip aggregate
+- [x] A `TripDestinations` table with a cascading foreign key and a unique index on
+      `(TripId, SortOrder)`, so a trip can never hold two stops in the same position
+- [x] `Trip.Create` takes an ordered list of destination names; `AddDestination`,
+      `RemoveDestination` and `ReorderDestinations` keep the aggregate coherent
+- [x] The API takes an ordered array on create and returns the stops in the same order
+- [x] An additive, non-destructive migration that turns every existing destination into
+      the first stop of its trip, keeps the legacy scalar column for one release, and
+      ships the queries that verify the backfill
+- [x] A route builder in the create form: numbered stops, add, remove and move up or
+      down, with the focus following the stop that moved
+- [x] The trip list and the trip page read the whole route, and the plates are labelled
+      with the first stop
+- [x] Duplicate names allowed — a route may visit the same place twice
+
+**Exit criteria:** a trip can be created with any number of ordered destinations, the
+order survives the database and the API, the existing data is intact, and every route
+reads as a journey.
+
+---
+
 ## Phase 1 — Accounts, trips and membership
 
 *Planned.* Everything downstream needs to know who the participants are.

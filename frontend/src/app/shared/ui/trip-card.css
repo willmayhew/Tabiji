@@ -56,27 +56,12 @@
   padding: var(--space-md) var(--space-lg) var(--space-lg);
 }
 
-.trip-card__destination {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-2xs);
+.trip-card__route {
   margin: 0;
   color: var(--color-ink-soft);
   font-size: var(--text-sm);
-}
-
-.trip-card__duration {
-  color: var(--color-ink-faint);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-}
-
-.trip-card__duration::before {
-  content: '·';
-  margin-right: var(--space-2xs);
-  color: var(--color-rule-strong);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
 }
 
 .trip-card__dates {
@@ -89,6 +74,19 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
+}
+
+.trip-card__duration {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.trip-card__duration::before {
+  content: '·';
+  margin-right: 0.35rem;
+  color: var(--color-rule-strong);
 }
 
 .trip-card__dash {

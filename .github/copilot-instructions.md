@@ -164,6 +164,12 @@ npm test
   by `shared/media/route-motif.ts`, generated from the trip's id. See the image policy in
   `docs/architecture.md`.
 - Do not assume a trip is in Japan. The `destination` is free text and must stay that way.
+- Do not put a trip's destinations in a comma-separated string or in JSON on the `Trip`
+  row. A trip holds an ordered collection of `TripDestination` entities, and the order
+  is the sort order.
+- Do not drop the legacy `Trips.Destination` column. It is kept for one release, mapped
+  as a shadow property, and is removed by a migration of its own once the backfill in
+  `backend/verify-migration.sql` has been verified.
 
 ## Before opening a pull request
 

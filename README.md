@@ -182,7 +182,11 @@ curl http://localhost:5080/api/trips
   {
     "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
     "name": "Rome & Amalfi",
-    "destination": "Italy",
+    "destinations": [
+      { "name": "Rome", "sortOrder": 0 },
+      { "name": "Amalfi", "sortOrder": 1 },
+      { "name": "Naples", "sortOrder": 2 }
+    ],
     "startsOn": "2027-04-01",
     "endsOn": "2027-04-14",
     "status": "Planning"
@@ -195,22 +199,27 @@ Create a trip:
 ```bash
 curl -X POST http://localhost:5080/api/trips \
   -H "Content-Type: application/json" \
-  -d '{"name":"Rome & Amalfi","destination":"Italy","startsOn":"2027-04-01","endsOn":"2027-04-14"}'
+  -d '{"name":"Rome & Amalfi","destinations":["Rome","Amalfi","Naples"],"startsOn":"2027-04-01","endsOn":"2027-04-14"}'
 ```
 
 ```json
 {
   "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
   "name": "Rome & Amalfi",
-  "destination": "Italy",
+  "destinations": [
+    { "name": "Rome", "sortOrder": 0 },
+    { "name": "Amalfi", "sortOrder": 1 },
+    { "name": "Naples", "sortOrder": 2 }
+  ],
   "startsOn": "2027-04-01",
   "endsOn": "2027-04-14",
   "status": "Planning"
 }
 ```
 
-`destination` is free text of up to 200 characters. It is never parsed and never
-compared against a list of countries, so any place in the world is accepted.
+A trip holds an **ordered route** of destinations, at least one and at most twenty. Each
+name is free text of up to 200 characters: it is never parsed and never compared against a
+list of countries, so any place in the world is accepted.
 
 ---
 
@@ -257,17 +266,18 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 28 tests
-cd frontend && npm test           # 100 tests
+dotnet test backend/Tabiji.sln   # 59 tests
+cd frontend && npm test           # 141 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that
 boot the real host in memory. **No test needs a running database** — the liveness probe
-performs no I/O by design, and the readiness test asserts a well-formed report rather than
-a specific outcome.
+performs no I/O by design, the readiness test asserts a well-formed report rather than
+a specific outcome, and the route table is checked against the EF model rather than
+against a server.
 
 The frontend suite covers the root component, the two API clients, the date rule, the
-route motif, the destination plate and every screen.
+route motif, the destination plate, the route builder and every screen.
 
 ---
 

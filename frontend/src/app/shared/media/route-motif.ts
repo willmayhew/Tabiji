@@ -3,7 +3,7 @@
  *
  * A plate needs a graphic. Rather than a photograph of somewhere, Tabiji
  * draws an abstract route: a line that travels across the plate and passes
- * through a handful of waypoints.
+ * through a waypoint for each stop on the trip.
  *
  * The motif is derived from a trip's id, never from its destination. That
  * matters twice over. The same trip always draws the same plate, and the
@@ -92,6 +92,22 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
+ * Keeps a value inside a range, bouncing off the ends rather than stopping
+ * at them, so a wandering route never piles up along one edge.
+ */
+function reflect(value: number, min: number, max: number): number {
+  if (value < min) {
+    return min + (min - value);
+  }
+
+  if (value > max) {
+    return max - (value - max);
+  }
+
+  return value;
+}
+
+/**
  * The line, drawn as a smooth curve through the waypoints.
  *
  * A Catmull-Rom spline is converted into cubic segments, so the route bends
@@ -157,27 +173,45 @@ function toGraticule(
  * The route for a seed.
  *
  * The line travels from left to right, so it reads as a journey rather than
- * as a scribble. The vertical position of each waypoint is free, which is
- * what gives every trip its own shape.
+ * as a scribble. It carries one waypoint for each stop on the trip, and
+ * never fewer than two, so that a trip with a single stop still has a line
+ * to draw.
  */
-export function routeMotif(seed: string, aspect: PlateAspect = 'card'): RouteMotif {
+export function routeMotif(seed: string, stops: number, aspect: PlateAspect = 'card'): RouteMotif {
   const { width, height } = ASPECTS[aspect];
   const hash = hashSeed(seed);
   const random = createRandom(hash);
 
-  // A wide band needs more waypoints to read as a route rather than a
-  // line, so it carries one more than a card does.
-  const nodeCount = aspect === 'band' ? 4 + (hash % 3) : 3 + (hash % 3);
+  const nodeCount = Math.max(2, stops);
+
+  // The waypoints are spread evenly across the plate. The jitter is kept
+  // below a quarter of the gap between them, so the route never doubles
+  // back on itself however many stops there are.
+  const span = 0.84;
+  const gap = span / (nodeCount - 1);
+  const jitter = Math.min(0.06, gap * 0.25);
+
+  // The route wanders: each waypoint is a bounded step from the last one,
+  // so a long route reads as a journey rather than as a scribble.
+  const margin = height * 0.14;
+  const limit = height - margin;
+  const maxStep = height * 0.28;
+
   const nodes: RouteNode[] = [];
+  let y = margin + random() * (limit - margin);
 
   for (let index = 0; index < nodeCount; index += 1) {
-    const span = index / (nodeCount - 1);
-    const x = width * (0.08 + 0.84 * span) + (random() - 0.5) * (width * 0.06);
-    const y = height * (0.14 + random() * 0.72);
+    const x =
+      width * (0.08 + span * (index / (nodeCount - 1))) +
+      (random() - 0.5) * width * jitter;
+
+    if (index > 0) {
+      y = reflect(y + (random() - 0.5) * maxStep, margin, limit);
+    }
 
     nodes.push({
       x: round(clamp(x, 4, width - 4)),
-      y: round(clamp(y, 6, height - 6)),
+      y: round(clamp(y, margin, limit)),
     });
   }
 

@@ -20,42 +20,44 @@ describe('hashSeed', () => {
 
 describe('routeMotif', () => {
   it('should draw the same route for the same seed', () => {
-    expect(routeMotif('a-trip-id')).toEqual(routeMotif('a-trip-id'));
+    expect(routeMotif('a-trip-id', 3)).toEqual(routeMotif('a-trip-id', 3));
   });
 
   it('should draw a different route for a different seed', () => {
-    expect(routeMotif('a-trip-id').path).not.toBe(routeMotif('another-trip-id').path);
+    expect(routeMotif('a-trip-id', 3).path).not.toBe(routeMotif('another-trip-id', 3).path);
   });
 
-  it('should draw between three and five waypoints', () => {
-    for (const seed of ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']) {
-      const nodes = routeMotif(seed).nodes;
-
-      expect(nodes.length).toBeGreaterThanOrEqual(3);
-      expect(nodes.length).toBeLessThanOrEqual(5);
+  it('should draw one waypoint for each stop', () => {
+    for (const stops of [2, 3, 4, 5, 6, 10, 20]) {
+      expect(routeMotif('a-trip-id', stops).nodes).toHaveLength(stops);
     }
   });
 
-  it('should draw one more waypoint on a band than on a card', () => {
-    for (const seed of ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']) {
-      const band = routeMotif(seed, 'band').nodes;
-      const card = routeMotif(seed, 'card').nodes;
+  it('should draw two waypoints for a trip with a single stop', () => {
+    expect(routeMotif('a-trip-id', 1).nodes).toHaveLength(2);
+  });
 
-      expect(band.length).toBe(card.length + 1);
-      expect(band.length).toBeGreaterThanOrEqual(4);
-      expect(band.length).toBeLessThanOrEqual(6);
+  it('should draw two waypoints for a trip with no stops at all', () => {
+    expect(routeMotif('a-trip-id', 0).nodes).toHaveLength(2);
+  });
+
+  it('should draw the same number of waypoints on a band as on a card', () => {
+    for (const stops of [1, 2, 3, 6]) {
+      expect(routeMotif('a-trip-id', stops, 'band').nodes).toHaveLength(
+        routeMotif('a-trip-id', stops, 'card').nodes.length,
+      );
     }
   });
 
   it('should start the path at the first waypoint', () => {
-    const motif = routeMotif('a-trip-id');
+    const motif = routeMotif('a-trip-id', 3);
     const first = motif.nodes[0];
 
     expect(motif.path.startsWith(`M ${first.x} ${first.y}`)).toBe(true);
   });
 
   it('should draw the line through every waypoint', () => {
-    const motif = routeMotif('a-trip-id');
+    const motif = routeMotif('a-trip-id', 6);
 
     for (const node of motif.nodes) {
       expect(motif.path).toContain(`${node.x} ${node.y}`);
@@ -63,7 +65,7 @@ describe('routeMotif', () => {
   });
 
   it('should draw a graticule of chart lines', () => {
-    const graticule = routeMotif('a-trip-id').graticule;
+    const graticule = routeMotif('a-trip-id', 3).graticule;
 
     expect(graticule.startsWith('M ')).toBe(true);
     expect(graticule.split('M ').length).toBe(8);
@@ -72,8 +74,8 @@ describe('routeMotif', () => {
   it('should keep every waypoint on the drawing', () => {
     const { width, height } = plateDimensions('card');
 
-    for (const seed of ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']) {
-      for (const node of routeMotif(seed).nodes) {
+    for (const stops of [1, 2, 3, 6, 12, 20]) {
+      for (const node of routeMotif('a-trip-id', stops).nodes) {
         expect(node.x).toBeGreaterThanOrEqual(0);
         expect(node.x).toBeLessThanOrEqual(width);
         expect(node.y).toBeGreaterThanOrEqual(0);
@@ -82,12 +84,31 @@ describe('routeMotif', () => {
     }
   });
 
+  it('should never let the route double back on itself', () => {
+    for (const stops of [2, 3, 6, 12, 20]) {
+      const nodes = routeMotif('a-trip-id', stops).nodes;
+
+      for (let index = 1; index < nodes.length; index += 1) {
+        expect(nodes[index].x).toBeGreaterThan(nodes[index - 1].x);
+      }
+    }
+  });
+
+  it('should keep a long route on the drawing rather than piling up at one edge', () => {
+    const { height } = plateDimensions('card');
+    const nodes = routeMotif('a-trip-id', 20).nodes;
+    const distinct = new Set(nodes.map((node) => node.y));
+
+    expect(distinct.size).toBeGreaterThan(4);
+    expect(Math.max(...nodes.map((node) => node.y))).toBeLessThanOrEqual(height);
+  });
+
   it('should draw a wider band than a card', () => {
     expect(plateDimensions('band').width).toBeGreaterThan(plateDimensions('card').width);
   });
 
   it('should draw on an empty seed without throwing', () => {
-    expect(() => routeMotif('')).not.toThrow();
+    expect(() => routeMotif('', 3)).not.toThrow();
   });
 });
 

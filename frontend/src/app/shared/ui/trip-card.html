@@ -2,8 +2,9 @@
   <app-destination-plate
     class="trip-card__plate"
     [seed]="trip().id"
-    [destination]="trip().destination"
+    [destination]="origin()"
     [index]="index()"
+    [stops]="trip().destinations.length"
     [aspect]="aspect()"
   />
 
@@ -13,18 +14,14 @@
       <app-status-badge [label]="trip().status" [tone]="toneFor(trip().status)" />
     </header>
 
-    <p class="trip-card__destination">
-      <span>{{ trip().destination }}</span>
-      @if (dates(); as range) {
-        <span class="trip-card__duration">{{ range.duration }}</span>
-      }
-    </p>
+    <p class="trip-card__route">{{ route() }}</p>
 
     <p class="trip-card__dates">
       @if (dates(); as range) {
         <time [attr.datetime]="trip().startsOn">{{ range.start }}</time>
         <span class="trip-card__dash" aria-hidden="true"> – </span>
         <time [attr.datetime]="trip().endsOn">{{ range.end }}</time>
+        <span class="trip-card__duration">{{ range.duration }}</span>
       } @else {
         <time [attr.datetime]="trip().startsOn">{{ trip().startsOn }}</time>
         <span class="trip-card__dash" aria-hidden="true"> – </span>

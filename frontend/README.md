@@ -34,7 +34,7 @@ src/
 │   │   └── models/        HealthReport, Trip
 │   ├── features/          home/, trips/, trip-create/, trip-detail/ — one folder per screen
 │   └── shared/
-│       ├── format/        pure formatting helpers, e.g. trip dates
+│       ├── format/        pure formatting helpers, e.g. trip dates and the route label
 │       ├── media/         the route motif generator
 │       └── ui/            reusable presentational components
 └── public/
@@ -61,6 +61,11 @@ stylesheet is for that component's layout; anything shared belongs in
   graticule, a route motif and the destination set in type — generated from
   the trip's id by `route-motif.ts`. Nothing selects media by guessing from
   the destination text, and there is no destination-to-asset table.
+- **A trip is a route.** A trip holds an ordered list of stops. The `.route`
+  primitives draw them as a numbered list joined by a hairline, and they are
+  used twice: the create form builds a route with them and the trip page
+  reads one back with them. The stops are moved with up and down buttons, so
+  reordering works from the keyboard without a library.
 
 ## Scripts
 

@@ -14,12 +14,15 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
 
     public Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return dbContext.Trips.SingleOrDefaultAsync(trip => trip.Id == id, cancellationToken);
+        return dbContext.Trips
+            .Include(trip => trip.Destinations.OrderBy(destination => destination.SortOrder))
+            .SingleOrDefaultAsync(trip => trip.Id == id, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Trip>> ListAsync(CancellationToken cancellationToken = default)
     {
         return await dbContext.Trips
+            .Include(trip => trip.Destinations.OrderBy(destination => destination.SortOrder))
             .OrderBy(trip => trip.StartsOn)
             .ThenBy(trip => trip.Name)
             .ToListAsync(cancellationToken);

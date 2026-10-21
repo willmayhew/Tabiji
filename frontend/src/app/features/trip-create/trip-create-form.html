@@ -26,28 +26,84 @@
   <fieldset class="fieldset">
     <legend class="fieldset__legend">
       <span class="fieldset__index">02</span>
-      <span>Destination</span>
-      <span class="fieldset__hint">A city, a region or a country</span>
+      <span>Route</span>
+      <span class="fieldset__hint">The places you are going, in the order you visit them</span>
     </legend>
 
-    <div class="field">
-      <label class="field-label" for="trip-destination">Where to</label>
-      <input
-        id="trip-destination"
-        type="text"
-        formControlName="destination"
-        [attr.maxlength]="destinationMaxLength"
-        autocomplete="off"
-        [attr.aria-invalid]="errorFor('destination') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('destination') ? 'trip-destination-error' : 'trip-destination-hint'"
-      />
-      <p class="field-hint" id="trip-destination-hint">
-        The place you are going, such as Rome, Patagonia or Iceland.
-      </p>
-      @if (errorFor('destination'); as message) {
-        <p class="field-error" id="trip-destination-error">{{ message }}</p>
+    <ol class="route" formArrayName="destinations">
+      @for (control of destinations.controls; track control; let index = $index) {
+        <li class="route__row">
+          <label class="route__node" [for]="destinationInputId(index)">
+            <span class="visually-hidden">Destination {{ index + 1 }}</span>
+            <span aria-hidden="true">{{ index + 1 < 10 ? '0' + (index + 1) : index + 1 }}</span>
+          </label>
+
+          <input
+            class="route__input"
+            [id]="destinationInputId(index)"
+            type="text"
+            [formControl]="control"
+            [attr.maxlength]="destinationMaxLength"
+            autocomplete="off"
+            [attr.aria-invalid]="destinationError(index) ? 'true' : null"
+            [attr.aria-describedby]="destinationError(index) ? 'trip-destination-error-' + index : null"
+          />
+
+          <span class="route__actions">
+            <button
+              type="button"
+              class="icon-button"
+              [id]="destinationActionId(index, 'up')"
+              (click)="moveUp(index)"
+              [disabled]="index === 0"
+              [attr.aria-label]="'Move ' + stopName(index) + ' up'"
+            >
+              <span aria-hidden="true">&uarr;</span>
+            </button>
+            <button
+              type="button"
+              class="icon-button"
+              [id]="destinationActionId(index, 'down')"
+              (click)="moveDown(index)"
+              [disabled]="index === destinations.length - 1"
+              [attr.aria-label]="'Move ' + stopName(index) + ' down'"
+            >
+              <span aria-hidden="true">&darr;</span>
+            </button>
+            <button
+              type="button"
+              class="icon-button icon-button--danger"
+              [id]="destinationActionId(index, 'remove')"
+              (click)="removeDestination(index)"
+              [disabled]="destinations.length <= 1"
+              [attr.aria-label]="'Remove ' + stopName(index)"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </span>
+
+          @if (destinationError(index); as message) {
+            <p class="field-error" [id]="'trip-destination-error-' + index">{{ message }}</p>
+          }
+        </li>
       }
+    </ol>
+
+    <div class="route__add">
+      <button
+        type="button"
+        class="button button--secondary"
+        (click)="addDestination()"
+        [disabled]="destinations.length >= maxDestinations"
+      >
+        Add a destination
+      </button>
+      <p class="field-hint">Up to {{ maxDestinations }} stops.</p>
     </div>
+
+    @if (routeError(); as message) {
+      <p class="field-error" id="trip-route-error">{{ message }}</p>
+    }
   </fieldset>
 
   <fieldset class="fieldset">
@@ -85,6 +141,8 @@
       <p class="field-error" id="trip-dates-error">{{ message }}</p>
     }
   </fieldset>
+
+  <p class="visually-hidden" aria-live="polite">{{ announcement() }}</p>
 
   @if (error(); as message) {
     <p class="field-error field-error--api" role="alert">{{ message }}</p>

@@ -91,7 +91,7 @@
               <span class="journey-list__index">{{ index + 1 < 10 ? '0' + (index + 1) : index + 1 }}</span>
               <span class="journey-list__body">
                 <span class="journey-list__name">{{ trip.name }}</span>
-                <span class="journey-list__where">{{ trip.destination }}</span>
+                <span class="journey-list__where">{{ route(trip) }}</span>
               </span>
               <span class="journey-list__when">
                 @if (dateRange(trip); as range) {

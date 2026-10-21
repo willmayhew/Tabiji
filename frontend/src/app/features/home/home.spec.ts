@@ -9,7 +9,10 @@ const journeys: Trip[] = [
   {
     id: '11111111-1111-1111-1111-111111111111',
     name: 'Rome & Amalfi',
-    destination: 'Italy',
+    destinations: [
+      { name: 'Rome', sortOrder: 0 },
+      { name: 'Amalfi', sortOrder: 1 },
+    ],
     startsOn: '2027-05-01',
     endsOn: '2027-05-12',
     status: 'Planning',
@@ -17,7 +20,7 @@ const journeys: Trip[] = [
   {
     id: '22222222-2222-2222-2222-222222222222',
     name: 'Reykjavík & the Ring Road',
-    destination: 'Iceland',
+    destinations: [{ name: 'Reykjavík', sortOrder: 0 }],
     startsOn: '2027-06-02',
     endsOn: '2027-06-08',
     status: 'Confirmed',
@@ -105,7 +108,7 @@ describe('Home', () => {
     fixture.detectChanges();
 
     expect(element().textContent).toContain('Rome & Amalfi');
-    expect(element().textContent).toContain('Iceland');
+    expect(element().textContent).toContain('Reykjavík');
     expect(element().querySelectorAll('.journey-list__row')).toHaveLength(2);
   });
 

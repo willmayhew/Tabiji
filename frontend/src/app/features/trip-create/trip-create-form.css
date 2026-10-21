@@ -26,6 +26,12 @@
   order: 3;
 }
 
+/* A stop's own message runs under the whole row, not under its input. */
+.form .route__row .field-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .form .button {
   margin-top: var(--space-2xs);
 }
@@ -33,5 +39,15 @@
 @media (max-width: 40rem) {
   .form-row {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On a narrow screen the buttons sit under the input, so the row grows
+     and the line that joins the stops stays put. */
+  .form .route__row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .form .route__actions {
+    grid-column: 2;
   }
 }

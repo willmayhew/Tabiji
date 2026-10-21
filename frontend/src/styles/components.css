@@ -697,3 +697,140 @@
   text-decoration: underline;
   text-underline-offset: 0.18em;
 }
+
+/* Route --------------------------------------------------------------
+   The stops of a trip, in order. The same list is used to build a route in
+   the create form and to read one back on the trip page, so the two always
+   look the same.
+
+   The hairline that joins the stops is the same device the destination
+   plates draw their route with. */
+
+.route {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) 0;
+}
+
+/* The line that joins one stop to the next. */
+.route__row::before {
+  content: '';
+  position: absolute;
+  left: 0.6875rem;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-rule);
+}
+
+.route__row:first-child::before {
+  top: 50%;
+}
+
+.route__row:last-child::before {
+  bottom: 50%;
+}
+
+.route__node {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-terracotta-deep);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* The node is a label in the editor, so it takes the focus of its input. */
+label.route__node {
+  cursor: pointer;
+}
+
+label.route__node:hover {
+  border-color: var(--color-forest);
+}
+
+.route__input {
+  width: 100%;
+  min-width: 0;
+}
+
+.route__name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
+}
+
+.route__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4xs);
+}
+
+.route__add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex-wrap: wrap;
+  padding-top: var(--space-2xs);
+}
+
+/* A read-only route has no input and no buttons. */
+.route--readout .route__row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+}
+
+/* Icon buttons -------------------------------------------------------- */
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: var(--color-forest);
+  color: var(--color-forest);
+}
+
+.icon-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.icon-button--danger:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}

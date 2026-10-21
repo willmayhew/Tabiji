@@ -4,8 +4,12 @@ import { TripCard } from './trip-card';
 
 const confirmed: Trip = {
   id: '5f2b1c4e-0000-0000-0000-000000000000',
-  name: 'Tokyo & Kyoto',
-  destination: 'Japan',
+  name: 'Rome & Amalfi',
+  destinations: [
+    { name: 'Rome', sortOrder: 0 },
+    { name: 'Amalfi', sortOrder: 1 },
+    { name: 'Naples', sortOrder: 2 },
+  ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-14',
   status: 'Confirmed',
@@ -28,9 +32,57 @@ describe('TripCard', () => {
 
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector('.trip-card__name')?.textContent).toContain('Tokyo & Kyoto');
-    expect(element.querySelector('.trip-card__destination')?.textContent).toContain('Japan');
+    expect(element.querySelector('.trip-card__name')?.textContent).toContain('Rome & Amalfi');
+    expect(element.querySelector('.trip-card__route')?.textContent).toContain('Rome → Amalfi');
     expect(element.querySelector('.trip-card__dates')?.textContent).toContain('1 Apr – 14 Apr 2027');
+  });
+
+  it('should set the whole route out in order', () => {
+    fixture.componentRef.setInput('trip', confirmed);
+    fixture.detectChanges();
+
+    const route = (fixture.nativeElement as HTMLElement).querySelector('.trip-card__route');
+
+    expect(route?.textContent).toContain('Rome → Amalfi → Naples');
+  });
+
+  it('should label the plate with the first stop', () => {
+    fixture.componentRef.setInput('trip', confirmed);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('.plate__destination')?.textContent).toContain('Rome');
+  });
+
+  it('should count the stops it does not have room for', () => {
+    fixture.componentRef.setInput('trip', {
+      ...confirmed,
+      destinations: [
+        { name: 'Rome', sortOrder: 0 },
+        { name: 'Amalfi', sortOrder: 1 },
+        { name: 'Naples', sortOrder: 2 },
+        { name: 'Bari', sortOrder: 3 },
+        { name: 'Matera', sortOrder: 4 },
+      ],
+    });
+    fixture.detectChanges();
+
+    const route = (fixture.nativeElement as HTMLElement).querySelector('.trip-card__route');
+
+    expect(route?.textContent).toContain('+2 more');
+  });
+
+  it('should say so when a trip has no stops at all', () => {
+    fixture.componentRef.setInput('trip', { ...confirmed, destinations: [] });
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('.trip-card__route')?.textContent).toContain(
+      'No destinations recorded',
+    );
+    expect(element.querySelector('.plate__destination')).toBeNull();
   });
 
   it('should keep the machine readable dates on the time elements', () => {

@@ -28,43 +28,54 @@ describe('TripsService', () => {
     request.flush([
       {
         id: '5f2b1c4e-0000-0000-0000-000000000000',
-        name: 'Tokyo',
-        destination: 'Japan',
+        name: 'Rome & Amalfi',
+        destinations: [
+          { name: 'Rome', sortOrder: 0 },
+          { name: 'Amalfi', sortOrder: 1 },
+        ],
         startsOn: '2027-04-01',
         endsOn: '2027-04-14',
         status: 'Planning',
       },
     ]);
 
-    expect(names).toEqual(['Tokyo']);
+    expect(names).toEqual(['Rome & Amalfi']);
   });
 
   it('should post a new trip', () => {
     let name: string | undefined;
 
     service
-      .create({ name: 'Tokyo', destination: 'Japan', startsOn: '2027-04-01', endsOn: '2027-04-14' })
+      .create({
+        name: 'Rome & Amalfi',
+        destinations: ['Rome', 'Amalfi'],
+        startsOn: '2027-04-01',
+        endsOn: '2027-04-14',
+      })
       .subscribe((trip) => (name = trip.name));
 
     const request = http.expectOne('/api/trips');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({
-      name: 'Tokyo',
-      destination: 'Japan',
+      name: 'Rome & Amalfi',
+      destinations: ['Rome', 'Amalfi'],
       startsOn: '2027-04-01',
       endsOn: '2027-04-14',
     });
 
     request.flush({
       id: '5f2b1c4e-0000-0000-0000-000000000000',
-      name: 'Tokyo',
-      destination: 'Japan',
+      name: 'Rome & Amalfi',
+      destinations: [
+        { name: 'Rome', sortOrder: 0 },
+        { name: 'Amalfi', sortOrder: 1 },
+      ],
       startsOn: '2027-04-01',
       endsOn: '2027-04-14',
       status: 'Planning',
     });
 
-    expect(name).toBe('Tokyo');
+    expect(name).toBe('Rome & Amalfi');
   });
 
   it('should request a trip by id', () => {
@@ -76,8 +87,11 @@ describe('TripsService', () => {
     expect(request.request.method).toBe('GET');
     request.flush({
       id: '5f2b1c4e-0000-0000-0000-000000000000',
-      name: 'Tokyo',
-      destination: 'Japan',
+      name: 'Rome & Amalfi',
+      destinations: [
+        { name: 'Rome', sortOrder: 0 },
+        { name: 'Amalfi', sortOrder: 1 },
+      ],
       startsOn: '2027-04-01',
       endsOn: '2027-04-14',
       status: 'Planning',
