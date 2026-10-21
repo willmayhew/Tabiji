@@ -18,7 +18,9 @@
   order: 2;
 }
 
-.form input {
+/* The trip's own fields fill the column. The fields of a stop do not: they
+   sit beside the name and keep the width a date needs. */
+.form .field input {
   width: 100%;
 }
 

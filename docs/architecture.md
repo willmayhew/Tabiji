@@ -579,7 +579,10 @@ numbered stop joined to the next by a hairline. The editor uses them to *build* 
 and the trip page uses them to *read* one back, so the two always look the same. The
 hairline that joins the stops is the same device the destination plates draw their route
 with. A stop carries its name and its two date fields in one cell, so that the row stays
-a single grid row and the hairline is not disturbed by the dates.
+a single grid row and the hairline is not disturbed by the dates. The name keeps its room
+and the dates give way when there is not enough space, because a place without a name is
+not a place; the caption of a date travels with its field, so the two are never left
+apart.
 
 **The editor is shared.** `shared/form/trip-form.ts` is the route builder, and it is used
 by two screens: the create page, and the trip page in its edit mode. The stops live in a

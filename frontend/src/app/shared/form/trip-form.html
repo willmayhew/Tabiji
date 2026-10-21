@@ -51,27 +51,31 @@
             />
 
             <div class="route__dates">
-              <span class="route__date-label" aria-hidden="true">Arrive</span>
-              <input
-                class="route__date"
-                type="date"
-                [id]="stopDateInputId(index, 'startsOn')"
-                formControlName="startsOn"
-                [attr.aria-label]="'Arrival date at ' + stopName(index)"
-                [attr.aria-invalid]="scheduleError(index) ? 'true' : null"
-                [attr.aria-describedby]="stopDescribedBy(index)"
-              />
+              <span class="route__date">
+                <span class="route__date-label" aria-hidden="true">Arrive</span>
+                <input
+                  class="route__date-input"
+                  type="date"
+                  [id]="stopDateInputId(index, 'startsOn')"
+                  formControlName="startsOn"
+                  [attr.aria-label]="'Arrival date at ' + stopName(index)"
+                  [attr.aria-invalid]="scheduleError(index) ? 'true' : null"
+                  [attr.aria-describedby]="stopDescribedBy(index)"
+                />
+              </span>
 
-              <span class="route__date-label" aria-hidden="true">Leave</span>
-              <input
-                class="route__date"
-                type="date"
-                [id]="stopDateInputId(index, 'endsOn')"
-                formControlName="endsOn"
-                [attr.aria-label]="'Departure date from ' + stopName(index)"
-                [attr.aria-invalid]="scheduleError(index) ? 'true' : null"
-                [attr.aria-describedby]="stopDescribedBy(index)"
-              />
+              <span class="route__date">
+                <span class="route__date-label" aria-hidden="true">Leave</span>
+                <input
+                  class="route__date-input"
+                  type="date"
+                  [id]="stopDateInputId(index, 'endsOn')"
+                  formControlName="endsOn"
+                  [attr.aria-label]="'Departure date from ' + stopName(index)"
+                  [attr.aria-invalid]="scheduleError(index) ? 'true' : null"
+                  [attr.aria-describedby]="stopDescribedBy(index)"
+                />
+              </span>
             </div>
           </div>
 

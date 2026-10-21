@@ -767,8 +767,11 @@ label.route__node:hover {
   border-color: var(--color-forest);
 }
 
+/* The name keeps its room. The dates are what give way when there is not
+   enough space, because a place without a name is not a place. */
 .route__input {
-  width: 100%;
+  flex: 1 1 8rem;
+  width: auto;
   min-width: 0;
 }
 
@@ -784,8 +787,8 @@ label.route__node:hover {
    is visited on. It stays one grid row so that the hairline joining the
    stops is not disturbed by the dates. */
 .route__stop {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-xs);
   min-width: 0;
@@ -798,7 +801,15 @@ label.route__node:hover {
   flex-wrap: wrap;
 }
 
+/* A date and the caption that names it. They are one piece, so that the
+   caption is never left behind when the pair wraps. */
 .route__date {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+.route__date-input {
   width: auto;
   min-width: 0;
 }
@@ -826,11 +837,34 @@ label.route__node:hover {
   font-style: italic;
 }
 
-/* On a narrow screen the dates drop under the name, inside the same cell. */
-@media (max-width: 47.99rem) {
-  .route__stop {
-    grid-template-columns: minmax(0, 1fr);
-  }
+/* The editor --------------------------------------------------------
+   A stop in the editor carries its dates as well as its name, so the row
+   is taller than the name and the node would drift away from it. The node
+   is put back in line with the name, and the hairline that joins the
+   stops is cut at the node's centre, so that it never floats above the
+   first stop or below the last one. */
+.route--editor {
+  --route-node-centre: 1.375rem;
+}
+
+.route--editor .route__row {
+  align-items: start;
+}
+
+.route--editor .route__node {
+  margin-top: calc(var(--route-node-centre) - 0.6875rem);
+}
+
+.route--editor .route__actions {
+  margin-top: 0.5rem;
+}
+
+.route--editor .route__row:first-child::before {
+  top: var(--route-node-centre);
+}
+
+.route--editor .route__row:last-child::before {
+  bottom: calc(100% - var(--route-node-centre));
 }
 
 .route__actions {
