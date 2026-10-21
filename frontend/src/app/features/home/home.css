@@ -87,7 +87,7 @@
 .hero__mark {
   position: absolute;
   right: var(--space-sm);
-  bottom: -0.18em;
+  bottom: 0.2em;
   color: var(--color-rule);
   font-family: var(--font-display);
   font-size: 7rem;

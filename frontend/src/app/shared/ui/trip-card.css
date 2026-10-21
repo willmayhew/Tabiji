@@ -51,9 +51,17 @@
 }
 
 .trip-card--band .trip-card__body {
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-2xs);
   padding: var(--space-md) var(--space-lg) var(--space-lg);
+}
+
+/* The dates sit at the foot of the card, the way a printed page carries its
+   imprint at the bottom. A band is short, so the card is often taller than
+   the band needs, and the space belongs between the route and the dates
+   rather than between the name and the route. */
+.trip-card--band .trip-card__dates {
+  margin-top: auto;
 }
 
 .trip-card__route {

@@ -424,8 +424,12 @@
   aspect-ratio: 4 / 3;
 }
 
+/* A band is a letterbox: a wide, shallow strip that titles a page. It
+   keeps to its ratio at every width, so it holds no minimum height of its
+   own — the ratio is what gives it its shape. */
 .plate--band {
-  aspect-ratio: 21 / 9;
+  aspect-ratio: 21 / 4;
+  min-height: 0;
 }
 
 .plate__motif {

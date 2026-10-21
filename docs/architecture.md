@@ -576,6 +576,10 @@ without the plate ever being wrong about where the trip is.
 A trip with no stops at all — a legacy trip whose destination was blank — still renders the
 motif with a label and an explicit *"No destinations recorded"* line, never a blank gap.
 
+**A band is a letterbox.** It is 21:4 — a wide, shallow strip — and the view box matches
+that ratio exactly, so the drawing is never distorted. A band holds no minimum height of
+its own: the ratio gives it its shape at every width, from a phone to a wide screen.
+
 **The route is one list, used twice.** The `.route` primitives in `components.css` draw a
 numbered stop joined to the next by a hairline. The editor uses them to *build* a route
 and the trip page uses them to *read* one back, so the two always look the same. The
