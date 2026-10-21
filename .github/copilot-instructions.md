@@ -170,6 +170,15 @@ npm test
 - Do not drop the legacy `Trips.Destination` column. It is kept for one release, mapped
   as a shadow property, and is removed by a migration of its own once the backfill in
   `backend/verify-migration.sql` has been verified.
+- Do not reorder a route to match its dates. The order is the traveller's. A route whose
+  dates contradict the order is refused with a message naming the stops at fault, and the
+  traveller puts it right. The chronological rule lives in
+  `Tabiji.Domain.Trips.TripSchedule` and is mirrored in
+  `frontend/src/app/shared/validate/trip-destinations.ts`.
+- Do not let the change tracker move a stop into a place another stop is holding. The
+  unique index on `(TripId, SortOrder)` makes the tracker read that as a circular
+  dependency, and it refuses to save. `TripRepository.UpdateAsync` moves the positions in
+  the database instead.
 
 ## Before opening a pull request
 

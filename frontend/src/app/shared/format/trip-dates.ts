@@ -91,3 +91,45 @@ export function formatTripDates(startsOn: string, endsOn: string): TripDateRange
     duration: `${days} ${days === 1 ? 'day' : 'days'}`,
   };
 }
+
+/**
+ * Formats the planned stay at a stop.
+ *
+ * A stop may have both dates, one of them or neither. The two together read
+ * as a stay, one alone as a day that is fixed and one that is not.
+ *
+ * Returns `null` when neither date has been decided, or when a date is not a
+ * plain `YYYY-MM-DD` value.
+ */
+export function formatDestinationDates(
+  startsOn: string | null,
+  endsOn: string | null,
+): string | null {
+  if (startsOn === null && endsOn === null) {
+    return null;
+  }
+
+  if (startsOn !== null && endsOn !== null) {
+    const start = parseIsoDate(startsOn);
+    const end = parseIsoDate(endsOn);
+
+    if (start === null || end === null) {
+      return null;
+    }
+
+    const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+    const startText = sameYear ? dayMonth.format(start) : dayMonthYear.format(start);
+
+    return `${startText} – ${dayMonthYear.format(end)}`;
+  }
+
+  const single = parseIsoDate(startsOn ?? endsOn ?? '');
+
+  if (single === null) {
+    return null;
+  }
+
+  return startsOn !== null
+    ? `From ${dayMonthYear.format(single)}`
+    : `Until ${dayMonthYear.format(single)}`;
+}

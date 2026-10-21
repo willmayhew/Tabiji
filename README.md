@@ -169,6 +169,7 @@ Base URL in development: `http://localhost:5080`.
 | `GET` | `/api/trips` | Lists every trip, ordered by start date and then by name. |
 | `POST` | `/api/trips` | Creates a trip. |
 | `GET` | `/api/trips/{id}` | Returns a single trip. |
+| `PUT` | `/api/trips/{id}` | Replaces a trip and its route. |
 | `GET` | `/openapi/v1.json` | The OpenAPI document. |
 
 List the trips:
@@ -181,14 +182,32 @@ curl http://localhost:5080/api/trips
 [
   {
     "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
-    "name": "Rome & Amalfi",
+    "name": "Japan Adventure",
     "destinations": [
-      { "name": "Rome", "sortOrder": 0 },
-      { "name": "Amalfi", "sortOrder": 1 },
-      { "name": "Naples", "sortOrder": 2 }
+      {
+        "id": "6d343873-45bc-42c6-abc2-5c271f99354a",
+        "name": "Osaka",
+        "sortOrder": 0,
+        "startsOn": "2027-05-16",
+        "endsOn": "2027-05-20"
+      },
+      {
+        "id": "3c21be5e-0868-4a3e-91c6-64b72892eaa3",
+        "name": "Kyoto",
+        "sortOrder": 1,
+        "startsOn": "2027-05-20",
+        "endsOn": "2027-05-24"
+      },
+      {
+        "id": "6df575e9-6e69-4c8a-b55e-52573a32168f",
+        "name": "Ise",
+        "sortOrder": 2,
+        "startsOn": null,
+        "endsOn": null
+      }
     ],
-    "startsOn": "2027-04-01",
-    "endsOn": "2027-04-14",
+    "startsOn": "2027-05-16",
+    "endsOn": "2027-06-05",
     "status": "Planning"
   }
 ]
@@ -199,27 +218,30 @@ Create a trip:
 ```bash
 curl -X POST http://localhost:5080/api/trips \
   -H "Content-Type: application/json" \
-  -d '{"name":"Rome & Amalfi","destinations":["Rome","Amalfi","Naples"],"startsOn":"2027-04-01","endsOn":"2027-04-14"}'
+  -d '{"name":"Japan Adventure","startsOn":"2027-05-16","endsOn":"2027-06-05","destinations":[{"name":"Osaka","startsOn":"2027-05-16","endsOn":"2027-05-20"},{"name":"Kyoto","startsOn":"2027-05-20","endsOn":"2027-05-24"},{"name":"Ise","startsOn":null,"endsOn":null}]}'
 ```
 
-```json
-{
-  "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
-  "name": "Rome & Amalfi",
-  "destinations": [
-    { "name": "Rome", "sortOrder": 0 },
-    { "name": "Amalfi", "sortOrder": 1 },
-    { "name": "Naples", "sortOrder": 2 }
-  ],
-  "startsOn": "2027-04-01",
-  "endsOn": "2027-04-14",
-  "status": "Planning"
-}
+Change a trip — the request holds the whole trip, and the order of the array is the route:
+
+```bash
+curl -X PUT http://localhost:5080/api/trips/c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Japan Adventure","startsOn":"2027-05-16","endsOn":"2027-06-05","destinations":[{"id":"6d343873-45bc-42c6-abc2-5c271f99354a","name":"Osaka","startsOn":"2027-05-16","endsOn":"2027-05-20"},{"id":null,"name":"Nagoya","startsOn":null,"endsOn":null}]}'
 ```
+
+A destination with an `id` is a stop that already exists: it is renamed, rescheduled and
+moved to its new position, and it keeps its identity. A destination with `"id": null` is a
+new stop. A stop the request leaves out is removed. A date sent as `null` is cleared.
 
 A trip holds an **ordered route** of destinations, at least one and at most twenty. Each
 name is free text of up to 200 characters: it is never parsed and never compared against a
 list of countries, so any place in the world is accepted.
+
+Each destination also carries the **optional days of its stay**. Both may be left out, so a
+place can be added before its dates are known. Every date must fall inside the trip's own
+dates, a destination may not end before it starts, and the route must be able to be
+visited in the order it is given. The order is the traveller's: a route whose dates
+contradict it is refused with a message naming both stops, never silently reordered.
 
 ---
 
@@ -266,18 +288,24 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 59 tests
-cd frontend && npm test           # 141 tests
+dotnet test backend/Tabiji.sln   # 117 tests
+cd frontend && npm test           # 197 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that
-boot the real host in memory. **No test needs a running database** — the liveness probe
-performs no I/O by design, the readiness test asserts a well-formed report rather than
-a specific outcome, and the route table is checked against the EF model rather than
+boot the real host in memory. **Almost no test needs a running database** — the liveness
+probe performs no I/O by design, the readiness test asserts a well-formed report rather
+than a specific outcome, and the route table is checked against the EF model rather than
 against a server.
 
-The frontend suite covers the root component, the two API clients, the date rule, the
-route motif, the destination plate, the route builder and every screen.
+The exception is the repository suite, which writes a route to a real database, because
+that is the one thing that cannot be checked any other way. Those tests are marked with
+`[DatabaseFact]` and are **skipped** when SQL Server LocalDB cannot be reached, so the
+suite still runs on a machine with no database. They use a database of their own, created
+with the real migrations and dropped again afterwards.
+
+The frontend suite covers the root component, the two API clients, the rules, the route
+motif, the destination plate, the shared editor and every screen.
 
 ---
 

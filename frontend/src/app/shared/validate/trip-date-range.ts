@@ -1,6 +1,5 @@
 import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
-
-const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+import { toUtcTimestamp } from './iso-date';
 
 /**
  * Validates that a trip does not end before it starts.
@@ -40,15 +39,3 @@ export const tripDateRangeValidator: ValidatorFn = (
 
   return message ? { tripDates: { message } } : null;
 };
-
-function toUtcTimestamp(isoDate: string): number | null {
-  const match = ISO_DATE_PATTERN.exec(isoDate);
-
-  if (!match) {
-    return null;
-  }
-
-  const [, year, month, day] = match;
-
-  return Date.UTC(Number(year), Number(month) - 1, Number(day));
-}

@@ -28,5 +28,9 @@
         <time [attr.datetime]="trip().endsOn">{{ trip().endsOn }}</time>
       }
     </p>
+
+    @if (datedStops(); as note) {
+      <p class="trip-card__note">{{ note }}</p>
+    }
   </div>
 </article>

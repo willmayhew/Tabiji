@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Trip } from '../../core/models/trip';
-import { TripCreateForm } from './trip-create-form';
+import { TripForm } from '../../shared/form/trip-form';
 
 /**
  * The page that holds the create trip form. It exists so the form can have
@@ -9,7 +9,7 @@ import { TripCreateForm } from './trip-create-form';
  */
 @Component({
   selector: 'app-trip-create',
-  imports: [RouterLink, TripCreateForm],
+  imports: [RouterLink, TripForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-create.html',
   styleUrl: './trip-create.css',

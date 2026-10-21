@@ -32,8 +32,10 @@
   margin: 0;
 }
 
-.form .button {
-  margin-top: var(--space-2xs);
+.form__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
 }
 
 @media (max-width: 40rem) {

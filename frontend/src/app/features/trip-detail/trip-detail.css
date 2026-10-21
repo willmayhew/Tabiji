@@ -177,6 +177,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Edit mode ------------------------------------------------------------- */
+
+.detail__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: 46rem;
+}
+
+.detail__edit-button {
+  align-self: flex-start;
+}
+
+/* A quiet note under a list: how much of the schedule has been decided. */
+.detail__note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+}
+
 /* Wider screens --------------------------------------------------------- */
 
 @media (min-width: 56rem) {

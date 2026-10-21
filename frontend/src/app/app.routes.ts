@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from './features/trip-detail/trip-detail.guard';
 
 export const routes: Routes = [
   {
@@ -19,6 +20,7 @@ export const routes: Routes = [
   },
   {
     path: 'trips/:id',
+    canDeactivate: [unsavedChangesGuard],
     loadComponent: () => import('./features/trip-detail/trip-detail').then((m) => m.TripDetail),
     title: 'Tabiji — Trip',
   },

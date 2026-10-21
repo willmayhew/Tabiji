@@ -40,109 +40,134 @@
         />
       </header>
 
-      <div class="detail__masthead">
-        <h1 class="detail__name">{{ found.name }}</h1>
-        <div class="detail__facts">
-          <p class="detail__meta">
-            @if (dates(); as range) {
-              <time [attr.datetime]="found.startsOn">{{ range.start }}</time>
-              <span aria-hidden="true"> – </span>
-              <time [attr.datetime]="found.endsOn">{{ range.end }}</time>
-              <span class="detail__duration">{{ range.duration }}</span>
-            } @else {
-              <time [attr.datetime]="found.startsOn">{{ found.startsOn }}</time>
-              <span aria-hidden="true"> – </span>
-              <time [attr.datetime]="found.endsOn">{{ found.endsOn }}</time>
-            }
-          </p>
-          <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" />
+      @if (editing()) {
+        <div class="detail__edit">
+          <h1 class="detail__name">Edit trip</h1>
+          <app-trip-form
+            [trip]="found"
+            (saved)="onSaved($event)"
+            (cancelled)="cancelEditing()"
+          />
         </div>
-      </div>
-
-      <div class="detail__body">
-        <div class="detail__details">
-          <section class="detail__section">
-            <div class="section-head">
-              <h2>Route</h2>
-              @if (found.destinations.length > 0) {
-                <p class="section-head__meta">{{ routeSummary() }}</p>
-              }
-            </div>
-
-            @if (found.destinations.length === 0) {
-              <p class="muted">No destinations recorded.</p>
-            } @else {
-              <ol class="route route--readout">
-                @for (destination of found.destinations; track destination.sortOrder; let index = $index) {
-                  <li class="route__row">
-                    <span class="route__node" aria-hidden="true">
-                      {{ index + 1 < 10 ? '0' + (index + 1) : index + 1 }}
-                    </span>
-                    <span class="route__name">{{ destination.name }}</span>
-                  </li>
-                }
-              </ol>
-            }
-          </section>
-
-          <section class="detail__section">
-            <div class="section-head">
-              <h2>Details</h2>
-            </div>
-            <dl class="detail__list">
-              <div class="detail__row">
-                <dt>Starts</dt>
-                <dd>
-                  @if (startDate(); as value) {
-                    <time [attr.datetime]="found.startsOn">{{ value }}</time>
-                  } @else {
-                    {{ found.startsOn }}
-                  }
-                </dd>
-              </div>
-              <div class="detail__row">
-                <dt>Ends</dt>
-                <dd>
-                  @if (endDate(); as value) {
-                    <time [attr.datetime]="found.endsOn">{{ value }}</time>
-                  } @else {
-                    {{ found.endsOn }}
-                  }
-                </dd>
-              </div>
+      } @else {
+        <div class="detail__masthead">
+          <h1 class="detail__name">{{ found.name }}</h1>
+          <div class="detail__facts">
+            <p class="detail__meta">
               @if (dates(); as range) {
-                <div class="detail__row">
-                  <dt>Length</dt>
-                  <dd>{{ range.duration }}</dd>
-                </div>
+                <time [attr.datetime]="found.startsOn">{{ range.start }}</time>
+                <span aria-hidden="true"> – </span>
+                <time [attr.datetime]="found.endsOn">{{ range.end }}</time>
+                <span class="detail__duration">{{ range.duration }}</span>
+              } @else {
+                <time [attr.datetime]="found.startsOn">{{ found.startsOn }}</time>
+                <span aria-hidden="true"> – </span>
+                <time [attr.datetime]="found.endsOn">{{ found.endsOn }}</time>
               }
-            </dl>
-            <p class="detail__id">Id: <code>{{ found.id }}</code></p>
-          </section>
+            </p>
+            <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" />
+          </div>
+          <button type="button" class="button button--secondary detail__edit-button" (click)="startEditing()">
+            Edit trip
+          </button>
         </div>
 
-        <aside class="detail__aside">
-          <h2 class="detail__heading">Coming next</h2>
-          <p class="detail__aside-text">
-            This trip is the start of something bigger. These are on the way, so the whole group can
-            shape it together:
-          </p>
-          <ol class="detail__roadmap">
-            <li>
-              <span class="detail__roadmap-index">01</span>
-              <span>Invitations, so everyone joins the same trip</span>
-            </li>
-            <li>
-              <span class="detail__roadmap-index">02</span>
-              <span>Activity proposals and voting</span>
-            </li>
-            <li>
-              <span class="detail__roadmap-index">03</span>
-              <span>A shared itinerary</span>
-            </li>
-          </ol>
-        </aside>
-      </div>
+        <div class="detail__body">
+          <div class="detail__details">
+            <section class="detail__section">
+              <div class="section-head">
+                <h2>Route</h2>
+                @if (found.destinations.length > 0) {
+                  <p class="section-head__meta">{{ routeSummary() }}</p>
+                }
+              </div>
+
+              @if (found.destinations.length === 0) {
+                <p class="muted">No destinations recorded.</p>
+              } @else {
+                <ol class="route route--readout">
+                  @for (destination of found.destinations; track destination.id; let index = $index) {
+                    <li class="route__row">
+                      <span class="route__node" aria-hidden="true">
+                        {{ index + 1 < 10 ? '0' + (index + 1) : index + 1 }}
+                      </span>
+                      <div class="route__stop">
+                        <span class="route__name">{{ destination.name }}</span>
+                        <span
+                          class="route__dates-text"
+                          [class.route__dates-text--undecided]="!hasDates(destination)"
+                        >
+                          {{ destinationDates(destination) }}
+                        </span>
+                      </div>
+                    </li>
+                  }
+                </ol>
+                @if (datedStops(); as note) {
+                  <p class="detail__note">{{ note }}</p>
+                }
+              }
+            </section>
+
+            <section class="detail__section">
+              <div class="section-head">
+                <h2>Details</h2>
+              </div>
+              <dl class="detail__list">
+                <div class="detail__row">
+                  <dt>Starts</dt>
+                  <dd>
+                    @if (startDate(); as value) {
+                      <time [attr.datetime]="found.startsOn">{{ value }}</time>
+                    } @else {
+                      {{ found.startsOn }}
+                    }
+                  </dd>
+                </div>
+                <div class="detail__row">
+                  <dt>Ends</dt>
+                  <dd>
+                    @if (endDate(); as value) {
+                      <time [attr.datetime]="found.endsOn">{{ value }}</time>
+                    } @else {
+                      {{ found.endsOn }}
+                    }
+                  </dd>
+                </div>
+                @if (dates(); as range) {
+                  <div class="detail__row">
+                    <dt>Length</dt>
+                    <dd>{{ range.duration }}</dd>
+                  </div>
+                }
+              </dl>
+              <p class="detail__id">Id: <code>{{ found.id }}</code></p>
+            </section>
+          </div>
+
+          <aside class="detail__aside">
+            <h2 class="detail__heading">Coming next</h2>
+            <p class="detail__aside-text">
+              This trip is the start of something bigger. These are on the way, so the whole group can
+              shape it together:
+            </p>
+            <ol class="detail__roadmap">
+              <li>
+                <span class="detail__roadmap-index">01</span>
+                <span>Invitations, so everyone joins the same trip</span>
+              </li>
+              <li>
+                <span class="detail__roadmap-index">02</span>
+                <span>Activity proposals and voting</span>
+              </li>
+              <li>
+                <span class="detail__roadmap-index">03</span>
+                <span>A shared itinerary</span>
+              </li>
+            </ol>
+          </aside>
+        </div>
+      }
     </article>
   }
 </section>

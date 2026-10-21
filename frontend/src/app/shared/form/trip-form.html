@@ -30,30 +30,56 @@
       <span class="fieldset__hint">The places you are going, in the order you visit them</span>
     </legend>
 
-    <ol class="route" formArrayName="destinations">
+    <ol class="route route--editor" formArrayName="destinations">
       @for (control of destinations.controls; track control; let index = $index) {
-        <li class="route__row">
-          <label class="route__node" [for]="destinationInputId(index)">
+        <li class="route__row" [formGroupName]="index">
+          <label class="route__node" [for]="stopInputId(index)">
             <span class="visually-hidden">Destination {{ index + 1 }}</span>
             <span aria-hidden="true">{{ index + 1 < 10 ? '0' + (index + 1) : index + 1 }}</span>
           </label>
 
-          <input
-            class="route__input"
-            [id]="destinationInputId(index)"
-            type="text"
-            [formControl]="control"
-            [attr.maxlength]="destinationMaxLength"
-            autocomplete="off"
-            [attr.aria-invalid]="destinationError(index) ? 'true' : null"
-            [attr.aria-describedby]="destinationError(index) ? 'trip-destination-error-' + index : null"
-          />
+          <div class="route__stop">
+            <input
+              class="route__input"
+              [id]="stopInputId(index)"
+              type="text"
+              formControlName="name"
+              [attr.maxlength]="destinationMaxLength"
+              autocomplete="off"
+              [attr.aria-invalid]="destinationError(index) ? 'true' : null"
+              [attr.aria-describedby]="stopDescribedBy(index)"
+            />
+
+            <div class="route__dates">
+              <span class="route__date-label" aria-hidden="true">Arrive</span>
+              <input
+                class="route__date"
+                type="date"
+                [id]="stopDateInputId(index, 'startsOn')"
+                formControlName="startsOn"
+                [attr.aria-label]="'Arrival date at ' + stopName(index)"
+                [attr.aria-invalid]="scheduleError(index) ? 'true' : null"
+                [attr.aria-describedby]="stopDescribedBy(index)"
+              />
+
+              <span class="route__date-label" aria-hidden="true">Leave</span>
+              <input
+                class="route__date"
+                type="date"
+                [id]="stopDateInputId(index, 'endsOn')"
+                formControlName="endsOn"
+                [attr.aria-label]="'Departure date from ' + stopName(index)"
+                [attr.aria-invalid]="scheduleError(index) ? 'true' : null"
+                [attr.aria-describedby]="stopDescribedBy(index)"
+              />
+            </div>
+          </div>
 
           <span class="route__actions">
             <button
               type="button"
               class="icon-button"
-              [id]="destinationActionId(index, 'up')"
+              [id]="stopActionId(index, 'up')"
               (click)="moveUp(index)"
               [disabled]="index === 0"
               [attr.aria-label]="'Move ' + stopName(index) + ' up'"
@@ -63,7 +89,7 @@
             <button
               type="button"
               class="icon-button"
-              [id]="destinationActionId(index, 'down')"
+              [id]="stopActionId(index, 'down')"
               (click)="moveDown(index)"
               [disabled]="index === destinations.length - 1"
               [attr.aria-label]="'Move ' + stopName(index) + ' down'"
@@ -73,7 +99,7 @@
             <button
               type="button"
               class="icon-button icon-button--danger"
-              [id]="destinationActionId(index, 'remove')"
+              [id]="stopActionId(index, 'remove')"
               (click)="removeDestination(index)"
               [disabled]="destinations.length <= 1"
               [attr.aria-label]="'Remove ' + stopName(index)"
@@ -84,6 +110,12 @@
 
           @if (destinationError(index); as message) {
             <p class="field-error" [id]="'trip-destination-error-' + index">{{ message }}</p>
+          }
+          @if (destinationDatesError(index); as message) {
+            <p class="field-error" [id]="'trip-destination-dates-error-' + index">{{ message }}</p>
+          }
+          @if (scheduleError(index); as message) {
+            <p class="field-error" [id]="'trip-destination-schedule-' + index">{{ message }}</p>
           }
         </li>
       }
@@ -124,7 +156,6 @@
         />
         <p class="field-hint" id="trip-starts-on-hint">First day</p>
       </div>
-
       <div class="field">
         <label class="field-label" for="trip-ends-on">Ends on</label>
         <input
@@ -152,7 +183,19 @@
     <p class="field-success" role="status">{{ message }}</p>
   }
 
-  <button type="submit" class="button button--block" [disabled]="submitting()">
-    {{ submitting() ? 'Creating…' : 'Create trip' }}
-  </button>
+  <div class="form__actions">
+    <button type="submit" class="button button--block" [disabled]="submitting()">
+      @if (submitting()) {
+        {{ trip() ? 'Saving…' : 'Creating…' }}
+      } @else {
+        {{ trip() ? 'Save changes' : 'Create trip' }}
+      }
+    </button>
+
+    @if (trip()) {
+      <button type="button" class="button button--secondary button--block" (click)="cancel()">
+        Cancel
+      </button>
+    }
+  </div>
 </form>

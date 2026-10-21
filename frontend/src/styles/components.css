@@ -780,6 +780,59 @@ label.route__node:hover {
   overflow-wrap: anywhere;
 }
 
+/* The middle column of a stop: its name, and in the editor the two days it
+   is visited on. It stays one grid row so that the hairline joining the
+   stops is not disturbed by the dates. */
+.route__stop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.route__dates {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex-wrap: wrap;
+}
+
+.route__date {
+  width: auto;
+  min-width: 0;
+}
+
+/* The caption beside a date field. It is decoration: the field carries the
+   name of its stop in its accessible name, so the caption is hidden from
+   the reader. */
+.route__date-label {
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+/* The dates of a stop, read back on the trip page. */
+.route__dates-text {
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  white-space: nowrap;
+}
+
+.route__dates-text--undecided {
+  color: var(--color-ink-faint);
+  font-style: italic;
+}
+
+/* On a narrow screen the dates drop under the name, inside the same cell. */
+@media (max-width: 47.99rem) {
+  .route__stop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .route__actions {
   display: flex;
   align-items: center;

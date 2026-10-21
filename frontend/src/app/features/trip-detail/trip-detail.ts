@@ -1,13 +1,22 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
-import { Trip, TripStatus } from '../../core/models/trip';
-import { formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
+import { Trip, TripDestination, TripStatus } from '../../core/models/trip';
+import { formatDestinationDates, formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
 import { firstDestination, routeSummary } from '../../shared/format/trip-destinations';
+import { TripForm } from '../../shared/form/trip-form';
 import { DestinationPlate } from '../../shared/ui/destination-plate';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
@@ -19,7 +28,7 @@ interface TripDetailResult {
 
 @Component({
   selector: 'app-trip-detail',
-  imports: [DestinationPlate, RouterLink, StatusBadge],
+  imports: [DestinationPlate, RouterLink, StatusBadge, TripForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-detail.html',
   styleUrl: './trip-detail.css',
@@ -37,6 +46,12 @@ export class TripDetail {
   readonly error = signal<string | null>(null);
   readonly notFound = signal(false);
 
+  /** Whether the trip is being changed. */
+  readonly editing = signal(false);
+
+  /** The editor, when the page is in edit mode. */
+  private readonly tripForm = viewChild(TripForm);
+
   constructor() {
     this.route.paramMap
       .pipe(
@@ -45,6 +60,7 @@ export class TripDetail {
           this.trip.set(null);
           this.error.set(null);
           this.notFound.set(false);
+          this.editing.set(false);
         }),
         map((params) => params.get('id') ?? ''),
         switchMap((id) =>
@@ -80,6 +96,30 @@ export class TripDetail {
     this.retry.next();
   }
 
+  /** Starts changing the trip. */
+  protected startEditing(): void {
+    this.editing.set(true);
+  }
+
+  /** Backs out of a change without saving it. */
+  protected cancelEditing(): void {
+    this.editing.set(false);
+  }
+
+  /** Takes the trip the editor saved. */
+  protected onSaved(trip: Trip): void {
+    this.trip.set(trip);
+    this.editing.set(false);
+  }
+
+  /**
+   * Whether the reader has a change they have not saved. The guard on the
+   * route asks about it before the reader goes anywhere else.
+   */
+  hasUnsavedChanges(): boolean {
+    return this.editing() && (this.tripForm()?.isDirty() ?? false);
+  }
+
   protected readonly dates = computed(() => {
     const found = this.trip();
 
@@ -98,8 +138,23 @@ export class TripDetail {
     return found === null ? null : formatTripDate(found.endsOn);
   });
 
-  /** Where the journey starts, which is what the cover band is labelled with. */
+  /**
+   * Where the journey starts, which is what the cover band is labelled with.
+   *
+   * While the trip is being changed the label follows the first stop in the
+   * editor, so the plate keeps up with the reader.
+   */
   protected readonly origin = computed(() => {
+    const form = this.tripForm();
+
+    if (this.editing() && form) {
+      const name = form.form.controls.destinations.at(0)?.controls.name.value.trim();
+
+      if (name) {
+        return name;
+      }
+    }
+
     const found = this.trip();
 
     return found === null ? null : firstDestination(found.destinations);
@@ -111,6 +166,36 @@ export class TripDetail {
 
     return found === null ? '' : routeSummary(found.destinations);
   });
+
+  /**
+   * How many stops have dates, so that a partly planned trip does not look
+   * as though it were fully scheduled.
+   */
+  protected readonly datedStops = computed(() => {
+    const found = this.trip();
+
+    if (found === null || found.destinations.length === 0) {
+      return null;
+    }
+
+    const dated = found.destinations.filter(
+      (destination) => destination.startsOn !== null || destination.endsOn !== null,
+    ).length;
+
+    return dated === 0
+      ? null
+      : `Dates are set for ${dated} of ${found.destinations.length} stops`;
+  });
+
+  /** The dates of one stop, or a note that they have not been decided. */
+  protected destinationDates(destination: TripDestination): string {
+    return formatDestinationDates(destination.startsOn, destination.endsOn) ?? 'Dates not decided';
+  }
+
+  /** Whether a stop has any dates at all. */
+  protected hasDates(destination: TripDestination): boolean {
+    return destination.startsOn !== null || destination.endsOn !== null;
+  }
 
   protected toneFor(status: TripStatus): BadgeTone {
     switch (status) {

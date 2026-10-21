@@ -136,6 +136,39 @@ reads as a journey.
 
 ---
 
+## Phase 0.95 — Dated stops and a trip that can be changed · **Done**
+
+Let a stop say when the traveller expects to be there, and let the trip be changed after
+it has been made. The route was ordered in Phase 0.9; this gives it a *schedule*, and it
+gives the traveller the pen.
+
+- [x] A stop carries an optional start day and an optional end day. Both may be left
+      out, so a place can be added long before its dates are known
+- [x] `TripSchedule`, a domain rule that keeps a route in chronological order:
+      forgiving about missing dates, strict about contradictory ones, and never a reorder
+- [x] Every date must fall inside the trip's own dates, and a stop may not end before it
+      starts
+- [x] The rule names the stop at fault and the stop it contradicts, so the traveller can
+      put it right rather than guess
+- [x] `Trip.ApplyRoute` checks the whole route before it changes anything, so a refused
+      update leaves the trip exactly as it was
+- [x] `PUT /api/trips/{id}` replaces the whole trip in one request and one transaction:
+      rename, reschedule, add, rename a stop, remove a stop, reorder and clear a date
+- [x] The stops keep their identity across an edit, so a future item can hang off one
+- [x] An additive migration that adds the two nullable date columns and moves no data
+- [x] A shared editor, used by the create page and by the trip page in its edit mode, so
+      the route builder is written once
+- [x] The trip page grows an inline edit mode, with a guard that asks before the reader
+      leaves a page with an unsaved change
+- [x] The schedule is read back honestly: a stop without dates says so, and the route
+      says how much of it has been decided
+
+**Exit criteria:** a stop can be given the days of its stay, a route that contradicts
+itself is refused with a message that says why, and a trip can be changed in place with
+every change saved together.
+
+---
+
 ## Phase 1 — Accounts, trips and membership
 
 *Planned.* Everything downstream needs to know who the participants are.

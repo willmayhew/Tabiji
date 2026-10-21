@@ -43,6 +43,24 @@ export class TripCard {
     return label.length > 0 ? label : 'No destinations recorded';
   });
 
+  /**
+   * How much of the schedule has been decided, so that a partly planned trip
+   * does not look as though it were fully scheduled.
+   */
+  protected readonly datedStops = computed(() => {
+    const destinations = this.trip().destinations;
+
+    if (destinations.length === 0) {
+      return null;
+    }
+
+    const dated = destinations.filter(
+      (destination) => destination.startsOn !== null || destination.endsOn !== null,
+    ).length;
+
+    return dated === 0 ? null : `Dates are set for ${dated} of ${destinations.length} stops`;
+  });
+
   protected toneFor(status: TripStatus): BadgeTone {
     switch (status) {
       case 'Confirmed':

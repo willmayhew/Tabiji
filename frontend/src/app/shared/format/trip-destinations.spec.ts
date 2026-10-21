@@ -2,9 +2,9 @@ import { TripDestination } from '../../core/models/trip';
 import { firstDestination, routeLabel, routeSummary } from './trip-destinations';
 
 const route: TripDestination[] = [
-  { name: 'Rome', sortOrder: 0 },
-  { name: 'Amalfi', sortOrder: 1 },
-  { name: 'Naples', sortOrder: 2 },
+  { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null },
+  { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
+  { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null },
 ];
 
 describe('firstDestination', () => {
@@ -23,14 +23,16 @@ describe('routeLabel', () => {
   });
 
   it('should give one stop on its own', () => {
-    expect(routeLabel([{ name: 'Rome', sortOrder: 0 }])).toBe('Rome');
+    expect(routeLabel([{ id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null }])).toBe(
+      'Rome',
+    );
   });
 
   it('should count the stops it leaves out', () => {
     const longer: TripDestination[] = [
       ...route,
-      { name: 'Bari', sortOrder: 3 },
-      { name: 'Matera', sortOrder: 4 },
+      { id: 'd4', name: 'Bari', sortOrder: 3, startsOn: null, endsOn: null },
+      { id: 'e5', name: 'Matera', sortOrder: 4, startsOn: null, endsOn: null },
     ];
 
     expect(routeLabel(longer)).toBe('Rome → Amalfi → Naples → +2 more');
@@ -47,7 +49,9 @@ describe('routeSummary', () => {
   });
 
   it('should use the singular for one stop', () => {
-    expect(routeSummary([{ name: 'Rome', sortOrder: 0 }])).toBe('1 stop');
+    expect(
+      routeSummary([{ id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null }]),
+    ).toBe('1 stop');
   });
 
   it('should count no stops', () => {
