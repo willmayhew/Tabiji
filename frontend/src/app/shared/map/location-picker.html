@@ -1,0 +1,91 @@
+<dialog
+  #dialog
+  class="picker"
+  aria-labelledby="location-picker-title"
+  (cancel)="dismiss($event)"
+  (click)="onBackdropClick($event)"
+>
+  <div class="picker__panel">
+    <header class="picker__head">
+      <h2 class="picker__title" id="location-picker-title">Choose a place</h2>
+      <button
+        type="button"
+        class="icon-button"
+        (click)="dismiss($event)"
+        aria-label="Close the map picker"
+      >
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </header>
+
+    <div class="picker__field">
+      <input
+        #search
+        id="location-picker-search"
+        class="picker__input"
+        type="search"
+        autocomplete="off"
+        placeholder="Search for a place"
+        aria-label="Search for a place"
+        [value]="query()"
+        (input)="onQuery($event)"
+      />
+      @if (searching()) {
+        <span class="picker__searching" role="status">Searching&hellip;</span>
+      }
+    </div>
+
+    @if (error(); as message) {
+      <p class="picker__message picker__message--error" role="alert">
+        {{ message }} You can still type the name by hand.
+      </p>
+    } @else if (suggestions().length > 0) {
+      <ul class="picker__results" aria-live="polite">
+        @for (place of suggestions(); track place.label) {
+          <li>
+            <button type="button" class="picker__result" (click)="chooseSuggestion(place)">
+              <span class="picker__result-name">{{ place.name }}</span>
+              @if (place.label !== place.name) {
+                <span class="picker__result-context">{{ place.label }}</span>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+    } @else if (searched() && !searching()) {
+      <p class="picker__message" role="status">
+        No places found. Try another search, or type the name by hand.
+      </p>
+    }
+
+    <div #map class="picker__map" [class.picker__map--unavailable]="mapUnavailable()">
+      @if (mapUnavailable()) {
+        <p class="picker__message">The map could not be drawn. Search for a place instead.</p>
+      }
+    </div>
+
+    <footer class="picker__foot">
+      <p class="picker__selection">
+        @if (selection(); as place) {
+          <span class="picker__selection-name">{{ place.name }}</span>
+          <span class="picker__selection-coords">{{
+            coordsText(place.latitude, place.longitude)
+          }}</span>
+        } @else {
+          <span class="picker__selection-empty">Search for a place, or click the map.</span>
+        }
+      </p>
+
+      <div class="picker__actions">
+        <button type="button" class="button button--secondary" (click)="dismiss($event)">
+          Cancel
+        </button>
+        <button type="button" class="button" [disabled]="selection() === null" (click)="confirm()">
+          Use this location
+        </button>
+      </div>
+    </footer>
+
+    <p class="picker__attribution">{{ attribution }}</p>
+  </div>
+</dialog>

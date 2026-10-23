@@ -39,16 +39,50 @@
           </label>
 
           <div class="route__stop">
-            <input
-              class="route__input"
-              [id]="stopInputId(index)"
-              type="text"
-              formControlName="name"
-              [attr.maxlength]="destinationMaxLength"
-              autocomplete="off"
-              [attr.aria-invalid]="destinationError(index) ? 'true' : null"
-              [attr.aria-describedby]="stopDescribedBy(index)"
-            />
+            <div class="route__field">
+              <input
+                class="route__input"
+                [id]="stopInputId(index)"
+                type="text"
+                formControlName="name"
+                [attr.maxlength]="destinationMaxLength"
+                autocomplete="off"
+                (input)="onNameTyped(index)"
+                [attr.aria-invalid]="destinationError(index) ? 'true' : null"
+                [attr.aria-describedby]="stopDescribedBy(index)"
+              />
+              <button
+                type="button"
+                class="icon-button route__map"
+                [id]="stopMapButtonId(index)"
+                (click)="openPicker(index)"
+                [attr.aria-label]="'Choose ' + stopName(index) + ' on a map'"
+                aria-haspopup="dialog"
+              >
+                <svg
+                  class="route__map-icon"
+                  viewBox="0 0 20 20"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                    d="M10 2.5c-2.9 0-5.2 2.3-5.2 5.2 0 3.6 4.3 8.1 4.9 8.7a.4.4 0 0 0 .6 0c.6-.6 4.9-5.1 4.9-8.7 0-2.9-2.3-5.2-5.2-5.2Z"
+                  />
+                  <circle
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    cx="10"
+                    cy="7.7"
+                    r="1.9"
+                  />
+                </svg>
+              </button>
+            </div>
 
             <div class="route__dates">
               <span class="route__date">
@@ -203,3 +237,14 @@
     }
   </div>
 </form>
+
+<!-- The picker sits outside the form on purpose: it is a modal of its own, so
+     the keys pressed inside it belong to the dialog and never reach the form
+     behind it. Inside the form, Enter in the search box submitted the trip. -->
+<app-location-picker
+  [open]="pickerIndex() !== null"
+  [initialQuery]="pickerQuery()"
+  [initialCoordinates]="pickerCoordinates()"
+  (chosen)="onPlaceChosen($event)"
+  (dismissed)="closePicker()"
+/>

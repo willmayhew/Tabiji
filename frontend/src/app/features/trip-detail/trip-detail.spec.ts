@@ -11,9 +11,33 @@ const trip: Trip = {
   id: '11111111-1111-1111-1111-111111111111',
   name: 'Rome & Amalfi',
   destinations: [
-    { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: '2027-04-01', endsOn: '2027-04-04' },
-    { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: '2027-04-04', endsOn: '2027-04-06' },
-    { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null },
+    {
+      id: 'a1',
+      name: 'Rome',
+      sortOrder: 0,
+      startsOn: '2027-04-01',
+      endsOn: '2027-04-04',
+      latitude: null,
+      longitude: null,
+    },
+    {
+      id: 'b2',
+      name: 'Amalfi',
+      sortOrder: 1,
+      startsOn: '2027-04-04',
+      endsOn: '2027-04-06',
+      latitude: null,
+      longitude: null,
+    },
+    {
+      id: 'c3',
+      name: 'Naples',
+      sortOrder: 2,
+      startsOn: null,
+      endsOn: null,
+      latitude: null,
+      longitude: null,
+    },
   ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-08',
@@ -191,11 +215,11 @@ describe('TripDetail', () => {
     expect(back.getAttribute('href')).toBe('/trips');
   });
 
-  it('should render the header without an image', () => {
+  it('should render the header without an image or a plate', () => {
     showTrip();
 
     expect(element().querySelector('img')).toBeNull();
-    expect(element().querySelector('.detail__hero .plate')).not.toBeNull();
+    expect(element().querySelector('.plate')).toBeNull();
   });
 
   it('should show the trip name as the only heading', () => {
@@ -206,29 +230,6 @@ describe('TripDetail', () => {
     expect(element().querySelectorAll('h1')).toHaveLength(1);
     expect(headings[0].tagName).toBe('H1');
     expect(headings[0].textContent).toContain('Rome & Amalfi');
-  });
-
-  it('should label the plate with the title of the trip', () => {
-    showTrip();
-
-    const element = fixture.nativeElement as HTMLElement;
-
-    expect(element.querySelector('.detail__plate .plate__label')?.textContent).toContain(
-      'Rome & Amalfi',
-    );
-  });
-
-  it('should follow the name in the editor', () => {
-    startEditing();
-
-    const name = element().querySelector('#trip-name') as HTMLInputElement;
-    name.value = 'Italia';
-    name.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(element().querySelector('.detail__plate .plate__label')?.textContent).toContain(
-      'Italia',
-    );
   });
 
   it('should let the reader change the trip', () => {
@@ -260,9 +261,9 @@ describe('TripDetail', () => {
       startsOn: '2027-04-01',
       endsOn: '2027-04-08',
       destinations: [
-        { id: 'a1', name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-04' },
-        { id: 'b2', name: 'Amalfi', startsOn: '2027-04-04', endsOn: '2027-04-06' },
-        { id: 'c3', name: 'Naples', startsOn: null, endsOn: null },
+        { id: 'a1', name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-04', latitude: null, longitude: null },
+        { id: 'b2', name: 'Amalfi', startsOn: '2027-04-04', endsOn: '2027-04-06', latitude: null, longitude: null },
+        { id: 'c3', name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null },
       ],
     });
 

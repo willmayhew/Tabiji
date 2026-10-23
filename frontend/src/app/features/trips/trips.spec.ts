@@ -9,8 +9,8 @@ const tokyo: Trip = {
   id: '11111111-1111-1111-1111-111111111111',
   name: 'Rome & Amalfi',
   destinations: [
-    { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null },
-    { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
+    { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null },
+    { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null, latitude: null, longitude: null },
   ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-08',
@@ -21,7 +21,7 @@ const kyoto: Trip = {
   id: '22222222-2222-2222-2222-222222222222',
   name: 'Kyoto in spring',
   destinations: [
-    { id: 'a1', name: 'Kyoto', sortOrder: 0, startsOn: null, endsOn: null },
+    { id: 'a1', name: 'Kyoto', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null },
   ],
   startsOn: '2027-04-10',
   endsOn: '2027-04-14',

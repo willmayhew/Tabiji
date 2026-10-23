@@ -424,11 +424,13 @@
   aspect-ratio: 4 / 3;
 }
 
-/* A band is a letterbox: a wide, shallow strip that titles a page. It
-   keeps to its ratio at every width, so it holds no minimum height of its
-   own — the ratio is what gives it its shape. */
+/* A band is the plate of the leading card. It spans two columns, so its
+   ratio is the two columns plus the gap between them over one column's
+   height, and it stands exactly as tall as the one-column cards beside
+   it. It holds no minimum height of its own: the ratio gives it its shape
+   at every width. */
 .plate--band {
-  aspect-ratio: 21 / 4;
+  aspect-ratio: 11 / 4;
   min-height: 0;
 }
 
@@ -773,10 +775,34 @@ label.route__node:hover {
 
 /* The name keeps its room. The dates are what give way when there is not
    enough space, because a place without a name is not a place. */
-.route__input {
+.route__field {
+  position: relative;
+  display: flex;
+  align-items: center;
   flex: 1 1 8rem;
-  width: auto;
   min-width: 0;
+}
+
+.route__input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  /* Room for the map button that sits at the end of the field. */
+  padding-inline-end: 2.5rem;
+}
+
+/* The map button sits inside the field, at its end. Pressing it opens the
+   picker for the stop this field names. */
+.route__map {
+  position: absolute;
+  inset-inline-end: var(--space-3xs);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.route__map-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .route__name {
@@ -814,8 +840,10 @@ label.route__node:hover {
   gap: var(--space-2xs);
 }
 
+/* A date field takes the room a date needs and no more, so the name beside
+   it keeps a generous width of its own. */
 .route__date-input {
-  width: auto;
+  width: 9rem;
   min-width: 0;
 }
 

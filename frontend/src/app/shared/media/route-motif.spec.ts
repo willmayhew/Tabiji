@@ -107,6 +107,12 @@ describe('routeMotif', () => {
     expect(plateDimensions('band').width).toBeGreaterThan(plateDimensions('card').width);
   });
 
+  it('should give the band the ratio of the two-column plate', () => {
+    const { width, height } = plateDimensions('band');
+
+    expect(width / height).toBeCloseTo(11 / 4);
+  });
+
   it('should draw on an empty seed without throwing', () => {
     expect(() => routeMotif('', 3)).not.toThrow();
   });

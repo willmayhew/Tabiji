@@ -54,3 +54,17 @@ SELECT t.[Name] AS Trip, r.[Name] AS Stop, r.[StartsOn], r.[EndsOn], r.[Floor]
 FROM [Ranked] r
 JOIN [Trips] t ON t.[Id] = r.[TripId]
 WHERE r.[Floor] IS NOT NULL AND r.[StartsOn] IS NOT NULL AND r.[StartsOn] < r.[Floor];
+
+PRINT '--- 8. Stops that carry half a pair of coordinates (expected: 0 rows) ---';
+SELECT t.[Name] AS Trip, d.[Name] AS Stop, d.[Latitude], d.[Longitude]
+FROM [TripDestinations] d
+JOIN [Trips] t ON t.[Id] = d.[TripId]
+WHERE (d.[Latitude] IS NULL AND d.[Longitude] IS NOT NULL)
+   OR (d.[Latitude] IS NOT NULL AND d.[Longitude] IS NULL);
+
+PRINT '--- 9. Stops whose coordinates fall off the globe (expected: 0 rows) ---';
+SELECT t.[Name] AS Trip, d.[Name] AS Stop, d.[Latitude], d.[Longitude]
+FROM [TripDestinations] d
+JOIN [Trips] t ON t.[Id] = d.[TripId]
+WHERE (d.[Latitude]  IS NOT NULL AND (d.[Latitude]  < -90  OR d.[Latitude]  > 90))
+   OR (d.[Longitude] IS NOT NULL AND (d.[Longitude] < -180 OR d.[Longitude] > 180));

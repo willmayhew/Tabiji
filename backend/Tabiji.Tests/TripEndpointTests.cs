@@ -204,6 +204,56 @@ public sealed class TripEndpointTests : IDisposable
         Assert.Equal(["Rome, Italy", "Amalfi, Italy"], payload.Destinations.Select(d => d.Name));
     }
 
+    [Fact]
+    public async Task Create_KeepsTheCoordinatesOfAPlaceChosenFromAMap()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Japan Adventure",
+            [new("Kyoto", null, null, 35.0116, 135.7681), new("Osaka", null, null)],
+            new DateOnly(2027, 5, 16),
+            new DateOnly(2027, 5, 20));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(payload);
+
+        Assert.Equal(35.0116, payload!.Destinations[0].Latitude);
+        Assert.Equal(135.7681, payload.Destinations[0].Longitude);
+
+        // A place typed by hand still has no coordinates, and that is valid.
+        Assert.Null(payload.Destinations[1].Latitude);
+        Assert.Null(payload.Destinations[1].Longitude);
+    }
+
+    [Theory]
+    [InlineData(35.0116, null)]
+    [InlineData(null, 135.7681)]
+    [InlineData(91.0, 0.0)]
+    [InlineData(-91.0, 0.0)]
+    [InlineData(0.0, 181.0)]
+    [InlineData(0.0, -181.0)]
+    public async Task Create_ReturnsBadRequestForIncompleteOrImpossibleCoordinates(
+        double? latitude,
+        double? longitude)
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Japan Adventure",
+            [new("Kyoto", null, null, latitude, longitude)],
+            new DateOnly(2027, 5, 16),
+            new DateOnly(2027, 5, 20));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Theory]
     [InlineData("   ", "2027-05-01", "2027-05-03")]
     [InlineData("Lisbon", "2027-05-03", "2027-05-01")]
@@ -430,6 +480,74 @@ public sealed class TripEndpointTests : IDisposable
 
         Assert.NotNull(reread);
         Assert.Null(reread!.Destinations[0].StartsOn);
+    }
+
+    [Fact]
+    public async Task Update_CanSetChangeAndClearCoordinates()
+    {
+        using var client = _factory.CreateClient();
+
+        var id = (await _factory.Repository.ListAsync()).First(trip => trip.Name == "Rome").Id;
+        var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
+        Assert.NotNull(stored);
+
+        var rome = stored!.Destinations[0].Id;
+
+        // A place chosen from a map carries its coordinates.
+        var setResponse = await client.PutAsJsonAsync($"/api/trips/{id}", new UpdateTripRequest(
+            "Rome",
+            [new(rome, "Rome", null, null, 41.9028, 12.4964)],
+            new DateOnly(2027, 4, 1),
+            new DateOnly(2027, 4, 8)));
+
+        Assert.Equal(HttpStatusCode.OK, setResponse.StatusCode);
+
+        var set = await setResponse.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(set);
+        Assert.Equal(41.9028, set!.Destinations[0].Latitude);
+        Assert.Equal(12.4964, set.Destinations[0].Longitude);
+
+        // Replacing the name by hand clears them, so a place is never a name
+        // from one place with the coordinates of another.
+        var clearResponse = await client.PutAsJsonAsync($"/api/trips/{id}", new UpdateTripRequest(
+            "Rome",
+            [new(rome, "Rome, Italy", null, null)],
+            new DateOnly(2027, 4, 1),
+            new DateOnly(2027, 4, 8)));
+
+        Assert.Equal(HttpStatusCode.OK, clearResponse.StatusCode);
+
+        var reread = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
+
+        Assert.NotNull(reread);
+        Assert.Null(reread!.Destinations[0].Latitude);
+        Assert.Null(reread.Destinations[0].Longitude);
+    }
+
+    [Fact]
+    public async Task Update_ReturnsBadRequestForAHalfSetCoordinatePairAndLeavesTheTripUnchanged()
+    {
+        using var client = _factory.CreateClient();
+
+        var id = (await _factory.Repository.ListAsync()).First(trip => trip.Name == "Rome").Id;
+        var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
+        Assert.NotNull(stored);
+
+        var rome = stored!.Destinations[0].Id;
+
+        var response = await client.PutAsJsonAsync($"/api/trips/{id}", new UpdateTripRequest(
+            "Rome",
+            [new(rome, "Rome", null, null, 41.9028, null)],
+            new DateOnly(2027, 4, 1),
+            new DateOnly(2027, 4, 8)));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var reread = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
+
+        Assert.NotNull(reread);
+        Assert.Null(reread!.Destinations[0].Latitude);
+        Assert.Null(reread.Destinations[0].Longitude);
     }
 
     [Fact]

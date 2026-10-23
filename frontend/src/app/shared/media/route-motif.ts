@@ -44,12 +44,14 @@ export interface PlateDimensions {
 /**
  * The drawing area for each shape.
  *
- * The card is 4:3 and the band is 21:4, and the view box matches the shape
- * exactly, so a drawing is never distorted by the aspect ratio.
+ * The card is 4:3. The band is 11:4, the shape the two columns of the
+ * trips grid make together, so the leading card stands as tall as the
+ * cards beside it. Each view box matches its shape exactly, so a drawing
+ * is never distorted by the aspect ratio.
  */
 const ASPECTS: Record<PlateAspect, PlateDimensions> = {
   card: { width: 120, height: 90 },
-  band: { width: 210, height: 40 },
+  band: { width: 220, height: 80 },
 };
 
 /** The grounds, in a fixed order so the mapping from a hash is stable. */

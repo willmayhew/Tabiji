@@ -14,7 +14,9 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
                 null,
                 destination.Name,
                 destination.StartsOn,
-                destination.EndsOn))
+                destination.EndsOn,
+                destination.Latitude,
+                destination.Longitude))
             .ToArray();
 
         var trip = Trip.Create(
@@ -54,7 +56,9 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
                 destination.Id,
                 destination.Name,
                 destination.StartsOn,
-                destination.EndsOn))
+                destination.EndsOn,
+                destination.Latitude,
+                destination.Longitude))
             .ToArray();
 
         trip.ApplyRoute(request.Name, request.StartsOn, request.EndsOn, destinations);
@@ -92,7 +96,9 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
                 destination.Name,
                 destination.SortOrder,
                 destination.StartsOn,
-                destination.EndsOn))
+                destination.EndsOn,
+                destination.Latitude,
+                destination.Longitude))
             .ToArray(),
         trip.StartsOn,
         trip.EndsOn,

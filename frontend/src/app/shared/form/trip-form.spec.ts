@@ -25,6 +25,8 @@ const existingTrip: Trip = {
       sortOrder: 0,
       startsOn: '2027-04-01',
       endsOn: '2027-04-05',
+      latitude: null,
+      longitude: null,
     },
     {
       id: 'b2000000-0000-0000-0000-000000000000',
@@ -32,6 +34,28 @@ const existingTrip: Trip = {
       sortOrder: 1,
       startsOn: null,
       endsOn: null,
+      latitude: null,
+      longitude: null,
+    },
+  ],
+  startsOn: '2027-04-01',
+  endsOn: '2027-04-14',
+  status: 'Planning',
+};
+
+/** A trip whose first stop was chosen from a map. */
+const mappedTrip: Trip = {
+  id: '7a1b2c3d-0000-0000-0000-000000000000',
+  name: 'Japan',
+  destinations: [
+    {
+      id: 'c3000000-0000-0000-0000-000000000000',
+      name: 'Kyoto',
+      sortOrder: 0,
+      startsOn: null,
+      endsOn: null,
+      latitude: 35.0116,
+      longitude: 135.7681,
     },
   ],
   startsOn: '2027-04-01',
@@ -223,9 +247,9 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05' },
-      { name: 'Amalfi', startsOn: '2027-04-05', endsOn: '2027-04-08' },
-      { name: 'Naples', startsOn: null, endsOn: null },
+      { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05', latitude: null, longitude: null },
+      { name: 'Amalfi', startsOn: '2027-04-05', endsOn: '2027-04-08', latitude: null, longitude: null },
+      { name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null },
     ]);
   });
 
@@ -238,7 +262,7 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Rome', startsOn: null, endsOn: null },
+      { name: 'Rome', startsOn: null, endsOn: null, latitude: null, longitude: null },
     ]);
   });
 
@@ -254,7 +278,7 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Rome', startsOn: '2027-04-01', endsOn: null },
+      { name: 'Rome', startsOn: '2027-04-01', endsOn: null, latitude: null, longitude: null },
     ]);
   });
 
@@ -517,14 +541,18 @@ describe('TripForm', () => {
           name: 'Roma',
           startsOn: '2027-04-01',
           endsOn: '2027-04-05',
+          latitude: null,
+          longitude: null,
         },
         {
           id: 'b2000000-0000-0000-0000-000000000000',
           name: 'Amalfi',
           startsOn: null,
           endsOn: null,
+          latitude: null,
+          longitude: null,
         },
-        { id: null, name: 'Naples', startsOn: null, endsOn: null },
+        { id: null, name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null },
       ],
     });
   });
@@ -555,5 +583,160 @@ describe('TripForm', () => {
     fixture.detectChanges();
 
     expect(cancelled).toHaveLength(1);
+  });
+
+  // The map picker -------------------------------------------------------
+
+  function mapButton(index: number): HTMLButtonElement {
+    return element().querySelector(`#trip-destination-${index}-map`) as HTMLButtonElement;
+  }
+
+  function pickerInput(): HTMLInputElement {
+    return element().querySelector('.picker__input') as HTMLInputElement;
+  }
+
+  function pickerButton(text: string): HTMLButtonElement {
+    return [...element().querySelectorAll('.picker__actions button')].find((candidate) =>
+      candidate.textContent?.includes(text),
+    ) as HTMLButtonElement;
+  }
+
+  /** Chooses a place on the map for one stop, the way a reader would. */
+  async function choosePlace(
+    index: number,
+    place: { name: string; latitude: number; longitude: number },
+  ): Promise<void> {
+    mapButton(index).click();
+    fixture.detectChanges();
+
+    const search = pickerInput();
+    search.value = place.name;
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    // Wait out the picker's debounce, then answer its search.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    fixture.detectChanges();
+
+    http
+      .expectOne((probe) => probe.url.endsWith('/api'))
+      .flush({
+        features: [
+          {
+            geometry: { coordinates: [place.longitude, place.latitude] },
+            properties: { name: place.name },
+          },
+        ],
+      });
+
+    fixture.detectChanges();
+
+    (element().querySelector('.picker__result') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    pickerButton('Use this location').click();
+    fixture.detectChanges();
+  }
+
+  it('should offer a map for every stop and not for the trip name', () => {
+    setDestinations(['Rome', 'Amalfi']);
+
+    expect(element().querySelectorAll('.route__map')).toHaveLength(2);
+    expect(element().querySelector('#trip-name-map')).toBeNull();
+    expect(mapButton(1).getAttribute('aria-label')).toBe('Choose Amalfi on a map');
+  });
+
+  it('should keep the picker out of the form, so its keys stay in the dialog', () => {
+    const picker = element().querySelector('app-location-picker');
+    const form = element().querySelector('form');
+
+    expect(picker).not.toBeNull();
+    expect(form?.contains(picker)).toBe(false);
+  });
+
+  it('should fill the stop the picker was opened for', async () => {
+    setDestinations(['Rome', 'Amalfi']);
+
+    await choosePlace(1, { name: 'Kyoto', latitude: 35.0116, longitude: 135.7681 });
+
+    expect(input(0).value).toBe('Rome');
+    expect(input(1).value).toBe('Kyoto');
+
+    const destinations = fixture.componentInstance.form.controls.destinations;
+
+    expect(destinations.at(0).controls.latitude.value).toBeNull();
+    expect(destinations.at(1).controls.latitude.value).toBe(35.0116);
+    expect(destinations.at(1).controls.longitude.value).toBe(135.7681);
+  });
+
+  it('should keep the dates and the order of the route when a place is chosen', async () => {
+    setDestinations(['Rome', 'Amalfi']);
+    typeDate(0, 'startsOn', '2027-04-01');
+    typeDate(0, 'endsOn', '2027-04-05');
+    typeDate(1, 'startsOn', '2027-04-05');
+    typeDate(1, 'endsOn', '2027-04-08');
+
+    await choosePlace(1, { name: 'Kyoto', latitude: 35.0116, longitude: 135.7681 });
+
+    expect(rows().map((row) => row.querySelector('input')?.value)).toEqual(['Rome', 'Kyoto']);
+    expect(dateInput(0, 'endsOn').value).toBe('2027-04-05');
+    expect(dateInput(1, 'startsOn').value).toBe('2027-04-05');
+    expect(dateInput(1, 'endsOn').value).toBe('2027-04-08');
+  });
+
+  it('should carry the chosen coordinates into the request', async () => {
+    setDestinations(['Kyoto']);
+    setTripFields();
+
+    await choosePlace(0, { name: 'Kyoto', latitude: 35.0116, longitude: 135.7681 });
+    submit();
+
+    const request = http.expectOne('/api/trips');
+
+    expect(request.request.body.destinations).toEqual([
+      { name: 'Kyoto', startsOn: null, endsOn: null, latitude: 35.0116, longitude: 135.7681 },
+    ]);
+  });
+
+  it('should drop the coordinates when the name is typed by hand', async () => {
+    setDestinations(['Kyoto']);
+    setTripFields();
+
+    await choosePlace(0, { name: 'Kyoto', latitude: 35.0116, longitude: 135.7681 });
+    type(0, 'Kyoto, Japan');
+    submit();
+
+    const request = http.expectOne('/api/trips');
+
+    expect(request.request.body.destinations).toEqual([
+      { name: 'Kyoto, Japan', startsOn: null, endsOn: null, latitude: null, longitude: null },
+    ]);
+  });
+
+  it('should change nothing when the picker is cancelled', () => {
+    setDestinations(['Rome']);
+
+    mapButton(0).click();
+    fixture.detectChanges();
+
+    pickerButton('Cancel').click();
+    fixture.detectChanges();
+
+    expect(input(0).value).toBe('Rome');
+    expect(
+      fixture.componentInstance.form.controls.destinations.at(0).controls.latitude.value,
+    ).toBeNull();
+    http.expectNone((probe) => probe.url.endsWith('/api'));
+  });
+
+  it('should open the picker with the place a stop already carries', () => {
+    fixture.componentRef.setInput('trip', mappedTrip);
+    fixture.detectChanges();
+
+    mapButton(0).click();
+    fixture.detectChanges();
+
+    expect(pickerInput().value).toBe('Kyoto');
+    expect(element().querySelector('.picker__selection-name')?.textContent).toContain('Kyoto');
   });
 });

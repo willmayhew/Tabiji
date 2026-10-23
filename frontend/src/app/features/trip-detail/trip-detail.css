@@ -19,22 +19,13 @@
   gap: var(--space-xl);
 }
 
-/* The cover. It is a drawn plate rather than a photograph, so it is always
-   the same dark ground and the type over it never has to fight an image. */
-.detail__hero {
-  overflow: hidden;
-  border: var(--rule-hairline) solid var(--color-rule);
-  border-radius: var(--radius-lg);
-}
-
-.detail__plate {
-  display: block;
-}
-
+/* The heading of the page. The title stands on its own now, so it carries
+   the whole of the identity: an eyebrow, the name, and the facts and the
+   one action brought together on a single line beneath it. */
 .detail__masthead {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2xs);
+  gap: var(--space-3xs);
   padding-bottom: var(--space-md);
   border-bottom: var(--rule-hairline) solid var(--color-rule);
 }
@@ -43,14 +34,26 @@
   margin: 0;
   font-size: var(--text-4xl);
   text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+/* The facts of the trip and its one action share a line, the action held to
+   the far end. On a narrow screen the action wraps below the facts and keeps
+   its place at the start of the line. */
+.detail__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin-top: var(--space-sm);
 }
 
 .detail__facts {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-md);
+  align-items: center;
   flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-sm);
 }
 
 .detail__meta {
@@ -179,15 +182,17 @@
 
 /* Edit mode ------------------------------------------------------------- */
 
+/* The editor's width is shared with the create page, so a stop looks the
+   same wherever it is being changed. */
 .detail__edit {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
-  max-width: 46rem;
+  max-width: var(--editor-width);
 }
 
 .detail__edit-button {
-  align-self: flex-start;
+  align-self: center;
 }
 
 /* A quiet note under a list: how much of the schedule has been decided. */

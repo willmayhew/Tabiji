@@ -64,6 +64,12 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("EndsOn")
                         .HasColumnType("date");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("float");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -85,6 +91,8 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
 
                     b.ToTable("TripDestinations", null, t =>
                         {
+                            t.HasCheckConstraint("CK_TripDestinations_Coordinates", "([Latitude] IS NULL AND [Longitude] IS NULL) OR ([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL AND [Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)");
+
                             t.HasCheckConstraint("CK_TripDestinations_Dates", "[StartsOn] IS NULL OR [EndsOn] IS NULL OR [EndsOn] >= [StartsOn]");
                         });
                 });

@@ -136,6 +136,39 @@ public sealed class TripDestinationConfigurationTests
         Assert.Contains("[EndsOn] >= [StartsOn]", constraint.Sql);
     }
 
+    [Theory]
+    [InlineData(nameof(TripDestination.Latitude))]
+    [InlineData(nameof(TripDestination.Longitude))]
+    public void TripDestination_CoordinatesAreOptional(string propertyName)
+    {
+        using var context = CreateContext();
+
+        var entity = context.Model.FindEntityType(typeof(TripDestination));
+        var property = entity?.FindProperty(propertyName);
+
+        // A place typed by hand carries neither coordinate, and that is
+        // always valid: a destination never has to come from a map.
+        Assert.NotNull(property);
+        Assert.True(property.IsNullable);
+        Assert.Equal("float", property.GetColumnType());
+    }
+
+    [Fact]
+    public void TripDestination_CoordinatesAreBothOrNeitherAndOnTheGlobe()
+    {
+        using var context = CreateContext();
+
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var entity = model.FindEntityType(typeof(TripDestination));
+        var constraint = entity?.GetCheckConstraints()
+            .SingleOrDefault(candidate => candidate.Name == "CK_TripDestinations_Coordinates");
+
+        Assert.NotNull(constraint);
+        Assert.Contains("[Latitude] IS NULL AND [Longitude] IS NULL", constraint.Sql);
+        Assert.Contains("[Latitude] BETWEEN -90 AND 90", constraint.Sql);
+        Assert.Contains("[Longitude] BETWEEN -180 AND 180", constraint.Sql);
+    }
+
     [Fact]
     public void Trip_KeepsTheLegacyDestinationColumnForOneRelease()
     {

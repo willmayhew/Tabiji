@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   effect,
   inject,
@@ -13,6 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
+import { PlaceSelection } from '../../core/models/place';
 import {
   CreateTrip,
   Trip,
@@ -21,6 +23,7 @@ import {
   TRIP_NAME_MAX_LENGTH,
   UpdateTrip,
 } from '../../core/models/trip';
+import { LocationPicker } from '../map/location-picker';
 import { tripDateRangeValidator } from '../validate/trip-date-range';
 import {
   destinationDatesValidator,
@@ -42,7 +45,7 @@ import {
  */
 @Component({
   selector: 'app-trip-form',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, LocationPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-form.html',
   styleUrl: './trip-form.css',
@@ -91,6 +94,34 @@ export class TripForm {
   /** What the reader is told after a stop is added, removed or moved. */
   protected readonly announcement = signal<string | null>(null);
 
+  /**
+   * The stop whose map picker is open, or null when none is. One picker
+   * serves the whole form; this is what points it at the right stop.
+   */
+  readonly pickerIndex = signal<number | null>(null);
+
+  /** What the picker is seeded with when it opens for the chosen stop. */
+  protected readonly pickerQuery = computed(() => {
+    const index = this.pickerIndex();
+    const control = index === null ? null : this.destinations.at(index);
+
+    return control?.controls.name.value.trim() ?? '';
+  });
+
+  /** The coordinates the chosen stop already has, if it has any. */
+  protected readonly pickerCoordinates = computed<PlaceSelection | null>(() => {
+    const index = this.pickerIndex();
+    const control = index === null ? null : this.destinations.at(index);
+    const latitude = control?.controls.latitude.value ?? null;
+    const longitude = control?.controls.longitude.value ?? null;
+
+    if (latitude === null || longitude === null) {
+      return null;
+    }
+
+    return { name: control?.controls.name.value.trim() ?? '', latitude, longitude };
+  });
+
   constructor() {
     // A trip handed to the form is laid out in it. The stops keep the
     // identities they had, so that the API can tell a renamed stop from a
@@ -118,6 +149,8 @@ export class TripForm {
     name: string,
     startsOn: string,
     endsOn: string,
+    latitude: number | null = null,
+    longitude: number | null = null,
   ) {
     return this.formBuilder.group(
       {
@@ -131,6 +164,8 @@ export class TripForm {
         }),
         startsOn: this.formBuilder.control(startsOn),
         endsOn: this.formBuilder.control(endsOn),
+        latitude: this.formBuilder.control<number | null>(latitude),
+        longitude: this.formBuilder.control<number | null>(longitude),
       },
       { validators: destinationDatesValidator },
     );
@@ -147,7 +182,14 @@ export class TripForm {
 
     for (const stop of stops) {
       this.form.controls.destinations.push(
-        this.destinationControl(stop.id, stop.name, stop.startsOn ?? '', stop.endsOn ?? ''),
+        this.destinationControl(
+          stop.id,
+          stop.name,
+          stop.startsOn ?? '',
+          stop.endsOn ?? '',
+          stop.latitude ?? null,
+          stop.longitude ?? null,
+        ),
       );
     }
 
@@ -222,6 +264,8 @@ export class TripForm {
         name: control.controls.name.value,
         startsOn: control.controls.startsOn.value || null,
         endsOn: control.controls.endsOn.value || null,
+        latitude: control.controls.latitude.value,
+        longitude: control.controls.longitude.value,
       })),
     };
   }
@@ -236,6 +280,8 @@ export class TripForm {
         name: control.controls.name.value,
         startsOn: control.controls.startsOn.value || null,
         endsOn: control.controls.endsOn.value || null,
+        latitude: control.controls.latitude.value,
+        longitude: control.controls.longitude.value,
       })),
     };
   }
@@ -315,6 +361,63 @@ export class TripForm {
 
   protected stopActionId(index: number, action: 'up' | 'down' | 'remove'): string {
     return `trip-destination-${index}-${action}`;
+  }
+
+  protected stopMapButtonId(index: number): string {
+    return `trip-destination-${index}-map`;
+  }
+
+  /** Opens the map picker for the stop at `index`. */
+  protected openPicker(index: number): void {
+    this.pickerIndex.set(index);
+  }
+
+  /** Closes the map picker without changing anything. */
+  protected closePicker(): void {
+    this.pickerIndex.set(null);
+  }
+
+  /**
+   * Takes the place chosen from the map and fills the stop the picker was
+   * opened for. Only its name and its coordinates are written, so its dates,
+   * its place in the route and every other stop are left alone.
+   */
+  protected onPlaceChosen(place: PlaceSelection): void {
+    const index = this.pickerIndex();
+    const control = index === null ? null : this.destinations.at(index);
+
+    if (control) {
+      control.patchValue({
+        name: place.name,
+        latitude: place.latitude,
+        longitude: place.longitude,
+      });
+
+      // Choosing a place is a change the reader would not want to lose.
+      this.form.markAsDirty();
+    }
+
+    this.pickerIndex.set(null);
+  }
+
+  /**
+   * A name typed by hand no longer matches the place that was chosen from
+   * the map, so the coordinates are dropped. Otherwise a stop would keep the
+   * coordinates of one place while showing the name of another.
+   */
+  protected onNameTyped(index: number): void {
+    const control = this.destinations.at(index);
+
+    if (!control) {
+      return;
+    }
+
+    const latitude = control.controls.latitude.value;
+    const longitude = control.controls.longitude.value;
+
+    if (latitude !== null || longitude !== null) {
+      control.patchValue({ latitude: null, longitude: null });
+    }
   }
 
   protected errorFor(field: 'name' | 'startsOn' | 'endsOn'): string | null {

@@ -131,6 +131,10 @@
 
   /* Layout ------------------------------------------------------------ */
   --container-max: 72rem;
+  /* The width of the trip editor, so the create page and the trip page's
+     edit mode lay the route out the same way. It is generous on purpose: a
+     stop's name keeps a wide field of its own beside its dates. */
+  --editor-width: 56rem;
   --measure: 62ch;
   --measure-tight: 24ch;
   --measure-editorial: 46ch;

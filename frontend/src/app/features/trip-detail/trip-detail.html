@@ -29,17 +29,6 @@
     </div>
   } @else if (trip(); as found) {
     <article class="detail">
-      <header class="detail__hero">
-        <app-destination-plate
-          class="detail__plate"
-          [seed]="found.id"
-          [label]="title()"
-          [stops]="found.destinations.length"
-          tone="forest"
-          aspect="band"
-        />
-      </header>
-
       @if (editing()) {
         <div class="detail__edit">
           <h1 class="detail__name">Edit trip</h1>
@@ -50,27 +39,32 @@
           />
         </div>
       } @else {
-        <div class="detail__masthead">
+        <header class="detail__masthead">
+          <p class="eyebrow">The journey</p>
           <h1 class="detail__name">{{ found.name }}</h1>
-          <div class="detail__facts">
-            <p class="detail__meta">
-              @if (dates(); as range) {
-                <time [attr.datetime]="found.startsOn">{{ range.start }}</time>
-                <span aria-hidden="true"> – </span>
-                <time [attr.datetime]="found.endsOn">{{ range.end }}</time>
-                <span class="detail__duration">{{ range.duration }}</span>
-              } @else {
-                <time [attr.datetime]="found.startsOn">{{ found.startsOn }}</time>
-                <span aria-hidden="true"> – </span>
-                <time [attr.datetime]="found.endsOn">{{ found.endsOn }}</time>
-              }
-            </p>
-            <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" />
+
+          <div class="detail__bar">
+            <div class="detail__facts">
+              <p class="detail__meta">
+                @if (dates(); as range) {
+                  <time [attr.datetime]="found.startsOn">{{ range.start }}</time>
+                  <span aria-hidden="true"> – </span>
+                  <time [attr.datetime]="found.endsOn">{{ range.end }}</time>
+                  <span class="detail__duration">{{ range.duration }}</span>
+                } @else {
+                  <time [attr.datetime]="found.startsOn">{{ found.startsOn }}</time>
+                  <span aria-hidden="true"> – </span>
+                  <time [attr.datetime]="found.endsOn">{{ found.endsOn }}</time>
+                }
+              </p>
+              <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" />
+            </div>
+
+            <button type="button" class="button button--secondary detail__edit-button" (click)="startEditing()">
+              Edit trip
+            </button>
           </div>
-          <button type="button" class="button button--secondary detail__edit-button" (click)="startEditing()">
-            Edit trip
-          </button>
-        </div>
+        </header>
 
         <div class="detail__body">
           <div class="detail__details">

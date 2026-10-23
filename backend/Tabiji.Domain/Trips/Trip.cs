@@ -78,6 +78,8 @@ public sealed class Trip
                     destination.Name,
                     destination.StartsOn,
                     destination.EndsOn,
+                    destination.Latitude,
+                    destination.Longitude,
                     index));
         }
 
@@ -149,6 +151,7 @@ public sealed class Trip
             {
                 kept.Rename(destination.Name);
                 kept.Schedule(destination.StartsOn, destination.EndsOn);
+                kept.Locate(destination.Latitude, destination.Longitude);
                 route.Add(kept);
                 continue;
             }
@@ -159,6 +162,8 @@ public sealed class Trip
                     destination.Name,
                     destination.StartsOn,
                     destination.EndsOn,
+                    destination.Latitude,
+                    destination.Longitude,
                     route.Count));
         }
 
@@ -174,7 +179,7 @@ public sealed class Trip
     {
         EnsureThereIsRoomForAnotherDestination();
 
-        _destinations.Add(TripDestination.Create(Id, name, null, null, _destinations.Count));
+        _destinations.Add(TripDestination.Create(Id, name, null, null, null, null, _destinations.Count));
     }
 
     /// <summary>
@@ -323,6 +328,10 @@ public sealed class Trip
                     $"The trip destination name cannot exceed {TripDestination.NameMaxLength} characters.",
                     nameof(destinations));
             }
+
+            // The coordinates are optional, but when they are given they must
+            // be a whole place: both of them, and each inside the globe.
+            TripDestination.ValidateCoordinates(destination.Latitude, destination.Longitude);
 
             validated.Add(destination with { Name = trimmed });
         }

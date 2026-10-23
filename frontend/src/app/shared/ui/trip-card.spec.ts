@@ -6,9 +6,9 @@ const confirmed: Trip = {
   id: '5f2b1c4e-0000-0000-0000-000000000000',
   name: 'Rome & Amalfi',
   destinations: [
-    { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null },
-    { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
-    { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null },
+    { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null },
+    { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null, latitude: null, longitude: null },
+    { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null, latitude: null, longitude: null },
   ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-14',
@@ -59,11 +59,11 @@ describe('TripCard', () => {
     fixture.componentRef.setInput('trip', {
       ...confirmed,
       destinations: [
-        { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null },
-        { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
-        { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null },
-        { id: 'd4', name: 'Bari', sortOrder: 3, startsOn: null, endsOn: null },
-        { id: 'e5', name: 'Matera', sortOrder: 4, startsOn: null, endsOn: null },
+        { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null },
+        { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null, latitude: null, longitude: null },
+        { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null, latitude: null, longitude: null },
+        { id: 'd4', name: 'Bari', sortOrder: 3, startsOn: null, endsOn: null, latitude: null, longitude: null },
+        { id: 'e5', name: 'Matera', sortOrder: 4, startsOn: null, endsOn: null, latitude: null, longitude: null },
       ],
     });
     fixture.detectChanges();
@@ -178,8 +178,10 @@ describe('TripCard', () => {
           sortOrder: 0,
           startsOn: '2027-04-01',
           endsOn: '2027-04-05',
+          latitude: null,
+          longitude: null,
         },
-        { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
+        { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null, latitude: null, longitude: null },
       ],
     });
     fixture.detectChanges();

@@ -22,13 +22,19 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "maplibre-gl-worker.mjs",
+                "input": "node_modules/maplibre-gl/dist",
+                "output": "/"
               }
             ],
             "styles": [
               "src/styles/tokens.css",
               "src/styles/base.css",
               "src/styles/components.css",
-              "src/styles/utilities.css"
+              "src/styles/utilities.css",
+              "node_modules/maplibre-gl/dist/maplibre-gl.css"
             ]
           },
           "configurations": {

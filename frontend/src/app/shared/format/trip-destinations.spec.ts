@@ -2,9 +2,9 @@ import { TripDestination } from '../../core/models/trip';
 import { routeLabel, routeSummary } from './trip-destinations';
 
 const route: TripDestination[] = [
-  { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null },
-  { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
-  { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null },
+  { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null },
+  { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null, latitude: null, longitude: null },
+  { id: 'c3', name: 'Naples', sortOrder: 2, startsOn: null, endsOn: null, latitude: null, longitude: null },
 ];
 
 describe('routeLabel', () => {
@@ -13,7 +13,7 @@ describe('routeLabel', () => {
   });
 
   it('should give one stop on its own', () => {
-    expect(routeLabel([{ id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null }])).toBe(
+    expect(routeLabel([{ id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null }])).toBe(
       'Rome',
     );
   });
@@ -21,8 +21,8 @@ describe('routeLabel', () => {
   it('should count the stops it leaves out', () => {
     const longer: TripDestination[] = [
       ...route,
-      { id: 'd4', name: 'Bari', sortOrder: 3, startsOn: null, endsOn: null },
-      { id: 'e5', name: 'Matera', sortOrder: 4, startsOn: null, endsOn: null },
+      { id: 'd4', name: 'Bari', sortOrder: 3, startsOn: null, endsOn: null, latitude: null, longitude: null },
+      { id: 'e5', name: 'Matera', sortOrder: 4, startsOn: null, endsOn: null, latitude: null, longitude: null },
     ];
 
     expect(routeLabel(longer)).toBe('Rome → Amalfi → Naples → +2 more');
@@ -40,7 +40,7 @@ describe('routeSummary', () => {
 
   it('should use the singular for one stop', () => {
     expect(
-      routeSummary([{ id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null }]),
+      routeSummary([{ id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null }]),
     ).toBe('1 stop');
   });
 

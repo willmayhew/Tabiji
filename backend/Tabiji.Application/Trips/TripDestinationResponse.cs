@@ -9,9 +9,13 @@ namespace Tabiji.Application.Trips;
 /// <param name="SortOrder">The position of the stop on the route, counting from zero.</param>
 /// <param name="StartsOn">The planned first day, or null when not decided.</param>
 /// <param name="EndsOn">The planned last day, or null when not decided.</param>
+/// <param name="Latitude">The latitude of a place chosen from a map, or null.</param>
+/// <param name="Longitude">The longitude of a place chosen from a map, or null.</param>
 public sealed record TripDestinationResponse(
     Guid Id,
     string Name,
     int SortOrder,
     DateOnly? StartsOn,
-    DateOnly? EndsOn);
+    DateOnly? EndsOn,
+    double? Latitude,
+    double? Longitude);

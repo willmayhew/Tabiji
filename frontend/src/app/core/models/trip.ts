@@ -24,6 +24,14 @@ export interface TripDestination {
   startsOn: string | null;
   /** The planned last day at the stop, or null when it has not been decided. */
   endsOn: string | null;
+  /**
+   * The latitude of a place chosen from a map, or null when the place was
+   * typed by hand. The name is always the primary value; the coordinates are
+   * only kept when they belong to that name.
+   */
+  latitude: number | null;
+  /** The longitude of a place chosen from a map, or null when it was typed by hand. */
+  longitude: number | null;
 }
 
 /** A stop as it is being written. */
@@ -31,6 +39,8 @@ export interface TripDestinationDraft {
   name: string;
   startsOn: string | null;
   endsOn: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 /**

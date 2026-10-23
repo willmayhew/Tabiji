@@ -16,6 +16,16 @@ public sealed class TripDestinationConfiguration : IEntityTypeConfiguration<Trip
             table.HasCheckConstraint(
                 "CK_TripDestinations_Dates",
                 "[StartsOn] IS NULL OR [EndsOn] IS NULL OR [EndsOn] >= [StartsOn]");
+
+            // A place chosen from a map carries both coordinates or neither,
+            // and each falls inside the range the globe allows. A place typed
+            // by hand carries neither. Another single-row guard; the domain is
+            // the authority.
+            table.HasCheckConstraint(
+                "CK_TripDestinations_Coordinates",
+                "([Latitude] IS NULL AND [Longitude] IS NULL) OR " +
+                "([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL AND " +
+                "[Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)");
         });
 
         builder.HasKey(destination => destination.Id);
@@ -39,6 +49,14 @@ public sealed class TripDestinationConfiguration : IEntityTypeConfiguration<Trip
             .IsRequired(false);
 
         builder.Property(destination => destination.EndsOn)
+            .IsRequired(false);
+
+        // Where the place is, when it was chosen from a map. A place typed by
+        // hand carries neither, which is always valid.
+        builder.Property(destination => destination.Latitude)
+            .IsRequired(false);
+
+        builder.Property(destination => destination.Longitude)
             .IsRequired(false);
 
         // A trip can never hold two stops in the same position. The index also

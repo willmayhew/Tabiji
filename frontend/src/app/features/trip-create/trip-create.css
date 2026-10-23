@@ -34,8 +34,10 @@
   text-wrap: pretty;
 }
 
+/* The editor is the same width here as on the trip page's edit mode, so a
+   stop keeps its name and its dates on one line in both. */
 .create__form {
-  max-width: 30rem;
+  max-width: var(--editor-width);
 }
 
 .create__aside {
@@ -85,16 +87,19 @@
 
   .create__lead {
     grid-column: 1;
+    grid-row: 1;
   }
 
+  /* The editor spans the full width beneath the lead and the note, so it can
+     hold the shared width and keep every stop on one line. */
   .create__form {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 2;
   }
 
   .create__aside {
     grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-row: 1;
     flex-direction: column;
     gap: var(--space-2xs);
     padding-top: 0;

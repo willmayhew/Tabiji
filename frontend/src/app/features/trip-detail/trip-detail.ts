@@ -17,7 +17,6 @@ import { Trip, TripDestination, TripStatus } from '../../core/models/trip';
 import { formatDestinationDates, formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
 import { routeSummary } from '../../shared/format/trip-destinations';
 import { TripForm } from '../../shared/form/trip-form';
-import { DestinationPlate } from '../../shared/ui/destination-plate';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 interface TripDetailResult {
@@ -28,7 +27,7 @@ interface TripDetailResult {
 
 @Component({
   selector: 'app-trip-detail',
-  imports: [DestinationPlate, RouterLink, StatusBadge, TripForm],
+  imports: [RouterLink, StatusBadge, TripForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-detail.html',
   styleUrl: './trip-detail.css',
@@ -137,28 +136,6 @@ export class TripDetail {
 
     return found === null ? null : formatTripDate(found.endsOn);
   });
-
-  /**
-   * The title of the trip, which is what the cover band is labelled with.
-   *
-   * While the trip is being changed the label follows the name in the
-   * editor, so the plate keeps up with the reader. A form control is not a
-   * signal, so this is a method rather than a computed: it is asked again on
-   * every pass of change detection.
-   */
-  protected title(): string | null {
-    const form = this.tripForm();
-
-    if (this.editing() && form) {
-      const name = form.form.controls.name.value.trim();
-
-      if (name) {
-        return name;
-      }
-    }
-
-    return this.trip()?.name ?? null;
-  }
 
   /** How many stops the route has, in words. */
   protected readonly routeSummary = computed(() => {

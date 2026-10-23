@@ -10,6 +10,11 @@ namespace Tabiji.Domain.Trips;
 /// The dates describe the planned stay at the stop. Both are optional: a
 /// stop can be added long before its dates are known, and either one can be
 /// left out on its own.
+///
+/// The coordinates describe where the place is, and are optional too: a
+/// place chosen from a map carries them, and a place typed by hand carries
+/// none. They are never used to derive the name, and the name is never
+/// derived from them.
 /// </summary>
 public sealed class TripDestination
 {
@@ -25,6 +30,8 @@ public sealed class TripDestination
         string name,
         DateOnly? startsOn,
         DateOnly? endsOn,
+        double? latitude,
+        double? longitude,
         int sortOrder)
     {
         Id = id;
@@ -32,6 +39,8 @@ public sealed class TripDestination
         Name = name;
         StartsOn = startsOn;
         EndsOn = endsOn;
+        Latitude = latitude;
+        Longitude = longitude;
         SortOrder = sortOrder;
     }
 
@@ -54,6 +63,18 @@ public sealed class TripDestination
     public DateOnly? EndsOn { get; private set; }
 
     /// <summary>
+    /// The latitude of the place, when it was chosen from a map. Null when
+    /// the place was typed by hand, which is always allowed.
+    /// </summary>
+    public double? Latitude { get; private set; }
+
+    /// <summary>
+    /// The longitude of the place, when it was chosen from a map. Null when
+    /// the place was typed by hand, which is always allowed.
+    /// </summary>
+    public double? Longitude { get; private set; }
+
+    /// <summary>
     /// The position of this stop on its trip's route, counting from zero.
     /// </summary>
     public int SortOrder { get; private set; }
@@ -68,6 +89,8 @@ public sealed class TripDestination
         string name,
         DateOnly? startsOn,
         DateOnly? endsOn,
+        double? latitude,
+        double? longitude,
         int sortOrder)
     {
         if (sortOrder < 0)
@@ -77,12 +100,16 @@ public sealed class TripDestination
                 nameof(sortOrder));
         }
 
+        ValidateCoordinates(latitude, longitude);
+
         return new TripDestination(
             Guid.NewGuid(),
             tripId,
             ValidateName(name),
             startsOn,
             endsOn,
+            latitude,
+            longitude,
             sortOrder);
     }
 
@@ -106,12 +133,61 @@ public sealed class TripDestination
     }
 
     /// <summary>
+    /// Sets where the place is, or clears it. A place carries both
+    /// coordinates or neither. Internal because only the owning trip decides
+    /// the location.
+    /// </summary>
+    internal void Locate(double? latitude, double? longitude)
+    {
+        ValidateCoordinates(latitude, longitude);
+
+        Latitude = latitude;
+        Longitude = longitude;
+    }
+
+    /// <summary>
     /// Moves this stop to a new position on its route. Internal because only
     /// the owning trip decides the order.
     /// </summary>
     internal void MoveTo(int sortOrder)
     {
         SortOrder = sortOrder;
+    }
+
+    /// <summary>
+    /// Checks the optional coordinates of a place: both are given or neither
+    /// is, and each falls inside the range the globe allows.
+    ///
+    /// A place typed by hand carries neither, which is valid: a destination
+    /// never has to come from a map.
+    /// </summary>
+    internal static void ValidateCoordinates(double? latitude, double? longitude)
+    {
+        if (latitude is null && longitude is null)
+        {
+            return;
+        }
+
+        if (latitude is null || longitude is null)
+        {
+            throw new ArgumentException(
+                "A destination needs both a latitude and a longitude, or neither.",
+                latitude is null ? nameof(latitude) : nameof(longitude));
+        }
+
+        if (latitude.Value < -90 || latitude.Value > 90)
+        {
+            throw new ArgumentException(
+                "The destination latitude must be between -90 and 90.",
+                nameof(latitude));
+        }
+
+        if (longitude.Value < -180 || longitude.Value > 180)
+        {
+            throw new ArgumentException(
+                "The destination longitude must be between -180 and 180.",
+                nameof(longitude));
+        }
     }
 
     private static string ValidateName(string name)

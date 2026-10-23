@@ -137,6 +137,8 @@ Invariants, all enforced in the domain and all covered by unit tests:
 - a trip has at least one destination and at most twenty;
 - each destination name is required and at most 200 characters;
 - a destination's sort order cannot be negative;
+- a destination's coordinates are both present or both absent, and each falls inside the
+  range the globe allows;
 - the trip cannot end before it starts;
 - a new trip always starts in `Planning`.
 
@@ -154,6 +156,8 @@ public sealed class TripDestination
     public int SortOrder { get; private set; }
     public DateOnly? StartsOn { get; private set; }
     public DateOnly? EndsOn { get; private set; }
+    public double? Latitude { get; private set; }
+    public double? Longitude { get; private set; }
 }
 ```
 
@@ -176,6 +180,14 @@ is no check constraint or foreign key on it.
 **The same place may appear twice.** A route that visits Rome on the way out and again on
 the way home is a round trip, not a mistake, so duplicates are allowed. The domain rejects
 only blank and over-long names, as it always did.
+
+**The coordinates are optional, and they belong to the name.** A place chosen from the map
+carries a latitude and a longitude; a place typed by hand carries neither, which is always
+valid. The two are either both present or both absent, each inside the range the globe
+allows, and they never derive the name — the editor drops them the moment the reader types
+over a chosen name, so a stop can never show one place's name with another place's
+coordinates. Nothing compares them against a list of countries, and no place identifier is
+stored: a destination's identity is still its own free text.
 
 Invalid input raises `ArgumentException` with the offending parameter name. The API maps
 that to a `400` with an RFC 7807 problem document.
@@ -242,7 +254,8 @@ is refused; a stop the drafts leave out is removed.
 
 ```csharp
 public sealed record TripDestinationDraft(
-    Guid? Id, string Name, DateOnly? StartsOn, DateOnly? EndsOn);
+    Guid? Id, string Name, DateOnly? StartsOn, DateOnly? EndsOn,
+    double? Latitude = null, double? Longitude = null);
 ```
 
 
@@ -284,6 +297,8 @@ entity configurations found in its own assembly.
 | `SortOrder` | `SortOrder` | `int` |
 | `StartsOn` | `StartsOn` | `date`, nullable |
 | `EndsOn` | `EndsOn` | `date`, nullable |
+| `Latitude` | `Latitude` | `float`, nullable |
+| `Longitude` | `Longitude` | `float`, nullable |
 
 The foreign key to `Trips` cascades, and a **unique** index on `(TripId, SortOrder)` makes
 it impossible for a trip to hold two stops in the same position. The same index covers the
@@ -292,6 +307,10 @@ foreign-key lookup, so one index does both jobs.
 A **check constraint** `CK_TripDestinations_Dates` refuses a stop that ends before it
 starts. It is a belt-and-braces guard on a single row: the domain is the authority on this,
 and the rule that spans the whole route cannot be written in SQL at all.
+
+A second check constraint, `CK_TripDestinations_Coordinates`, refuses a row that carries
+half a pair of coordinates or a pair off the globe. It is the same kind of guard: the
+domain is the authority, and the database is the backstop.
 
 `Status` is stored as a string rather than an integer so that the stored value stays
 readable and adding an enum member cannot silently change the meaning of existing rows.
@@ -383,6 +402,20 @@ at all. So the repository:
 The tracker is told that the positions have not changed, so that it never tries to move a
 stop into a place another stop is holding.
 
+### 5.3.4 The migration that gave the stops their coordinates
+
+`<timestamp>_AddDestinationCoordinates` is additive and moves no data, exactly like the
+dates migration before it. It adds the two nullable `float` columns and the check
+constraint, and drops nothing:
+
+```sql
+ALTER TABLE [TripDestinations] ADD [Latitude]  float NULL;
+ALTER TABLE [TripDestinations] ADD [Longitude] float NULL;
+```
+
+Every existing stop gets `NULL` for both, which reads as *"this place was typed by hand"* —
+the honest answer for a stop that never came from a map. The client sends coordinates only
+when a place is chosen from the map, so nothing in the existing data needs a backfill.
 
 ### 5.4 API
 
@@ -411,7 +444,7 @@ the stops, and each stop carries the optional days of its stay:
   "startsOn": "2027-05-16",
   "endsOn": "2027-06-05",
   "destinations": [
-    { "name": "Osaka", "startsOn": "2027-05-16", "endsOn": "2027-05-20" },
+    { "name": "Osaka", "startsOn": "2027-05-16", "endsOn": "2027-05-20", "latitude": 34.6937, "longitude": 135.5023 },
     { "name": "Kyoto", "startsOn": "2027-05-20", "endsOn": "2027-05-24" },
     { "name": "Ise", "startsOn": null, "endsOn": null },
     { "name": "Tokyo", "startsOn": "2027-05-26", "endsOn": "2027-06-05" }
@@ -424,16 +457,22 @@ the stops, and each stop carries the optional days of its stay:
   "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
   "name": "Japan Adventure",
   "destinations": [
-    { "id": "…", "name": "Osaka", "sortOrder": 0, "startsOn": "2027-05-16", "endsOn": "2027-05-20" },
-    { "id": "…", "name": "Kyoto", "sortOrder": 1, "startsOn": "2027-05-20", "endsOn": "2027-05-24" },
-    { "id": "…", "name": "Ise", "sortOrder": 2, "startsOn": null, "endsOn": null },
-    { "id": "…", "name": "Tokyo", "sortOrder": 3, "startsOn": "2027-05-26", "endsOn": "2027-06-05" }
+    { "id": "…", "name": "Osaka", "sortOrder": 0, "startsOn": "2027-05-16", "endsOn": "2027-05-20", "latitude": 34.6937, "longitude": 135.5023 },
+    { "id": "…", "name": "Kyoto", "sortOrder": 1, "startsOn": "2027-05-20", "endsOn": "2027-05-24", "latitude": null, "longitude": null },
+    { "id": "…", "name": "Ise", "sortOrder": 2, "startsOn": null, "endsOn": null, "latitude": null, "longitude": null },
+    { "id": "…", "name": "Tokyo", "sortOrder": 3, "startsOn": "2027-05-26", "endsOn": "2027-06-05", "latitude": null, "longitude": null }
   ],
   "startsOn": "2027-05-16",
   "endsOn": "2027-06-05",
   "status": "Planning"
 }
 ```
+
+**A stop may carry the coordinates of a place chosen from a map.** `latitude` and
+`longitude` are optional and always travel together: a place chosen from the map has both,
+a place typed by hand has neither, and the domain refuses half a pair or a pair off the
+globe. They never derive the name, and the response always includes them (as `null` when
+there are none), so a client never has to guess.
 
 The response carries the sort order explicitly because the domain has one, and the array
 is returned in that order too, so a client may rely on either. It also carries each stop's
@@ -517,6 +556,7 @@ frontend/src/
         ├── media/                       the route motif generator
         ├── validate/                    the pure rules the forms mirror
         ├── form/                        the editor, shared by two screens
+        ├── map/                         the map picker and its MapLibre adapter
         └── ui/                          StatusBadge, TripCard, DestinationPlate
 ```
 
@@ -568,17 +608,19 @@ place, it can never be wrong about where the trip is. The plate is `aria-hidden`
 label and the index are repeated as real text beside it, so a reader hears each
 fact exactly once.
 
-**A plate carries a label: the title of the trip.** On a card it says which journey each
-card is at a glance, and on the trip page it titles the cover band. The motif is drawn from
-the trip's id and says nothing about the place, so the label can be the trip's own name
-without the plate ever being wrong about where the trip is.
+**A plate carries a label: the title of the trip.** It says which journey each card is at a
+glance. The motif is drawn from the trip's id and says nothing about the place, so the
+label can be the trip's own name without the plate ever being wrong about where the trip
+is.
 
 A trip with no stops at all — a legacy trip whose destination was blank — still renders the
 motif with a label and an explicit *"No destinations recorded"* line, never a blank gap.
 
-**A band is a letterbox.** It is 21:4 — a wide, shallow strip — and the view box matches
-that ratio exactly, so the drawing is never distorted. A band holds no minimum height of
-its own: the ratio gives it its shape at every width, from a phone to a wide screen.
+**A band is the plate of the leading card.** It is 11:4 — the shape the two columns of the
+trips grid make together — and the view box matches that ratio exactly, so the drawing is
+never distorted. That makes the leading card stand exactly as tall as the one-column cards
+beside it, rather than reading as a shallow strip. A band holds no minimum height of its
+own: the ratio gives it its shape at every width.
 
 **The route is one list, used twice.** The `.route` primitives in `components.css` draw a
 numbered stop joined to the next by a hairline. The editor uses them to *build* a route
@@ -588,7 +630,9 @@ with. A stop carries its name and its two date fields in one cell, so that the r
 a single grid row and the hairline is not disturbed by the dates. The name keeps its room
 and the dates give way when there is not enough space, because a place without a name is
 not a place; the caption of a date travels with its field, so the two are never left
-apart.
+apart. The editor keeps **one width** on both screens — the create page and the trip
+page's edit mode — so a stop's name and its dates share a line on either, and the two
+screens cannot drift apart.
 
 **The editor is shared.** `shared/form/trip-form.ts` is the route builder, and it is used
 by two screens: the create page, and the trip page in its edit mode. The stops live in a
@@ -600,6 +644,20 @@ without a pointer implementation. The template tracks each control rather than i
 position, so a moved row is moved in the document and **the focus follows it**. Adding or
 removing a stop moves the focus deliberately, and a polite live region says what
 happened.
+
+**A destination can be chosen from a map, or typed by hand.** Every stop's name field
+carries a small map button. Pressing it opens one shared `app-location-picker`, which is a
+native `<dialog>` — a centred card on a wide screen, a full-height sheet on a phone — so
+the browser gives it the top layer, a focus trap and Escape to close. The picker searches
+through `core/api/geocoding.service.ts` and draws the map through
+`shared/map/map-engine.ts`, which imports MapLibre **only when a map is actually drawn**, so
+the library lives in a chunk of its own. It holds no destination field: the editor tells it
+which stop it was opened for, so confirming writes that stop's name and coordinates and
+nothing else, cancelling writes nothing, and typing over a chosen name clears its
+coordinates. A place chosen from the results is written with the locality that tells it
+apart — *Asda, Poole* rather than *Asda* — so the name on a stop says which place was
+meant. The map is never required — a free-text destination never touches it, and a picker
+whose provider cannot be reached still leaves the field perfectly usable.
 
 A stop handed to the editor is laid out in it, in the order it is visited, with its
 identity kept so that the API can tell a renamed stop from a new one. The editor is the
@@ -647,9 +705,12 @@ In development the Angular dev server proxies `/api` and `/health` to
 its own origin and there is no CORS preflight in the common path. A CORS policy is still
 configured on the API for direct cross-origin calls.
 
-**The app makes no third party request at runtime.** Fraunces and Inter are self hosted
-under the SIL Open Font License, and there are no image assets at all, so the browser
-only ever talks to this origin.
+**The app makes no third party request at runtime, with one opt-in exception.** Fraunces
+and Inter are self hosted under the SIL Open Font License, there are no image assets at
+all, and every screen is drawn from its own origin. The single exception is the map picker:
+while it is open it fetches vector tiles from OpenFreeMap and searches through Photon. Those
+requests happen **only while the picker is open** — never on page load — and the picker
+degrades to plain text entry when they fail, so the rest of the product keeps its promise.
 
 ## 7. Cross-cutting decisions
 
@@ -672,6 +733,20 @@ mocking framework would add a dependency without removing any work.
 
 **No mapping library.** `Trip` to `TripResponse` is a single explicit method call. A
 mapping library would add a dependency and hide a conversion that is currently three lines.
+
+**One new runtime dependency, and it is lazy.** The map picker adds `maplibre-gl`. It is
+imported only when a map is actually drawn, so it is a chunk of its own and never part of
+the first paint. The tile style and the geocoding host are settings in `environment.ts`
+(no keys, nothing secret), so the provider can be changed without touching a component.
+
+**MapLibre's worker is shipped as an asset, not left to the bundler.** The library parses
+tiles and styles on a worker thread, and since v5 that worker is a file of its own rather
+than something inlined into the bundle. A bundler cannot place it, so it is copied to the
+app root by `angular.json` and named in `environment.ts`, and the picker hands the URL to
+`setWorkerUrl` before it draws anything. Without it MapLibre fails with *"Worker failed to
+load"* and the map stays blank while everything else looks healthy — which is exactly what
+happened the first time. The worker is loaded only while the picker is open, like the tiles
+themselves.
 
 **Warnings are errors.** `TreatWarningsAsErrors` is on, together with nullable reference
 types and `AnalysisLevel=latest-recommended`. The single exception is `CA1707` in the
@@ -697,7 +772,7 @@ developer and every build uses the same compiler.
 | Trip endpoint tests | `backend/Tabiji.Tests/TripEndpointTests.cs` | The trip HTTP surface, via `WebApplicationFactory` | No |
 | Migration tests | `backend/Tabiji.Tests/*MigrationTests.cs` | The operations of a migration, inspected by reflection | No |
 | Repository tests | `backend/Tabiji.Tests/TripRepositoryTests.cs` | The route written to a real database | **Yes** |
-| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the rules, the route motif, the destination plate | No |
+| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the rules, the route motif, the destination plate, the map picker and the geocoder | No |
 
 The suite is written to run **without a database**, and most of it does. The one exception
 is the repository, because writing a route back is the one thing that cannot be checked any

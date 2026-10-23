@@ -141,6 +141,65 @@ public sealed class TripTests
     }
 
     [Fact]
+    public void Create_KeepsTheCoordinatesOfAPlaceChosenFromAMap()
+    {
+        var trip = Trip.Create(
+            "Japan",
+            [new TripDestinationDraft(null, "Kyoto", null, null, 35.0116, 135.7681)],
+            StartsOn,
+            EndsOn,
+            CreatedAt);
+
+        var stop = Assert.Single(trip.Destinations);
+
+        Assert.Equal(35.0116, stop.Latitude);
+        Assert.Equal(135.7681, stop.Longitude);
+    }
+
+    [Fact]
+    public void Create_LeavesAPlaceTypedByHandWithoutCoordinates()
+    {
+        var trip = Trip.Create("Rome & Amalfi", Stops("Rome"), StartsOn, EndsOn, CreatedAt);
+
+        var stop = Assert.Single(trip.Destinations);
+
+        Assert.Null(stop.Latitude);
+        Assert.Null(stop.Longitude);
+    }
+
+    [Theory]
+    [InlineData(35.0116, null)]
+    [InlineData(null, 135.7681)]
+    public void Create_RejectsAHalfSetCoordinatePair(double? latitude, double? longitude)
+    {
+        var exception = Assert.Throws<ArgumentException>(() => Trip.Create(
+            "Japan",
+            [new TripDestinationDraft(null, "Kyoto", null, null, latitude, longitude)],
+            StartsOn,
+            EndsOn,
+            CreatedAt));
+
+        Assert.Contains("both a latitude and a longitude", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(91.0, 0.0)]
+    [InlineData(-91.0, 0.0)]
+    [InlineData(0.0, 181.0)]
+    [InlineData(0.0, -181.0)]
+    public void Create_RejectsCoordinatesOffTheGlobe(double latitude, double longitude)
+    {
+        var exception = Assert.Throws<ArgumentException>(() => Trip.Create(
+            "Japan",
+            [new TripDestinationDraft(null, "Kyoto", null, null, latitude, longitude)],
+            StartsOn,
+            EndsOn,
+            CreatedAt));
+
+        Assert.Contains("must be between", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Create_RejectsEndDateBeforeStartDate()
     {
         var exception = Assert.Throws<ArgumentException>(
@@ -417,6 +476,66 @@ public sealed class TripTests
 
         Assert.Null(trip.Destinations[0].StartsOn);
         Assert.Null(trip.Destinations[0].EndsOn);
+    }
+
+    [Fact]
+    public void ApplyRoute_PreservesChangesAndClearsTheCoordinates()
+    {
+        var trip = Trip.Create(
+            "Japan",
+            [new TripDestinationDraft(null, "Osaka", null, null, 34.6937, 135.5023)],
+            StartsOn,
+            EndsOn,
+            CreatedAt);
+        var osaka = trip.Destinations[0].Id;
+
+        // A kept stop keeps its coordinates when they are sent again.
+        trip.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [new TripDestinationDraft(osaka, "Osaka", null, null, 34.6937, 135.5023)]);
+
+        Assert.Equal(34.6937, trip.Destinations[0].Latitude);
+        Assert.Equal(135.5023, trip.Destinations[0].Longitude);
+
+        // Moving the stop to another place changes them.
+        trip.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [new TripDestinationDraft(osaka, "Kyoto", null, null, 35.0116, 135.7681)]);
+
+        Assert.Equal("Kyoto", trip.Destinations[0].Name);
+        Assert.Equal(35.0116, trip.Destinations[0].Latitude);
+
+        // Typing the name by hand clears them, so the place is never a name
+        // from one place with the coordinates of another.
+        trip.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [new TripDestinationDraft(osaka, "Somewhere else", null, null)]);
+
+        Assert.Equal("Somewhere else", trip.Destinations[0].Name);
+        Assert.Null(trip.Destinations[0].Latitude);
+        Assert.Null(trip.Destinations[0].Longitude);
+    }
+
+    [Fact]
+    public void ApplyRoute_ChangesNothingWhenAPairOfCoordinatesIsHalfGiven()
+    {
+        var trip = Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt);
+        var before = trip.Destinations.Select(d => (d.Id, d.Name, d.SortOrder)).ToArray();
+
+        Assert.Throws<ArgumentException>(() => trip.ApplyRoute(
+            "Changed",
+            StartsOn,
+            EndsOn,
+            [new TripDestinationDraft(null, "Kyoto", null, null, 35.0116, null)]));
+
+        Assert.Equal("Rome & Amalfi", trip.Name);
+        Assert.Equal(before, trip.Destinations.Select(d => (d.Id, d.Name, d.SortOrder)).ToArray());
     }
 
     [Fact]

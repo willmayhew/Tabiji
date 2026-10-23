@@ -13,6 +13,8 @@ const trip = {
       sortOrder: 0,
       startsOn: '2027-04-01',
       endsOn: '2027-04-05',
+      latitude: null,
+      longitude: null,
     },
     {
       id: '0a1b2c3d-0000-0000-0000-000000000001',
@@ -20,6 +22,8 @@ const trip = {
       sortOrder: 1,
       startsOn: null,
       endsOn: null,
+      latitude: null,
+      longitude: null,
     },
   ],
   startsOn: '2027-04-01',
@@ -61,8 +65,8 @@ describe('TripsService', () => {
       .create({
         name: 'Rome & Amalfi',
         destinations: [
-          { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05' },
-          { name: 'Amalfi', startsOn: null, endsOn: null },
+          { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05', latitude: null, longitude: null },
+          { name: 'Amalfi', startsOn: null, endsOn: null, latitude: null, longitude: null },
         ],
         startsOn: '2027-04-01',
         endsOn: '2027-04-14',
@@ -74,8 +78,8 @@ describe('TripsService', () => {
     expect(request.request.body).toEqual({
       name: 'Rome & Amalfi',
       destinations: [
-        { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05' },
-        { name: 'Amalfi', startsOn: null, endsOn: null },
+        { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05', latitude: null, longitude: null },
+        { name: 'Amalfi', startsOn: null, endsOn: null, latitude: null, longitude: null },
       ],
       startsOn: '2027-04-01',
       endsOn: '2027-04-14',
@@ -105,8 +109,8 @@ describe('TripsService', () => {
       .update('5f2b1c4e-0000-0000-0000-000000000000', {
         name: 'Italia',
         destinations: [
-          { id: '0a1b2c3d-0000-0000-0000-000000000000', name: 'Roma', startsOn: null, endsOn: null },
-          { id: null, name: 'Napoli', startsOn: '2027-04-05', endsOn: '2027-04-08' },
+          { id: '0a1b2c3d-0000-0000-0000-000000000000', name: 'Roma', startsOn: null, endsOn: null, latitude: null, longitude: null },
+          { id: null, name: 'Napoli', startsOn: '2027-04-05', endsOn: '2027-04-08', latitude: null, longitude: null },
         ],
         startsOn: '2027-04-01',
         endsOn: '2027-04-14',
@@ -118,8 +122,8 @@ describe('TripsService', () => {
     expect(request.request.body).toEqual({
       name: 'Italia',
       destinations: [
-        { id: '0a1b2c3d-0000-0000-0000-000000000000', name: 'Roma', startsOn: null, endsOn: null },
-        { id: null, name: 'Napoli', startsOn: '2027-04-05', endsOn: '2027-04-08' },
+        { id: '0a1b2c3d-0000-0000-0000-000000000000', name: 'Roma', startsOn: null, endsOn: null, latitude: null, longitude: null },
+        { id: null, name: 'Napoli', startsOn: '2027-04-05', endsOn: '2027-04-08', latitude: null, longitude: null },
       ],
       startsOn: '2027-04-01',
       endsOn: '2027-04-14',

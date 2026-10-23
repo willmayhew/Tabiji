@@ -9,8 +9,8 @@ const created: Trip = {
   id: '5f2b1c4e-0000-0000-0000-000000000000',
   name: 'Rome & Amalfi',
   destinations: [
-    { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null },
-    { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null },
+    { id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null },
+    { id: 'b2', name: 'Amalfi', sortOrder: 1, startsOn: null, endsOn: null, latitude: null, longitude: null },
   ],
   startsOn: '2027-04-01',
   endsOn: '2027-04-14',

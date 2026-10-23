@@ -11,8 +11,12 @@ namespace Tabiji.Application.Trips;
 /// <param name="Name">The place, as free text.</param>
 /// <param name="StartsOn">The planned first day, or null when not decided.</param>
 /// <param name="EndsOn">The planned last day, or null when not decided.</param>
+/// <param name="Latitude">The latitude of a place chosen from a map, or null when it was typed by hand.</param>
+/// <param name="Longitude">The longitude of a place chosen from a map, or null when it was typed by hand.</param>
 public sealed record TripDestinationUpdateRequest(
     Guid? Id,
     string Name,
     DateOnly? StartsOn,
-    DateOnly? EndsOn);
+    DateOnly? EndsOn,
+    double? Latitude = null,
+    double? Longitude = null);

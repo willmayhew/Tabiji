@@ -171,6 +171,33 @@ every change saved together.
 
 ---
 
+## Phase 0.97 — A destination from the map · **Done**
+
+Let a destination be chosen from a map instead of typed, without ever making the map
+mandatory. The coordinates are optional; the name stays the primary value.
+
+- [x] A map button inside every stop's name field, on the create page and on the trip
+      page's edit mode, and nowhere near the trip's own name
+- [x] One reusable `app-location-picker`: a native `<dialog>`, a centred card on a wide
+      screen and a full-height sheet on a phone, with search, suggestions, a marked map,
+      a confirmation and a close, and loading, empty, error and map-unavailable states
+- [x] MapLibre GL JS and OpenFreeMap for the tiles, Photon for search and reverse
+      geocoding — no API keys, no billing, and no backend proxy
+- [x] MapLibre imported only when a map is actually drawn, so it never reaches the first
+      paint
+- [x] Optional `latitude` and `longitude` on a stop, both or neither, each inside the
+      globe, with an additive migration that leaves the existing data untouched
+- [x] Confirming a place fills the stop the picker was opened for; cancelling changes
+      nothing; typing over a chosen name clears its coordinates
+- [x] Free text always works: the map is never required, and a picker that cannot reach
+      its providers degrades to search alone
+
+**Exit criteria:** a destination can be chosen from a map or typed by hand, the two are
+indistinguishable to the rest of the product, and a trip with coordinates survives the
+database and the API unchanged.
+
+---
+
 ## Phase 1 — Accounts, trips and membership
 
 *Planned.* Everything downstream needs to know who the participants are.
