@@ -1,0 +1,18 @@
+<div class="atlas-map" [class.atlas-map--unavailable]="unavailable()">
+  @if (unavailable()) {
+    <p class="atlas-map__fallback">
+      The map could not be drawn here. Every stop is still listed beside it.
+    </p>
+  } @else {
+    <div
+      #canvas
+      class="atlas-map__canvas"
+      role="region"
+      [attr.aria-label]="label() ? 'Map of ' + label() : 'Map of the trip'"
+    ></div>
+  }
+</div>
+
+@if (degraded() && !unavailable()) {
+  <p class="atlas-map__note" role="status">Some of the map's detail could not be loaded.</p>
+}

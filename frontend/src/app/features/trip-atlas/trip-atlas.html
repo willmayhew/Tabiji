@@ -1,0 +1,154 @@
+<section class="panel">
+  <a class="back-link" [routerLink]="['/trips', tripId()]">&larr; Back to the trip</a>
+
+  @if (loading()) {
+    <div class="atlas__loading">
+      <p class="muted">Loading the atlas&hellip;</p>
+      <span class="skeleton atlas__skeleton-map"></span>
+      <span class="skeleton atlas__skeleton-line"></span>
+      <span class="skeleton atlas__skeleton-line atlas__skeleton-line--short"></span>
+    </div>
+  } @else if (notFound()) {
+    <div class="empty-state">
+      <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+        <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+        <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+        <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+        <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+      </svg>
+      <h1 class="empty-state__title">This trip has wandered off</h1>
+      <p class="empty-state__body">That trip could not be found. It may have been removed.</p>
+      <a class="button" routerLink="/trips">Back to your trips</a>
+    </div>
+  } @else if (error(); as message) {
+    <div class="empty-state empty-state--danger">
+      <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+        <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+        <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+        <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+        <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+      </svg>
+      <h1 class="empty-state__title">Something went wrong</h1>
+      <p class="empty-state__body">{{ message }}</p>
+      <button type="button" class="button" (click)="retryLoad()">Try again</button>
+    </div>
+  } @else if (trip(); as found) {
+    <header class="atlas__masthead">
+      <p class="eyebrow">The atlas</p>
+      <h1 class="atlas__name">{{ found.name }}</h1>
+
+      <div class="atlas__bar">
+        <div class="atlas__facts">
+          @if (dates(); as range) {
+            <p class="atlas__meta">
+              <time [attr.datetime]="found.startsOn">{{ range.start }}</time>
+              <span aria-hidden="true"> – </span>
+              <time [attr.datetime]="found.endsOn">{{ range.end }}</time>
+              <span class="atlas__duration">{{ range.duration }}</span>
+            </p>
+          } @else {
+            <p class="atlas__meta">
+              <time [attr.datetime]="found.startsOn">{{ found.startsOn }}</time>
+              <span aria-hidden="true"> – </span>
+              <time [attr.datetime]="found.endsOn">{{ found.endsOn }}</time>
+            </p>
+          }
+          <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" />
+        </div>
+
+        <a class="button button--secondary" [routerLink]="['/trips', found.id]">Open the trip</a>
+      </div>
+    </header>
+
+    <div class="atlas__toggle" role="group" aria-label="Atlas view">
+      <button
+        type="button"
+        class="atlas__toggle-button"
+        [attr.aria-pressed]="mode() === 'map'"
+        (click)="setMode('map')"
+      >
+        Map
+      </button>
+      <button
+        type="button"
+        class="atlas__toggle-button"
+        [attr.aria-pressed]="mode() === 'list'"
+        (click)="setMode('list')"
+      >
+        List
+      </button>
+    </div>
+
+    @if (saveError(); as message) {
+      <p class="callout callout--danger" role="alert">
+        {{ message }} The location was not changed.
+      </p>
+    } @else if (saving()) {
+      <p class="atlas__saving" role="status">Saving the location&hellip;</p>
+    }
+
+    <div
+      class="atlas__body"
+      [class.atlas__body--map]="mode() === 'map'"
+      [class.atlas__body--list]="mode() === 'list'"
+    >
+      <div class="atlas__map-panel">
+        @if (locatedCount() === 0) {
+          <div class="empty-state atlas__map-empty">
+            <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+              <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+              <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+              <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+              <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+            </svg>
+            <h2 class="empty-state__title">Nothing on the map yet</h2>
+            <p class="empty-state__body">
+              No stop has a location yet. Choose a place for a stop and it will appear here.
+            </p>
+          </div>
+        } @else {
+          <app-trip-atlas-map
+            [destinations]="found.destinations"
+            [selectedId]="selectedId()"
+            [label]="found.name"
+            [active]="mode() === 'map'"
+            (select)="select($event)"
+          />
+
+          <div class="atlas__map-actions">
+            <button type="button" class="button button--secondary" (click)="frame()">
+              Frame the trip
+            </button>
+          </div>
+        }
+      </div>
+
+      <div class="atlas__side">
+        <app-trip-atlas-list
+          [destinations]="found.destinations"
+          [selectedId]="selectedId()"
+          (select)="select($event)"
+        />
+      </div>
+
+      <div class="atlas__panel-slot">
+        <app-trip-atlas-panel
+          [destination]="selected()"
+          [position]="selectedPosition()"
+          [total]="ordered().length"
+          (changeLocation)="relocate($event)"
+        />
+      </div>
+    </div>
+  }
+
+  <app-location-picker
+    [open]="pickerFor() !== null"
+    [initialQuery]="pickerQuery()"
+    [initialCoordinates]="pickerCoordinates()"
+    (chosen)="onPlaceChosen($event)"
+    (dismissed)="closePicker()"
+  />
+
+  <p class="visually-hidden" aria-live="polite">{{ announcement() }}</p>
+</section>

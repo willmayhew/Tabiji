@@ -1,0 +1,71 @@
+.atlas-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.atlas-list__route {
+  border-top: var(--rule-hairline) solid var(--color-rule);
+}
+
+/* A stop is a button, so it is reachable from the keyboard. It keeps the
+   layout of a route row and gives up none of its text to the map. */
+.atlas-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4xs);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3xs) 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.atlas-list__item:hover .atlas-list__name {
+  color: var(--color-forest);
+}
+
+.atlas-list__name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
+}
+
+/* The selected stop is marked by a rule as well as by colour, so it reads
+   for a reader who cannot see the difference in tone. */
+.atlas-list__item--selected .atlas-list__name {
+  color: var(--color-forest);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--color-terracotta);
+  text-underline-offset: 0.18em;
+}
+
+.atlas-list__facts {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.atlas-list__flag {
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+  font-style: italic;
+}
+
+.atlas-list__note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}

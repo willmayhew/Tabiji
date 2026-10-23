@@ -56,6 +56,14 @@
   gap: var(--space-2xs) var(--space-sm);
 }
 
+/* The two things a reader can do with the trip, side by side and wrapping
+   together when there is not room for both. */
+.detail__bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
 .detail__meta {
   display: flex;
   align-items: baseline;

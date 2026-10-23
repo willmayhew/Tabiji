@@ -1,0 +1,190 @@
+.back-link {
+  align-self: flex-start;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.back-link:hover {
+  color: var(--color-forest);
+}
+
+/* Masthead ------------------------------------------------------------- */
+
+.atlas__masthead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  padding-bottom: var(--space-md);
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
+}
+
+.atlas__name {
+  margin: 0;
+  font-size: var(--text-4xl);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+.atlas__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.atlas__facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2xs) var(--space-sm);
+}
+
+.atlas__meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas__duration {
+  padding-left: var(--space-2xs);
+  font-weight: 600;
+}
+
+.atlas__duration::before {
+  content: '·';
+  margin-right: var(--space-2xs);
+  color: var(--color-rule-strong);
+}
+
+/* The map and the list, on a phone, take turns. ----------------------- */
+
+.atlas__toggle {
+  display: none;
+  gap: var(--space-4xs);
+}
+
+.atlas__toggle-button {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.atlas__toggle-button[aria-pressed='true'] {
+  border-color: var(--color-forest);
+  background: var(--color-forest);
+  color: var(--color-surface);
+}
+
+/* The body. On a wide screen the map and its panel stand beside the list;
+   on a narrow one they take turns. */
+.atlas__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'map'
+    'side'
+    'panel';
+  gap: var(--space-xl);
+}
+
+.atlas__map-panel {
+  grid-area: map;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.atlas__side {
+  grid-area: side;
+  min-width: 0;
+}
+
+.atlas__panel-slot {
+  grid-area: panel;
+  min-width: 0;
+}
+
+.atlas__map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
+.atlas__map-empty {
+  padding: var(--space-2xl) var(--space-md);
+}
+
+.atlas__saving {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+}
+
+/* Loading -------------------------------------------------------------- */
+
+.atlas__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.atlas__skeleton-map {
+  display: block;
+  height: clamp(18rem, 50vh, 32rem);
+}
+
+.atlas__skeleton-line {
+  display: block;
+  height: 0.9rem;
+  width: 70%;
+}
+
+.atlas__skeleton-line--short {
+  width: 40%;
+}
+
+/* Narrow screens ------------------------------------------------------- */
+
+@media (max-width: 56rem) {
+  .atlas__toggle {
+    display: flex;
+  }
+
+  .atlas__body--map .atlas__side {
+    display: none;
+  }
+
+  .atlas__body--list .atlas__map-panel {
+    display: none;
+  }
+}
+
+/* Wider screens -------------------------------------------------------- */
+
+@media (min-width: 56rem) {
+  .atlas__body {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    grid-template-areas:
+      'map side'
+      'panel side';
+    gap: var(--space-xl) var(--space-3xl);
+    align-items: start;
+  }
+}

@@ -1,0 +1,43 @@
+<section class="atlas-list">
+  <div class="section-head">
+    <h2>Route</h2>
+    @if (ordered().length > 0) {
+      <p class="section-head__meta">{{ summary() }}</p>
+    }
+  </div>
+
+  @if (ordered().length === 0) {
+    <p class="muted">No destinations recorded.</p>
+  } @else {
+    <ol class="route route--readout atlas-list__route">
+      @for (destination of ordered(); track destination.id; let index = $index) {
+        <li class="route__row">
+          <span class="route__node" aria-hidden="true">{{ position(index) }}</span>
+          <button
+            type="button"
+            class="atlas-list__item"
+            [class.atlas-list__item--selected]="destination.id === selectedId()"
+            [attr.aria-pressed]="destination.id === selectedId()"
+            (click)="select.emit(destination.id)"
+          >
+            <span class="atlas-list__name">{{ destination.name }}</span>
+            <span class="atlas-list__facts">
+              <span
+                class="route__dates-text"
+                [class.route__dates-text--undecided]="!hasDates(destination)"
+                >{{ datesFor(destination) }}</span
+              >
+              @if (!isLocated(destination)) {
+                <span class="atlas-list__flag">Not on the map</span>
+              }
+            </span>
+          </button>
+        </li>
+      }
+    </ol>
+
+    @if (mapNote(); as note) {
+      <p class="atlas-list__note">{{ note }}</p>
+    }
+  }
+</section>

@@ -1,0 +1,42 @@
+:host {
+  display: block;
+}
+
+/* The map holds its own height, because MapLibre needs a container with a
+   size to draw into. It keeps a usable height even on a short screen. */
+.atlas-map {
+  position: relative;
+  height: clamp(18rem, 50vh, 32rem);
+  border: var(--rule-hairline) solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunk);
+  overflow: hidden;
+}
+
+.atlas-map__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* When the map cannot be drawn the frame still holds its shape, so the list
+   beside it does not jump, and says why in plain words. */
+.atlas-map--unavailable {
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.atlas-map__fallback {
+  margin: 0;
+  max-width: 32ch;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.atlas-map__note {
+  margin: var(--space-2xs) 0 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+}

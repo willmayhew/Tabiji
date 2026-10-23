@@ -954,3 +954,44 @@ label.route__node:hover {
   border-color: var(--color-danger);
   color: var(--color-danger);
 }
+
+/* Atlas markers -------------------------------------------------------
+   The map markers are DOM elements the map engine makes itself, so Angular's
+   component style encapsulation never reaches them. Their classes live here,
+   with the other primitives, rather than in a component stylesheet.
+
+   A destination marker is a numbered pin. The selection is a ring, so it
+   reads without relying on colour alone. */
+
+.atlas-marker {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--color-forest-deep);
+  border-radius: var(--radius-pill);
+  background: var(--color-forest);
+  color: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.atlas-marker:hover {
+  transform: scale(1.1);
+}
+
+.atlas-marker--selected {
+  transform: scale(1.25);
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-terracotta);
+}

@@ -1,0 +1,35 @@
+@if (destination(); as stop) {
+  <section class="atlas-panel" aria-labelledby="atlas-panel-title">
+    <div class="section-head">
+      <h2 id="atlas-panel-title">Selected stop</h2>
+      @if (position(); as place) {
+        <p class="section-head__meta">Stop {{ place }} of {{ total() }}</p>
+      }
+    </div>
+
+    <h3 class="atlas-panel__name">{{ stop.name }}</h3>
+
+    <dl class="atlas-panel__list">
+      <div class="atlas-panel__row">
+        <dt>Dates</dt>
+        <dd [class.atlas-panel__undecided]="stop.startsOn === null && stop.endsOn === null">
+          {{ dates() }}
+        </dd>
+      </div>
+      <div class="atlas-panel__row">
+        <dt>Location</dt>
+        <dd>{{ located() ? 'On the map' : 'Not on the map' }}</dd>
+      </div>
+    </dl>
+
+    <button type="button" class="button button--secondary" (click)="changeLocation.emit(stop)">
+      Change location
+    </button>
+
+    <p class="atlas-panel__hint">
+      The name, the order and the dates are changed on the trip page.
+    </p>
+  </section>
+} @else {
+  <p class="atlas-panel__empty">Select a stop to see where it is and when you are there.</p>
+}

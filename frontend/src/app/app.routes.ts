@@ -19,6 +19,11 @@ export const routes: Routes = [
     title: 'Tabiji — New trip',
   },
   {
+    path: 'trips/:id/atlas',
+    loadComponent: () => import('./features/trip-atlas/trip-atlas').then((m) => m.TripAtlas),
+    title: 'Tabiji — Atlas',
+  },
+  {
     path: 'trips/:id',
     canDeactivate: [unsavedChangesGuard],
     loadComponent: () => import('./features/trip-detail/trip-detail').then((m) => m.TripDetail),
