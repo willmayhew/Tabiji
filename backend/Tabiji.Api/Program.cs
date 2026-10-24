@@ -54,6 +54,7 @@ app.MapHealthChecks(
     .WithSummary("Readiness probe. Verifies that the database is reachable.");
 
 app.MapTripEndpoints();
+app.MapSavedPlaceEndpoints();
 
 app.Run();
 

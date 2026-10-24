@@ -9,6 +9,7 @@ public static class DependencyInjection
     {
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<TripService>();
+        services.AddScoped<SavedPlaceService>();
 
         return services;
     }

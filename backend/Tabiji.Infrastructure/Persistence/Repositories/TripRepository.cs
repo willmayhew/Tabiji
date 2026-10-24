@@ -100,9 +100,31 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
                 dbContext.Entry(destination).State = EntityState.Added;
             }
 
-            foreach (var removed in existing.Where(destination => !wanted.Contains(destination.Id)))
+            var removed = existing
+                .Where(destination => !wanted.Contains(destination.Id))
+                .ToArray();
+
+            foreach (var destination in removed)
             {
-                dbContext.Entry(removed).State = EntityState.Deleted;
+                dbContext.Entry(destination).State = EntityState.Deleted;
+            }
+
+            // A stop that goes does not take its saved places with it: they
+            // stay on the trip and simply come off the route. The database
+            // cannot clear the association for us, because a cascading foreign
+            // key from the trip and an unloading one from the stop would be two
+            // paths to the same table, which SQL Server refuses. So the filing
+            // is cleared here, in the same transaction that removes the stop.
+            if (removed.Length > 0)
+            {
+                var removedIds = removed.Select(destination => destination.Id).ToArray();
+
+                await dbContext.SavedPlaces
+                    .Where(place => place.DestinationId.HasValue
+                        && removedIds.Contains(place.DestinationId.Value))
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(place => place.DestinationId, (Guid?)null),
+                        cancellationToken);
             }
         }
         finally

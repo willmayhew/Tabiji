@@ -68,3 +68,25 @@ FROM [TripDestinations] d
 JOIN [Trips] t ON t.[Id] = d.[TripId]
 WHERE (d.[Latitude]  IS NOT NULL AND (d.[Latitude]  < -90  OR d.[Latitude]  > 90))
    OR (d.[Longitude] IS NOT NULL AND (d.[Longitude] < -180 OR d.[Longitude] > 180));
+
+PRINT '--- 10. Saved places whose coordinates fall off the globe (expected: 0 rows) ---';
+SELECT p.[Id], p.[Name], p.[Latitude], p.[Longitude]
+FROM [SavedPlaces] p
+WHERE p.[Latitude] < -90 OR p.[Latitude] > 90
+   OR p.[Longitude] < -180 OR p.[Longitude] > 180;
+
+-- The one rule the schema cannot state for itself. A foreign key can say that
+-- a stop exists, but not that it belongs to the same trip as the place filed
+-- under it, so the application is the only thing keeping this true.
+PRINT '--- 11. Saved places filed under a stop of another trip (expected: 0 rows) ---';
+SELECT p.[Id], p.[Name], t.[Name] AS Trip, d.[Name] AS Stop, od.[Name] AS StopsTrip
+FROM [SavedPlaces] p
+JOIN [Trips] t ON t.[Id] = p.[TripId]
+JOIN [TripDestinations] d ON d.[Id] = p.[DestinationId]
+JOIN [Trips] od ON od.[Id] = d.[TripId]
+WHERE d.[TripId] <> p.[TripId];
+
+PRINT '--- 12. Saved places, for the record ---';
+SELECT (SELECT COUNT(*) FROM [SavedPlaces])                                  AS Places,
+       (SELECT COUNT(*) FROM [SavedPlaces] WHERE [DestinationId] IS NOT NULL) AS FiledUnderAStop,
+       (SELECT COUNT(DISTINCT [TripId]) FROM [SavedPlaces])                   AS TripsWithPlaces;
