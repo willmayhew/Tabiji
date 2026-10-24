@@ -12,12 +12,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
 import { describeHttpError } from '../../core/api/http-error';
+import { PlacesService } from '../../core/api/places.service';
 import { TripsService } from '../../core/api/trips.service';
-import { PlaceSelection } from '../../core/models/place';
+import { PlaceSelection, SavedPlace, SavedPlaceDraft } from '../../core/models/place';
 import { Trip, TripDestination, TripStatus, UpdateTrip } from '../../core/models/trip';
 import { formatTripDates } from '../../shared/format/trip-dates';
 import { LocationPicker } from '../../shared/map/location-picker';
+import { AtlasSelection } from '../../shared/map/map-engine';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
+import { PlaceEditor } from './place-editor';
 import { TripAtlasList } from './trip-atlas-list';
 import { TripAtlasMap } from './trip-atlas-map';
 import { TripAtlasPanel } from './trip-atlas-panel';
@@ -28,28 +31,47 @@ interface AtlasResult {
   notFound: boolean;
 }
 
+/** Puts a saved place into the list, in the order the server keeps it. */
+function mergePlace(places: readonly SavedPlace[], saved: SavedPlace): SavedPlace[] {
+  return places.some((place) => place.id === saved.id)
+    ? places.map((place) => (place.id === saved.id ? saved : place))
+    : [...places, saved];
+}
+
 /**
- * The trip as an atlas: the whole route on a map, the same route as a list,
- * and one selection the two share.
+ * The trip as an atlas: the route on a map, the same route as a list, the
+ * trip's saved places beside it, and one selection all three share.
  *
- * The screen owns the state. The map, the list and the panel are given what to
- * draw and say what was chosen; none of them holds a copy of the trip. The map
- * is never required: every stop is readable in the list, and a map that cannot
- * be drawn leaves the rest of the page untouched.
+ * The screen owns the state and every request that changes it. The map, the
+ * list and the panel are given what to draw and say what was chosen; none of
+ * them holds a copy of the trip.
+ *
+ * The map is never required. Every stop and every place is readable in the
+ * list, a map that cannot be drawn leaves the list and the editor working,
+ * and a search that fails while saving a place leaves the trip untouched.
  */
 @Component({
   selector: 'app-trip-atlas',
-  imports: [RouterLink, StatusBadge, LocationPicker, TripAtlasMap, TripAtlasList, TripAtlasPanel],
+  imports: [
+    RouterLink,
+    StatusBadge,
+    LocationPicker,
+    PlaceEditor,
+    TripAtlasMap,
+    TripAtlasList,
+    TripAtlasPanel,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-atlas.html',
   styleUrl: './trip-atlas.css',
 })
 export class TripAtlas {
   private readonly tripsService = inject(TripsService);
+  private readonly placesService = inject(PlacesService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** Emits when the reader asks for the map and the list again. */
+  /** Emits when the reader asks for the trip again. */
   private readonly retry = new Subject<void>();
   private readonly routeId = signal('');
 
@@ -58,8 +80,16 @@ export class TripAtlas {
   readonly error = signal<string | null>(null);
   readonly notFound = signal(false);
 
-  /** The stop the map and the list agree is selected. */
-  readonly selectedId = signal<string | null>(null);
+  /** The places saved to the trip, kept apart from the trip's own failure. */
+  readonly places = signal<SavedPlace[]>([]);
+  readonly placesLoading = signal(true);
+  readonly placesError = signal<string | null>(null);
+
+  /** What went wrong while adding, changing or removing a place. */
+  readonly placesActionError = signal<string | null>(null);
+
+  /** The stop or place the map and the list agree is selected. */
+  readonly selection = signal<AtlasSelection | null>(null);
 
   /** Which half of the atlas a narrow screen is showing. */
   protected readonly mode = signal<'map' | 'list'>('map');
@@ -72,6 +102,12 @@ export class TripAtlas {
   protected readonly saving = signal(false);
   protected readonly saveError = signal<string | null>(null);
 
+  /** The place editor: open, and the place it is changing. */
+  readonly editorOpen = signal(false);
+  readonly editorPlace = signal<SavedPlace | null>(null);
+  readonly editorSaving = signal(false);
+  protected readonly editorError = signal<string | null>(null);
+
   private readonly atlasMap = viewChild(TripAtlasMap);
 
   constructor() {
@@ -82,9 +118,15 @@ export class TripAtlas {
           this.trip.set(null);
           this.error.set(null);
           this.notFound.set(false);
-          this.selectedId.set(null);
+          this.selection.set(null);
           this.saveError.set(null);
           this.pickerFor.set(null);
+          this.places.set([]);
+          this.placesLoading.set(true);
+          this.placesError.set(null);
+          this.placesActionError.set(null);
+          this.editorOpen.set(false);
+          this.editorPlace.set(null);
         }),
         map((params) => params.get('id') ?? ''),
         tap((id) => this.routeId.set(id)),
@@ -112,6 +154,12 @@ export class TripAtlas {
         this.error.set(result.error);
         this.notFound.set(result.notFound);
         this.loading.set(false);
+
+        if (result.trip !== null) {
+          this.loadPlaces(result.trip.id);
+        } else {
+          this.placesLoading.set(false);
+        }
       });
   }
 
@@ -140,23 +188,38 @@ export class TripAtlas {
       ).length,
   );
 
-  protected readonly selected = computed(() => {
-    const id = this.selectedId();
+  /**
+   * Whether there is anything at all to draw. A trip whose stops are all typed
+   * by hand may still have places worth seeing, so the map is kept when it
+   * has either.
+   */
+  protected readonly showsMap = computed(() => this.locatedCount() > 0 || this.places().length > 0);
 
-    return id === null
+  protected readonly selectedDestination = computed(() => {
+    const selection = this.selection();
+
+    return selection === null || selection.kind !== 'destination'
       ? null
-      : (this.ordered().find((destination) => destination.id === id) ?? null);
+      : (this.ordered().find((destination) => destination.id === selection.id) ?? null);
+  });
+
+  protected readonly selectedPlace = computed(() => {
+    const selection = this.selection();
+
+    return selection === null || selection.kind !== 'place'
+      ? null
+      : (this.places().find((place) => place.id === selection.id) ?? null);
   });
 
   /** The selected stop's place on the route, counting from one. */
   protected readonly selectedPosition = computed(() => {
-    const id = this.selectedId();
+    const selection = this.selection();
 
-    if (id === null) {
+    if (selection === null || selection.kind !== 'destination') {
       return null;
     }
 
-    const index = this.ordered().findIndex((destination) => destination.id === id);
+    const index = this.ordered().findIndex((destination) => destination.id === selection.id);
 
     return index < 0 ? null : index + 1;
   });
@@ -179,6 +242,14 @@ export class TripAtlas {
     this.retry.next();
   }
 
+  protected retryPlaces(): void {
+    const trip = this.trip();
+
+    if (trip !== null) {
+      this.loadPlaces(trip.id);
+    }
+  }
+
   protected setMode(mode: 'map' | 'list'): void {
     this.mode.set(mode);
   }
@@ -187,12 +258,16 @@ export class TripAtlas {
     this.atlasMap()?.frameTrip();
   }
 
-  /** Selects a stop, from either the map or the list. */
-  protected select(id: string): void {
-    const stop = this.ordered().find((destination) => destination.id === id);
+  /** Selects a stop or a place, from the map or from the list. */
+  protected select(selection: AtlasSelection): void {
+    this.selection.set(selection);
 
-    this.selectedId.set(id);
-    this.announcement.set(stop === undefined ? null : `${stop.name} selected.`);
+    const name =
+      selection.kind === 'destination'
+        ? this.ordered().find((destination) => destination.id === selection.id)?.name
+        : this.places().find((place) => place.id === selection.id)?.name;
+
+    this.announcement.set(name === undefined ? null : `${name} selected.`);
   }
 
   /** Opens the picker for a stop's location. Nothing is changed until it is confirmed. */
@@ -203,6 +278,109 @@ export class TripAtlas {
 
   protected closePicker(): void {
     this.pickerFor.set(null);
+  }
+
+  /** Opens the editor on an empty draft. */
+  protected addPlace(): void {
+    this.editorPlace.set(null);
+    this.editorError.set(null);
+    this.editorOpen.set(true);
+  }
+
+  /** Opens the editor on a saved place. */
+  protected editPlace(place: SavedPlace): void {
+    this.editorPlace.set(place);
+    this.editorError.set(null);
+    this.editorOpen.set(true);
+  }
+
+  /** Backs out of an edit without writing anything. */
+  protected closeEditor(): void {
+    this.editorOpen.set(false);
+    this.editorPlace.set(null);
+    this.editorError.set(null);
+  }
+
+  /**
+   * Writes the draft the editor confirmed.
+   *
+   * The list and the map only change once the API has accepted the place, so
+   * a refused save leaves no phantom marker behind and the editor stays open
+   * with the reason.
+   */
+  protected savePlace(draft: SavedPlaceDraft): void {
+    const trip = this.trip();
+
+    if (trip === null || this.editorSaving()) {
+      return;
+    }
+
+    const existing = this.editorPlace();
+
+    this.editorSaving.set(true);
+    this.editorError.set(null);
+    this.placesActionError.set(null);
+
+    const request$ =
+      existing === null
+        ? this.placesService.create(trip.id, draft)
+        : this.placesService.update(trip.id, existing.id, draft);
+
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (saved) => {
+        this.editorSaving.set(false);
+        this.editorOpen.set(false);
+        this.editorPlace.set(null);
+
+        this.places.update((places) => mergePlace(places, saved));
+        this.selection.set({ kind: 'place', id: saved.id });
+        this.announcement.set(`${saved.name} was saved.`);
+      },
+      error: (failure: HttpErrorResponse) => {
+        this.editorSaving.set(false);
+        this.editorError.set(describeHttpError(failure));
+      },
+    });
+  }
+
+  /**
+   * Removes a place, once the reader has agreed to it.
+   *
+   * The place stays where it is until the API confirms, so a failed delete
+   * leaves it on the trip with the reason beside it.
+   */
+  protected deletePlace(place: SavedPlace): void {
+    const trip = this.trip();
+
+    if (trip === null) {
+      return;
+    }
+
+    if (!window.confirm(`Remove “${place.name}” from this trip?`)) {
+      return;
+    }
+
+    this.placesActionError.set(null);
+
+    this.placesService
+      .remove(trip.id, place.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.places.update((places) => places.filter((candidate) => candidate.id !== place.id));
+
+          const selection = this.selection();
+
+          if (selection !== null && selection.kind === 'place' && selection.id === place.id) {
+            this.selection.set(null);
+          }
+
+          this.announcement.set(`${place.name} was removed.`);
+        },
+        error: (failure: HttpErrorResponse) => {
+          this.placesActionError.set(describeHttpError(failure));
+        },
+      });
   }
 
   /**
@@ -257,6 +435,39 @@ export class TripAtlas {
       default:
         return 'neutral';
     }
+  }
+
+  /**
+   * Loads the trip's places on their own, so a failure here says so in the
+   * places section without taking the trip, the route or the map with it.
+   */
+  private loadPlaces(tripId: string): void {
+    this.placesLoading.set(true);
+    this.placesError.set(null);
+
+    this.placesService
+      .listForTrip(tripId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (places) => {
+          // A late answer for a trip the reader has already left must not
+          // overwrite the one on screen.
+          if (this.trip()?.id !== tripId) {
+            return;
+          }
+
+          this.places.set(places);
+          this.placesLoading.set(false);
+        },
+        error: (failure: HttpErrorResponse) => {
+          if (this.trip()?.id !== tripId) {
+            return;
+          }
+
+          this.placesError.set(describeHttpError(failure));
+          this.placesLoading.set(false);
+        },
+      });
   }
 
   private toUpdateRequest(trip: Trip, destinations: readonly TripDestination[]): UpdateTrip {

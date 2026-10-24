@@ -69,3 +69,90 @@
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
 }
+
+/* Saved places ---------------------------------------------------------
+   The route is the trip; these are what is worth seeing along the way. They
+   are set as a quieter ruled list, without the numbered nodes and the
+   hairline that joins a route, so the two cannot be mistaken for each
+   other. */
+
+.atlas-list__places-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  margin-top: var(--space-xl);
+}
+
+.atlas-places {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: var(--rule-hairline) solid var(--color-rule);
+}
+
+.atlas-places__row {
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
+}
+
+.atlas-places__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4xs);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-xs) 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.atlas-places__name {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
+}
+
+/* The selected place is marked by a rule as well as by colour, so it reads
+   for a reader who cannot see the difference in tone. */
+.atlas-places__item--selected .atlas-places__name {
+  color: var(--color-forest);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--color-terracotta);
+  text-underline-offset: 0.18em;
+}
+
+.atlas-places__facts {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+  min-width: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+}
+
+.atlas-places__category {
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-soft);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.atlas-places__where,
+.atlas-places__stop {
+  overflow-wrap: anywhere;
+}

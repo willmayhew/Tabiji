@@ -1,14 +1,21 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { SavedPlace } from '../../core/models/place';
 import { TripDestination } from '../../core/models/trip';
 import { formatDestinationDates } from '../../shared/format/trip-dates';
 import { routeSummary } from '../../shared/format/trip-destinations';
+import { AtlasSelection } from '../../shared/map/map-engine';
 
 /**
- * The route as a list, and the accessible half of the atlas.
+ * The trip as a list, and the accessible half of the atlas.
  *
- * Every stop is a button, so selecting one is reachable from the keyboard and
- * every stop can be read without the map. The list and the map share one
- * selection; neither owns it.
+ * It holds two different things. The route is the trip itself: ordered stops
+ * that carry a place in the journey. The saved places are what is worth
+ * seeing along the way — attractions, food, a hotel — and belong to no order
+ * at all.
+ *
+ * Every stop and every place is a button, so selecting one is reachable from
+ * the keyboard and everything on the map can be read here instead. The list
+ * and the map share one selection; neither owns it.
  */
 @Component({
   selector: 'app-trip-atlas-list',
@@ -19,10 +26,18 @@ import { routeSummary } from '../../shared/format/trip-destinations';
 export class TripAtlasList {
   readonly destinations = input<readonly TripDestination[]>([]);
 
-  /** The stop the map and the list agree is selected, if any. */
-  readonly selectedId = input<string | null>(null);
+  readonly places = input<readonly SavedPlace[]>([]);
 
-  readonly select = output<string>();
+  /** The stop or place the map and the list agree is selected, if any. */
+  readonly selection = input<AtlasSelection | null>(null);
+
+  readonly placesLoading = input(false);
+
+  readonly placesError = input<string | null>(null);
+
+  readonly select = output<AtlasSelection>();
+
+  readonly retryPlaces = output<void>();
 
   protected readonly ordered = computed(() =>
     [...this.destinations()].sort((left, right) => left.sortOrder - right.sortOrder),
@@ -49,6 +64,12 @@ export class TripAtlasList {
     return located === 0 ? 'No stop is on the map yet' : `${located} of ${total} stops are on the map`;
   });
 
+  protected readonly placesSummary = computed(() => {
+    const count = this.places().length;
+
+    return count === 1 ? '1 place' : `${count} places`;
+  });
+
   protected isLocated(destination: TripDestination): boolean {
     return destination.latitude !== null && destination.longitude !== null;
   }
@@ -67,5 +88,24 @@ export class TripAtlasList {
     const number = index + 1;
 
     return number < 10 ? `0${number}` : String(number);
+  }
+
+  protected isSelected(kind: AtlasSelection['kind'], id: string): boolean {
+    const selection = this.selection();
+
+    return selection !== null && selection.kind === kind && selection.id === id;
+  }
+
+  /**
+   * The stop a place is filed under, or null when it is under none — or under
+   * a stop that has since gone, which reads the same way rather than showing
+   * a name the trip no longer has.
+   */
+  protected association(place: SavedPlace): string | null {
+    if (place.destinationId === null) {
+      return null;
+    }
+
+    return this.ordered().find((stop) => stop.id === place.destinationId)?.name ?? null;
   }
 }

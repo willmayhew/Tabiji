@@ -56,7 +56,10 @@
           <app-status-badge [label]="found.status" [tone]="toneFor(found.status)" />
         </div>
 
-        <a class="button button--secondary" [routerLink]="['/trips', found.id]">Open the trip</a>
+        <div class="atlas__bar-actions">
+          <button type="button" class="button" (click)="addPlace()">Add a place</button>
+          <a class="button button--secondary" [routerLink]="['/trips', found.id]">Open the trip</a>
+        </div>
       </div>
     </header>
 
@@ -79,6 +82,10 @@
       </button>
     </div>
 
+    @if (placesActionError(); as message) {
+      <p class="callout callout--danger" role="alert">{{ message }}</p>
+    }
+
     @if (saveError(); as message) {
       <p class="callout callout--danger" role="alert">
         {{ message }} The location was not changed.
@@ -93,23 +100,11 @@
       [class.atlas__body--list]="mode() === 'list'"
     >
       <div class="atlas__map-panel">
-        @if (locatedCount() === 0) {
-          <div class="empty-state atlas__map-empty">
-            <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
-              <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
-              <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
-              <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
-              <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
-            </svg>
-            <h2 class="empty-state__title">Nothing on the map yet</h2>
-            <p class="empty-state__body">
-              No stop has a location yet. Choose a place for a stop and it will appear here.
-            </p>
-          </div>
-        } @else {
+        @if (showsMap()) {
           <app-trip-atlas-map
             [destinations]="found.destinations"
-            [selectedId]="selectedId()"
+            [places]="places()"
+            [selection]="selection()"
             [label]="found.name"
             [active]="mode() === 'map'"
             (select)="select($event)"
@@ -120,23 +115,45 @@
               Frame the trip
             </button>
           </div>
+        } @else {
+          <div class="empty-state atlas__map-empty">
+            <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+              <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+              <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+              <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+              <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+            </svg>
+            <h2 class="empty-state__title">Nothing on the map yet</h2>
+            <p class="empty-state__body">
+              No stop has a location yet, and no place has been saved. Choose a place for a stop,
+              or add somewhere worth going.
+            </p>
+          </div>
         }
       </div>
 
       <div class="atlas__side">
         <app-trip-atlas-list
           [destinations]="found.destinations"
-          [selectedId]="selectedId()"
+          [places]="places()"
+          [selection]="selection()"
+          [placesLoading]="placesLoading()"
+          [placesError]="placesError()"
           (select)="select($event)"
+          (retryPlaces)="retryPlaces()"
         />
       </div>
 
       <div class="atlas__panel-slot">
         <app-trip-atlas-panel
-          [destination]="selected()"
+          [destination]="selectedDestination()"
+          [place]="selectedPlace()"
           [position]="selectedPosition()"
           [total]="ordered().length"
+          [destinations]="ordered()"
           (changeLocation)="relocate($event)"
+          (editPlace)="editPlace($event)"
+          (deletePlace)="deletePlace($event)"
         />
       </div>
     </div>
@@ -148,6 +165,16 @@
     [initialCoordinates]="pickerCoordinates()"
     (chosen)="onPlaceChosen($event)"
     (dismissed)="closePicker()"
+  />
+
+  <app-place-editor
+    [open]="editorOpen()"
+    [place]="editorPlace()"
+    [destinations]="ordered()"
+    [saving]="editorSaving()"
+    [error]="editorError()"
+    (save)="savePlace($event)"
+    (dismissed)="closeEditor()"
   />
 
   <p class="visually-hidden" aria-live="polite">{{ announcement() }}</p>

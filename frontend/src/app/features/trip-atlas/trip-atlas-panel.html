@@ -1,4 +1,45 @@
-@if (destination(); as stop) {
+@if (place(); as saved) {
+  <section class="atlas-panel" aria-labelledby="atlas-panel-title">
+    <div class="section-head">
+      <h2 id="atlas-panel-title">Saved place</h2>
+      @if (saved.category; as category) {
+        <p class="section-head__meta">{{ category }}</p>
+      }
+    </div>
+
+    <h3 class="atlas-panel__name">{{ saved.name }}</h3>
+
+    <dl class="atlas-panel__list">
+      @if (saved.address; as address) {
+        <div class="atlas-panel__row">
+          <dt>Address</dt>
+          <dd>{{ address }}</dd>
+        </div>
+      }
+      <div class="atlas-panel__row">
+        <dt>Stops</dt>
+        <dd>{{ filedUnder() }}</dd>
+      </div>
+      <div class="atlas-panel__row">
+        <dt>Coordinates</dt>
+        <dd>{{ coordinates() }}</dd>
+      </div>
+    </dl>
+
+    @if (saved.notes; as notes) {
+      <p class="atlas-panel__notes">{{ notes }}</p>
+    }
+
+    <div class="atlas-panel__actions">
+      <button type="button" class="button button--secondary" (click)="editPlace.emit(saved)">
+        Edit place
+      </button>
+      <button type="button" class="button button--secondary" (click)="deletePlace.emit(saved)">
+        Delete place
+      </button>
+    </div>
+  </section>
+} @else if (destination(); as stop) {
   <section class="atlas-panel" aria-labelledby="atlas-panel-title">
     <div class="section-head">
       <h2 id="atlas-panel-title">Selected stop</h2>
@@ -31,5 +72,5 @@
     </p>
   </section>
 } @else {
-  <p class="atlas-panel__empty">Select a stop to see where it is and when you are there.</p>
+  <p class="atlas-panel__empty">Select a stop or a saved place to see its details.</p>
 }

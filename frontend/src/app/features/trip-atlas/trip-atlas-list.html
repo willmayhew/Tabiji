@@ -1,43 +1,94 @@
 <section class="atlas-list">
-  <div class="section-head">
-    <h2>Route</h2>
-    @if (ordered().length > 0) {
-      <p class="section-head__meta">{{ summary() }}</p>
+  <div class="atlas-list__route-section">
+    <div class="section-head">
+      <h2>Route</h2>
+      @if (ordered().length > 0) {
+        <p class="section-head__meta">{{ summary() }}</p>
+      }
+    </div>
+
+    @if (ordered().length === 0) {
+      <p class="muted">No destinations recorded.</p>
+    } @else {
+      <ol class="route route--readout atlas-list__route">
+        @for (destination of ordered(); track destination.id; let index = $index) {
+          <li class="route__row">
+            <span class="route__node" aria-hidden="true">{{ position(index) }}</span>
+            <button
+              type="button"
+              class="atlas-list__item"
+              [class.atlas-list__item--selected]="isSelected('destination', destination.id)"
+              [attr.aria-pressed]="isSelected('destination', destination.id)"
+              (click)="select.emit({ kind: 'destination', id: destination.id })"
+            >
+              <span class="atlas-list__name">{{ destination.name }}</span>
+              <span class="atlas-list__facts">
+                <span
+                  class="route__dates-text"
+                  [class.route__dates-text--undecided]="!hasDates(destination)"
+                  >{{ datesFor(destination) }}</span
+                >
+                @if (!isLocated(destination)) {
+                  <span class="atlas-list__flag">Not on the map</span>
+                }
+              </span>
+            </button>
+          </li>
+        }
+      </ol>
+
+      @if (mapNote(); as note) {
+        <p class="atlas-list__note">{{ note }}</p>
+      }
     }
   </div>
 
-  @if (ordered().length === 0) {
-    <p class="muted">No destinations recorded.</p>
-  } @else {
-    <ol class="route route--readout atlas-list__route">
-      @for (destination of ordered(); track destination.id; let index = $index) {
-        <li class="route__row">
-          <span class="route__node" aria-hidden="true">{{ position(index) }}</span>
-          <button
-            type="button"
-            class="atlas-list__item"
-            [class.atlas-list__item--selected]="destination.id === selectedId()"
-            [attr.aria-pressed]="destination.id === selectedId()"
-            (click)="select.emit(destination.id)"
-          >
-            <span class="atlas-list__name">{{ destination.name }}</span>
-            <span class="atlas-list__facts">
-              <span
-                class="route__dates-text"
-                [class.route__dates-text--undecided]="!hasDates(destination)"
-                >{{ datesFor(destination) }}</span
-              >
-              @if (!isLocated(destination)) {
-                <span class="atlas-list__flag">Not on the map</span>
-              }
-            </span>
-          </button>
-        </li>
+  <div class="atlas-list__places-section">
+    <div class="section-head">
+      <h2>Saved places</h2>
+      @if (places().length > 0) {
+        <p class="section-head__meta">{{ placesSummary() }}</p>
       }
-    </ol>
+    </div>
 
-    @if (mapNote(); as note) {
-      <p class="atlas-list__note">{{ note }}</p>
+    @if (placesError(); as message) {
+      <div class="callout callout--danger">
+        <p>{{ message }}</p>
+        <button type="button" class="button button--secondary" (click)="retryPlaces.emit()">
+          Try again
+        </button>
+      </div>
+    } @else if (placesLoading()) {
+      <p class="muted" aria-busy="true">Loading saved places&hellip;</p>
+    } @else if (places().length === 0) {
+      <p class="muted">Nothing saved yet. Add a place to keep somewhere worth going.</p>
+    } @else {
+      <ul class="atlas-places">
+        @for (place of places(); track place.id) {
+          <li class="atlas-places__row">
+            <button
+              type="button"
+              class="atlas-places__item"
+              [class.atlas-places__item--selected]="isSelected('place', place.id)"
+              [attr.aria-pressed]="isSelected('place', place.id)"
+              (click)="select.emit({ kind: 'place', id: place.id })"
+            >
+              <span class="atlas-places__name">{{ place.name }}</span>
+              <span class="atlas-places__facts">
+                @if (place.category; as category) {
+                  <span class="atlas-places__category">{{ category }}</span>
+                }
+                @if (place.address; as address) {
+                  <span class="atlas-places__where">{{ address }}</span>
+                }
+                @if (association(place); as stop) {
+                  <span class="atlas-places__stop">Near {{ stop }}</span>
+                }
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
     }
-  }
+  </div>
 </section>

@@ -13,18 +13,25 @@ import {
   viewChild,
 } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { SavedPlace } from '../../core/models/place';
 import { TripDestination } from '../../core/models/trip';
-import { AtlasHandle, AtlasPoint, MapEngine } from '../../shared/map/map-engine';
+import {
+  AtlasHandle,
+  AtlasPoint,
+  AtlasSelection,
+  LocatedPoint,
+  MapEngine,
+} from '../../shared/map/map-engine';
 
 /**
- * The trip drawn on a map: a numbered marker for every located destination
- * and one dashed line that joins them in the order they are visited.
+ * The trip drawn on a map: a numbered marker for every located destination, a
+ * dot for every saved place, and one dashed line that joins the destinations
+ * in the order they are visited.
  *
  * The component is presentational. It owns only the map instance; the
  * selection and the trip belong to the screen above it. The map is never the
- * only way to reach a stop — the list beside it carries every one of them as
- * text — so the markers are decorative and are hidden from assistive
- * technology.
+ * only way to reach a stop or a place — the list beside it carries every one
+ * of them as text — so the markers are hidden from assistive technology.
  */
 @Component({
   selector: 'app-trip-atlas-map',
@@ -38,8 +45,11 @@ export class TripAtlasMap implements OnDestroy {
   /** The trip's whole route, in order. Only the located stops are drawn. */
   readonly destinations = input<readonly TripDestination[]>([]);
 
-  /** The destination the screen has selected, if any. */
-  readonly selectedId = input<string | null>(null);
+  /** The places saved to the trip. A place always has a position. */
+  readonly places = input<readonly SavedPlace[]>([]);
+
+  /** The stop or place the screen has selected, if any. */
+  readonly selection = input<AtlasSelection | null>(null);
 
   /** The trip's name, for the map's accessible name. */
   readonly label = input('');
@@ -47,8 +57,8 @@ export class TripAtlasMap implements OnDestroy {
   /** Whether the map is on screen, so a map that returns can be re-measured. */
   readonly active = input(true);
 
-  /** Emits the destination whose marker was clicked. */
-  readonly select = output<string>();
+  /** Emits the stop or place whose marker was clicked. */
+  readonly select = output<AtlasSelection>();
 
   protected readonly unavailable = signal(false);
 
@@ -86,6 +96,15 @@ export class TripAtlasMap implements OnDestroy {
     return located;
   });
 
+  /** The saved places, which always carry a position of their own. */
+  protected readonly placePoints = computed<LocatedPoint[]>(() =>
+    this.places().map((place) => ({
+      id: place.id,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    })),
+  );
+
   constructor() {
     afterNextRender(() => void this.start());
 
@@ -98,13 +117,18 @@ export class TripAtlasMap implements OnDestroy {
     });
 
     effect(() => {
+      const points = this.placePoints();
+      this.handle?.setPlaces(points);
+    });
+
+    effect(() => {
       const points = this.points();
       this.handle?.setRoute(points);
     });
 
     effect(() => {
-      const selected = this.selectedId();
-      this.handle?.setSelection(selected);
+      const selection = this.selection();
+      this.handle?.setSelection(selection);
     });
 
     // A map that was hidden has no size to measure with, so it is asked to
@@ -150,13 +174,14 @@ export class TripAtlasMap implements OnDestroy {
     this.unavailable.set(false);
     this.handle = handle;
 
-    handle.onSelect((id) => this.select.emit(id));
+    handle.onSelect((selection) => this.select.emit(selection));
     handle.onError(() => this.degraded.set(true));
 
     // The inputs may have arrived while the map was being built.
     handle.setDestinations(this.points());
+    handle.setPlaces(this.placePoints());
     handle.setRoute(this.points());
-    handle.setSelection(this.selectedId());
+    handle.setSelection(this.selection());
     handle.fitToTrip();
   }
 

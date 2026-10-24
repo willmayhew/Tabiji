@@ -1,0 +1,182 @@
+:host {
+  display: contents;
+}
+
+/* The panel itself. Wide screens get a centred card; a narrow screen gets a
+   full-height sheet, as the map picker does. */
+.editor {
+  width: min(100%, 34rem);
+  max-height: min(88vh, 48rem);
+  margin: auto;
+  padding: 0;
+  border: var(--rule-hairline) solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.editor::backdrop {
+  background: rgb(28 26 22 / 45%);
+}
+
+.editor__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-height: min(88vh, 48rem);
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.editor__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.editor__title {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+/* Search --------------------------------------------------------------- */
+
+.editor__search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.editor__search-input {
+  width: 100%;
+}
+
+.editor__status {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.editor__attribution {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-xs);
+}
+
+/* A plain list of buttons: the results stay keyboard-reachable without a
+   combobox, and the list never changes height under the pointer. */
+.editor__results {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 9rem;
+  overflow-y: auto;
+  border-top: var(--rule-hairline) solid var(--color-rule);
+}
+
+.editor__result {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
+  width: 100%;
+  padding: var(--space-2xs) var(--space-3xs);
+  border: 0;
+  border-bottom: var(--rule-hairline) solid var(--color-rule);
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.editor__result:hover {
+  background: var(--color-surface-sunk);
+}
+
+.editor__result-name {
+  font-weight: 600;
+}
+
+.editor__result-context {
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* The draft ------------------------------------------------------------ */
+
+.editor__draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: var(--rule-hairline) solid var(--color-rule);
+}
+
+.editor__subtitle {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+.editor__chosen {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.editor__chosen-address {
+  overflow-wrap: anywhere;
+}
+
+.editor__chosen-coords {
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.editor__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.editor__row select {
+  width: 100%;
+}
+
+.editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2xs);
+  padding-top: var(--space-2xs);
+  border-top: var(--rule-hairline) solid var(--color-rule);
+}
+
+@media (max-width: 40rem) {
+  .editor {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .editor__panel {
+    height: 100%;
+    max-height: none;
+  }
+
+  .editor__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

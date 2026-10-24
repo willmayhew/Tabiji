@@ -65,3 +65,22 @@
   border-radius: var(--radius-md);
   background: var(--color-surface);
 }
+
+/* A saved place carries its own note, which is prose rather than a fact, so
+   it is set apart from the ruled list of facts above it. */
+.atlas-panel__notes {
+  margin: 0;
+  padding: var(--space-2xs) var(--space-xs);
+  border-left: 3px solid var(--color-sage-tint);
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.atlas-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}

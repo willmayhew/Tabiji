@@ -2,6 +2,11 @@ import { Injectable } from '@angular/core';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 import type { GeoJSONSource, Map as MapLibreMap, Marker as MapLibreMarker } from 'maplibre-gl';
 import { environment } from '../../../environments/environment';
+import { LocatedPoint, markerOffsets } from './marker-offsets';
+
+// A saved place is drawn from its position alone, so the map's callers speak
+// in the same point type the offsets are worked out from.
+export type { LocatedPoint } from './marker-offsets';
 
 /** How to draw a map. */
 export interface MapOptions {
@@ -29,12 +34,18 @@ export interface MapHandle {
  * except here, where they are turned into the `[longitude, latitude]` order
  * MapLibre expects and nowhere else.
  */
-export interface AtlasPoint {
-  id: string;
-  latitude: number;
-  longitude: number;
+export interface AtlasPoint extends LocatedPoint {
   /** The stop's place on the route, counting from one. */
   index: number;
+}
+
+/**
+ * What the atlas has selected. A stop and a saved place are two different
+ * things with their own identities, so which one is meant has to be said.
+ */
+export interface AtlasSelection {
+  kind: 'destination' | 'place';
+  id: string;
 }
 
 /** How to draw the atlas. */
@@ -43,22 +54,25 @@ export interface AtlasOptions {
 }
 
 /**
- * A drawn atlas: the trip's located destinations, the line that joins them
- * in planned order, and the selection the map and the list share.
+ * A drawn atlas: the trip's located destinations, its saved places, the line
+ * that joins the destinations in planned order, and the selection the map and
+ * the list share.
  */
 export interface AtlasHandle {
   /** Draws the located destinations, numbered, replacing what was there. */
   setDestinations(points: readonly AtlasPoint[]): void;
+  /** Draws the trip's saved places, replacing what was there. */
+  setPlaces(points: readonly LocatedPoint[]): void;
   /** Draws the planned connection, in the order the points are given. */
   setRoute(points: readonly AtlasPoint[]): void;
-  /** Marks one destination as selected, or clears the selection. */
-  setSelection(id: string | null): void;
-  /** Frames every destination the map is drawing. */
+  /** Marks one stop or place as selected, or clears the selection. */
+  setSelection(selection: AtlasSelection | null): void;
+  /** Frames the trip, falling back to its places when no stop is located. */
   fitToTrip(): void;
   /** Re-measures the container, for a map that was hidden and has returned. */
   resize(): void;
-  /** Reports a click on a destination marker. */
-  onSelect(handler: (id: string) => void): void;
+  /** Reports a click on a marker. */
+  onSelect(handler: (selection: AtlasSelection) => void): void;
   /** Reports that the map could not draw something, such as its tiles. */
   onError(handler: () => void): void;
   destroy(): void;
@@ -148,8 +162,10 @@ export class MapEngine {
   }
 
   /**
-   * Draws the trip's atlas: a numbered marker for every located destination
-   * and one dashed line that joins them in the order they are given.
+   * Draws the trip's atlas: a numbered marker for every located destination,
+   * a dot for every saved place, and one dashed line that joins the
+   * destinations in the order they are given. Places are never joined into
+   * that line: they are points of interest, not stops on the route.
    *
    * The markers are DOM elements the engine makes itself, so their classes
    * are global: Angular's component style encapsulation never reaches them.
@@ -177,15 +193,22 @@ export class MapEngine {
       return null;
     }
 
-    const markers = new Map<string, MapLibreMarker>();
-    const elements = new Map<string, HTMLElement>();
+    // The stops and the saved places are drawn as two sets of markers, because
+    // they mean two different things and are told apart on the map. Their
+    // identities come from different tables, so they are kept apart here too.
+    const destinationMarkers = new Map<string, MapLibreMarker>();
+    const destinationElements = new Map<string, HTMLElement>();
+    const placeMarkers = new Map<string, MapLibreMarker>();
+    const placeElements = new Map<string, HTMLElement>();
 
+    let destinations: readonly AtlasPoint[] = [];
+    let places: readonly LocatedPoint[] = [];
     let route: readonly AtlasPoint[] = [];
-    let selectedId: string | null = null;
+    let selection: AtlasSelection | null = null;
     let loaded = false;
     let routeDirty = false;
     let failed = false;
-    let selectHandler: ((id: string) => void) | null = null;
+    let selectHandler: ((selection: AtlasSelection) => void) | null = null;
     let errorHandler: (() => void) | null = null;
 
     // A source or a layer can only be added once the style has loaded, so the
@@ -251,12 +274,56 @@ export class MapEngine {
     }
 
     function paintSelection(): void {
-      for (const [id, element] of elements) {
-        element.classList.toggle('atlas-marker--selected', id === selectedId);
+      for (const [id, element] of destinationElements) {
+        element.classList.toggle(
+          'atlas-marker--selected',
+          selection?.kind === 'destination' && selection.id === id,
+        );
+      }
+
+      for (const [id, element] of placeElements) {
+        element.classList.toggle(
+          'atlas-marker--selected',
+          selection?.kind === 'place' && selection.id === id,
+        );
       }
     }
 
-    function setDestinations(points: readonly AtlasPoint[]): void {
+    function setOffset(element: HTMLElement, offset: { x: number; y: number } | undefined): void {
+      element.style.setProperty('--atlas-offset-x', `${offset?.x ?? 0}px`);
+      element.style.setProperty('--atlas-offset-y', `${offset?.y ?? 0}px`);
+    }
+
+    /**
+     * Two markers at the same place would cover each other, and a saved place
+     * can share a place with a stop just as two stops can. So every marker is
+     * offset against the whole set, not only its own kind.
+     */
+    function applyOffsets(): void {
+      const offsets = markerOffsets([...destinations, ...places]);
+
+      for (const [id, element] of destinationElements) {
+        setOffset(element, offsets.get(id));
+      }
+
+      for (const [id, element] of placeElements) {
+        setOffset(element, offsets.get(id));
+      }
+    }
+
+    /**
+     * Brings one set of markers into line with the points it is given: markers
+     * that have gone are removed, the rest are moved rather than replaced, and
+     * a marker that is new to the set is made once.
+     */
+    function syncMarkers(
+      points: readonly LocatedPoint[],
+      markers: Map<string, MapLibreMarker>,
+      elements: Map<string, HTMLElement>,
+      kind: AtlasSelection['kind'],
+      faceClass: string,
+      textFor: (id: string) => string,
+    ): void {
       const wanted = new Set(points.map((point) => point.id));
 
       for (const [id, marker] of markers) {
@@ -268,34 +335,69 @@ export class MapEngine {
       }
 
       for (const point of points) {
-        const existing = markers.get(point.id);
+        let anchor = elements.get(point.id);
 
-        // A marker that is already on the map is simply moved, so the
-        // element the reader clicked on is the one that stays.
-        if (existing !== undefined) {
-          existing.setLngLat([point.longitude, point.latitude]);
-          continue;
+        if (anchor === undefined) {
+          // Two elements, because the map writes its own transform onto the one
+          // it positions. Everything drawn, and the spread, therefore lives on
+          // the inner face, where the stylesheet still has a say.
+          anchor = document.createElement('span');
+          anchor.className = 'atlas-marker';
+          anchor.setAttribute('aria-hidden', 'true');
+
+          const face = document.createElement('span');
+          face.className = faceClass;
+          face.textContent = textFor(point.id);
+
+          anchor.append(face);
+          anchor.addEventListener('click', () => selectHandler?.({ kind, id: point.id }));
+
+          const marker = new Marker({ element: anchor })
+            .setLngLat([point.longitude, point.latitude])
+            .addTo(map);
+
+          markers.set(point.id, marker);
+          elements.set(point.id, anchor);
+        } else {
+          // A marker that is already on the map is simply moved, so the element
+          // the reader clicked on is the one that stays.
+          markers.get(point.id)?.setLngLat([point.longitude, point.latitude]);
         }
-
-        const element = document.createElement('span');
-        element.className = 'atlas-marker';
-        element.setAttribute('aria-hidden', 'true');
-        element.textContent = String(point.index);
-        element.addEventListener('click', () => selectHandler?.(point.id));
-
-        const marker = new Marker({ element })
-          .setLngLat([point.longitude, point.latitude])
-          .addTo(map);
-
-        markers.set(point.id, marker);
-        elements.set(point.id, element);
       }
+    }
 
+    function setDestinations(points: readonly AtlasPoint[]): void {
+      destinations = points;
+
+      // The number is the stop's place on the whole route, not its place among
+      // the stops that happen to have a location.
+      const numbers = new Map(points.map((point) => [point.id, String(point.index)]));
+
+      syncMarkers(
+        points,
+        destinationMarkers,
+        destinationElements,
+        'destination',
+        'atlas-marker__face',
+        (id) => numbers.get(id) ?? '',
+      );
+
+      applyOffsets();
+      paintSelection();
+    }
+
+    function setPlaces(points: readonly LocatedPoint[]): void {
+      places = points;
+
+      syncMarkers(points, placeMarkers, placeElements, 'place', 'atlas-marker__dot', () => '');
+
+      applyOffsets();
       paintSelection();
     }
 
     return {
       setDestinations,
+      setPlaces,
       setRoute: (points) => {
         route = points;
 
@@ -306,12 +408,17 @@ export class MapEngine {
 
         routeDirty = true;
       },
-      setSelection: (id) => {
-        selectedId = id;
+      setSelection: (next) => {
+        selection = next;
         paintSelection();
       },
       fitToTrip: () => {
-        if (elements.size === 0) {
+        // The stops are the trip; the places are what is worth seeing along the
+        // way, and may be anywhere. The map frames the stops, and falls back to
+        // the places only when no stop has a location.
+        const framing: readonly LocatedPoint[] = destinations.length > 0 ? destinations : places;
+
+        if (framing.length === 0) {
           map.easeTo({ center: [WORLD_VIEW.longitude, WORLD_VIEW.latitude], zoom: WORLD_VIEW.zoom });
           return;
         }
@@ -321,16 +428,14 @@ export class MapEngine {
         let east = Number.NEGATIVE_INFINITY;
         let north = Number.NEGATIVE_INFINITY;
 
-        for (const marker of markers.values()) {
-          const { lng, lat } = marker.getLngLat();
-
-          west = Math.min(west, lng);
-          south = Math.min(south, lat);
-          east = Math.max(east, lng);
-          north = Math.max(north, lat);
+        for (const point of framing) {
+          west = Math.min(west, point.longitude);
+          south = Math.min(south, point.latitude);
+          east = Math.max(east, point.longitude);
+          north = Math.max(north, point.latitude);
         }
 
-        // A single stop has no bounds to fit, so it is simply looked at.
+        // A single point has no bounds to fit, so it is simply looked at.
         if (west === east && south === north) {
           map.easeTo({ center: [west, south], zoom: SINGLE_STOP_ZOOM });
           return;
@@ -357,12 +462,18 @@ export class MapEngine {
         }
       },
       destroy: () => {
-        for (const marker of markers.values()) {
+        for (const marker of destinationMarkers.values()) {
           marker.remove();
         }
 
-        markers.clear();
-        elements.clear();
+        for (const marker of placeMarkers.values()) {
+          marker.remove();
+        }
+
+        destinationMarkers.clear();
+        destinationElements.clear();
+        placeMarkers.clear();
+        placeElements.clear();
         map.remove();
       },
     };

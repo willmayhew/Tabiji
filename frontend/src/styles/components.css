@@ -960,10 +960,22 @@ label.route__node:hover {
    component style encapsulation never reaches them. Their classes live here,
    with the other primitives, rather than in a component stylesheet.
 
-   A destination marker is a numbered pin. The selection is a ring, so it
-   reads without relying on colour alone. */
+   A marker is two elements. The map positions the outer one and writes its own
+   transform onto it, so nothing drawn may be put there: a transform written by
+   this stylesheet onto the outer element would be overridden. Everything
+   visible therefore lives on the face.
+
+   The face also carries the offset that keeps two markers at the same place
+   from covering each other. The engine works that offset out from the whole
+   set, because it depends on how many markers share the place, and sets it
+   here as a custom property. */
 
 .atlas-marker {
+  --atlas-offset-x: 0px;
+  --atlas-offset-y: 0px;
+}
+
+.atlas-marker__face {
   display: grid;
   place-items: center;
   width: 1.5rem;
@@ -980,18 +992,51 @@ label.route__node:hover {
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   user-select: none;
+  transform: translate(var(--atlas-offset-x), var(--atlas-offset-y));
   transition:
     transform var(--dur-fast) var(--ease-standard),
     box-shadow var(--dur-fast) var(--ease-standard);
 }
 
-.atlas-marker:hover {
-  transform: scale(1.1);
+.atlas-marker:hover .atlas-marker__face {
+  transform: translate(var(--atlas-offset-x), var(--atlas-offset-y)) scale(1.1);
 }
 
-.atlas-marker--selected {
-  transform: scale(1.25);
+/* A destination marker is a numbered pin. The selection is a ring, so it
+   reads without relying on colour alone. */
+.atlas-marker--selected .atlas-marker__face {
+  transform: translate(var(--atlas-offset-x), var(--atlas-offset-y)) scale(1.25);
   box-shadow:
     0 0 0 2px var(--color-surface),
     0 0 0 4px var(--color-terracotta);
+}
+
+/* A saved place is a point of interest, not a stop on the route. It is a small
+   terracotta dot rather than a numbered pin, so size and shape tell the two
+   apart as well as colour does. Its ring is forest, which reads against the
+   terracotta it surrounds. */
+.atlas-marker__dot {
+  display: block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-pill);
+  background: var(--color-terracotta);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transform: translate(var(--atlas-offset-x), var(--atlas-offset-y));
+  transition:
+    transform var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.atlas-marker:hover .atlas-marker__dot {
+  transform: translate(var(--atlas-offset-x), var(--atlas-offset-y)) scale(1.25);
+}
+
+.atlas-marker--selected .atlas-marker__dot {
+  transform: translate(var(--atlas-offset-x), var(--atlas-offset-y)) scale(1.4);
+  box-shadow:
+    0 0 0 2px var(--color-surface),
+    0 0 0 4px var(--color-forest);
 }

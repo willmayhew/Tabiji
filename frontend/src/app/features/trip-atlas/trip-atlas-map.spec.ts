@@ -1,6 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { SavedPlace } from '../../core/models/place';
 import { TripDestination } from '../../core/models/trip';
-import { AtlasHandle, AtlasOptions, AtlasPoint, MapEngine } from '../../shared/map/map-engine';
+import {
+  AtlasHandle,
+  AtlasOptions,
+  AtlasPoint,
+  AtlasSelection,
+  LocatedPoint,
+  MapEngine,
+} from '../../shared/map/map-engine';
 import { TripAtlasMap } from './trip-atlas-map';
 
 const route: TripDestination[] = [
@@ -42,23 +50,39 @@ const route: TripDestination[] = [
   },
 ];
 
+const places: SavedPlace[] = [
+  {
+    id: 'p1',
+    destinationId: null,
+    name: 'Fushimi Inari',
+    latitude: 34.9671,
+    longitude: 135.7727,
+    category: 'Sight',
+    address: null,
+    notes: null,
+    createdAt: '2026-10-20T09:00:00+00:00',
+  },
+];
+
 class FakeMapEngine {
   readonly drawn: AtlasPoint[][] = [];
+  readonly placed: LocatedPoint[][] = [];
   readonly routed: AtlasPoint[][] = [];
-  readonly selected: (string | null)[] = [];
+  readonly selected: (AtlasSelection | null)[] = [];
 
   fitted = 0;
   resized = 0;
   destroyed = 0;
   options: AtlasOptions | null = null;
   unavailable = false;
-  selectHandler: ((id: string) => void) | null = null;
+  selectHandler: ((selection: AtlasSelection) => void) | null = null;
   errorHandler: (() => void) | null = null;
 
   handle: AtlasHandle = {
     setDestinations: (points) => this.drawn.push([...points]),
+    setPlaces: (points) => this.placed.push([...points]),
     setRoute: (points) => this.routed.push([...points]),
-    setSelection: (id) => this.selected.push(id),
+    setSelection: (selection) => this.selected.push(selection),
     fitToTrip: () => {
       this.fitted += 1;
     },
@@ -104,11 +128,15 @@ describe('TripAtlasMap', () => {
   }
 
   async function render(
-    destinations: TripDestination[],
-    selectedId: string | null = null,
+    options: {
+      destinations?: TripDestination[];
+      places?: SavedPlace[];
+      selection?: AtlasSelection | null;
+    } = {},
   ): Promise<void> {
-    fixture.componentRef.setInput('destinations', destinations);
-    fixture.componentRef.setInput('selectedId', selectedId);
+    fixture.componentRef.setInput('destinations', options.destinations ?? route);
+    fixture.componentRef.setInput('places', options.places ?? []);
+    fixture.componentRef.setInput('selection', options.selection ?? null);
     fixture.componentRef.setInput('label', 'Italy & Iceland');
     fixture.detectChanges();
     await fixture.whenStable();
@@ -117,19 +145,19 @@ describe('TripAtlasMap', () => {
   }
 
   it('should draw only the stops that have a location', async () => {
-    await render(route);
+    await render();
 
     expect(engine.drawn.at(-1)?.map((point) => point.id)).toEqual(['a1', 'd4']);
   });
 
   it('should number a stop by its place on the whole route', async () => {
-    await render(route);
+    await render();
 
     expect(engine.drawn.at(-1)?.map((point) => point.index)).toEqual([1, 4]);
   });
 
   it('should hand the coordinates over as they were given', async () => {
-    await render(route);
+    await render();
 
     const drawn = engine.drawn.at(-1) ?? [];
 
@@ -139,54 +167,102 @@ describe('TripAtlasMap', () => {
   });
 
   it('should draw the route in the order the stops are visited', async () => {
-    await render(route);
+    await render();
 
     expect(engine.routed.at(-1)?.map((point) => point.id)).toEqual(['a1', 'd4']);
   });
 
+  it('should draw the saved places', async () => {
+    await render({ places });
+
+    expect(engine.placed.at(-1)).toEqual([
+      { id: 'p1', latitude: 34.9671, longitude: 135.7727 },
+    ]);
+  });
+
+  it('should keep the saved places out of the route', async () => {
+    await render({ places });
+
+    // A place is a point of interest, not a stop: it never joins the line.
+    expect(engine.routed.at(-1)?.map((point) => point.id)).toEqual(['a1', 'd4']);
+  });
+
+  it('should tell the map when a place is added after it is drawn', async () => {
+    await render();
+
+    expect(engine.placed.at(-1)).toEqual([]);
+
+    fixture.componentRef.setInput('places', places);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(engine.placed.at(-1)?.map((point) => point.id)).toEqual(['p1']);
+  });
+
+  it('should tell the map when a place goes', async () => {
+    await render({ places });
+
+    fixture.componentRef.setInput('places', []);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(engine.placed.at(-1)).toEqual([]);
+  });
+
   it('should frame the trip once the map is drawn', async () => {
-    await render(route);
+    await render();
 
     expect(engine.fitted).toBeGreaterThan(0);
   });
 
   it('should pass the tile style from the environment', async () => {
-    await render(route);
+    await render();
 
     expect(engine.options?.styleUrl).toContain('https://');
   });
 
-  it('should report the marker that was clicked', async () => {
-    await render(route);
+  it('should report a stop marker that was clicked', async () => {
+    await render();
 
-    const chosen: string[] = [];
-    fixture.componentInstance.select.subscribe((id) => chosen.push(id));
+    const chosen: AtlasSelection[] = [];
+    fixture.componentInstance.select.subscribe((selection) => chosen.push(selection));
 
-    engine.selectHandler?.('d4');
+    engine.selectHandler?.({ kind: 'destination', id: 'd4' });
 
-    expect(chosen).toEqual(['d4']);
+    expect(chosen).toEqual([{ kind: 'destination', id: 'd4' }]);
+  });
+
+  it('should report a place marker that was clicked', async () => {
+    await render({ places });
+
+    const chosen: AtlasSelection[] = [];
+    fixture.componentInstance.select.subscribe((selection) => chosen.push(selection));
+
+    engine.selectHandler?.({ kind: 'place', id: 'p1' });
+
+    expect(chosen).toEqual([{ kind: 'place', id: 'p1' }]);
   });
 
   it('should hand the selection to the map', async () => {
-    await render(route, 'a1');
+    await render({ selection: { kind: 'place', id: 'p1' } });
 
-    expect(engine.selected).toContain('a1');
+    expect(engine.selected).toContainEqual({ kind: 'place', id: 'p1' });
   });
 
   it('should tell the map when the selection changes after it is drawn', async () => {
-    await render(route, null);
+    await render({ selection: null });
 
     engine.selected.length = 0;
 
-    fixture.componentRef.setInput('selectedId', 'd4');
+    fixture.componentRef.setInput('selection', { kind: 'destination', id: 'd4' });
     fixture.detectChanges();
     await fixture.whenStable();
 
-    expect(engine.selected).toContain('d4');
+    expect(engine.selected).toContainEqual({ kind: 'destination', id: 'd4' });
   });
 
   it('should tell the map when the stops change after it is drawn', async () => {
-    await render(route);
+    await render();
 
     const drawnBefore = engine.drawn.length;
 
@@ -199,7 +275,7 @@ describe('TripAtlasMap', () => {
   });
 
   it('should ask the map to frame the trip when it is asked to', async () => {
-    await render(route);
+    await render();
 
     engine.fitted = 0;
     fixture.componentInstance.frameTrip();
@@ -209,20 +285,20 @@ describe('TripAtlasMap', () => {
 
   it('should say so when the map cannot be drawn', async () => {
     engine.unavailable = true;
-    await render(route);
+    await render();
 
     expect(element().textContent).toContain('The map could not be drawn');
   });
 
   it('should draw nothing when the map cannot be drawn', async () => {
     engine.unavailable = true;
-    await render(route);
+    await render();
 
     expect(engine.drawn).toHaveLength(0);
   });
 
   it('should note quietly when something the map needed failed', async () => {
-    await render(route);
+    await render();
 
     expect(element().textContent).not.toContain('could not be loaded');
 
@@ -233,7 +309,7 @@ describe('TripAtlasMap', () => {
   });
 
   it('should re-measure a map that has returned to the screen', async () => {
-    await render(route);
+    await render();
 
     fixture.componentRef.setInput('active', false);
     fixture.detectChanges();
@@ -247,7 +323,7 @@ describe('TripAtlasMap', () => {
   });
 
   it('should let the map go when the component is destroyed', async () => {
-    await render(route);
+    await render();
 
     fixture.destroy();
 
@@ -255,7 +331,7 @@ describe('TripAtlasMap', () => {
   });
 
   it('should name the map for assistive technology', async () => {
-    await render(route);
+    await render();
 
     expect(element().querySelector('.atlas-map__canvas')?.getAttribute('aria-label')).toBe(
       'Map of Italy & Iceland',
