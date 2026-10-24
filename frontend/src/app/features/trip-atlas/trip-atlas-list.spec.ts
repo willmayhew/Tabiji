@@ -109,12 +109,26 @@ describe('TripAtlasList', () => {
     return [...element().querySelectorAll('.atlas-places__item')] as HTMLButtonElement[];
   }
 
+  function groups(): HTMLElement[] {
+    return [...element().querySelectorAll('.atlas-plan__group')] as HTMLElement[];
+  }
+
+  function groupHeads(): HTMLElement[] {
+    return [...element().querySelectorAll('.atlas-plan__head')] as HTMLElement[];
+  }
+
+  function groupNames(): string[] {
+    return groupHeads().map(
+      (head) => head.querySelector('.atlas-plan__stop')?.textContent?.trim() ?? '',
+    );
+  }
+
   it('should list every stop, in order', () => {
     render();
 
-    expect(stopRows().map((row) => row.querySelector('.atlas-list__name')?.textContent?.trim())).toEqual(
-      ['Rome', 'Amalfi', 'Naples', 'Reykjavík'],
-    );
+    expect(
+      stopRows().map((row) => row.querySelector('.atlas-list__name')?.textContent?.trim()),
+    ).toEqual(['Rome', 'Amalfi', 'Naples', 'Reykjavík']);
   });
 
   it('should number the stops on the whole route', () => {
@@ -187,6 +201,70 @@ describe('TripAtlasList', () => {
     expect(chosen).toEqual([{ kind: 'destination', id: 'c3' }]);
   });
 
+  it('should read the saved places as a plan, grouped by the stop they are filed to', () => {
+    render({ places });
+
+    expect(groupNames()).toEqual(['Rome', 'Not filed under a stop']);
+    expect(groups()).toHaveLength(2);
+
+    const rome = groups()[0].querySelectorAll('.atlas-places__name');
+    const unfiled = groups()[1].querySelectorAll('.atlas-places__name');
+
+    expect([...rome].map((node) => node.textContent?.trim())).toEqual(['Fushimi Inari']);
+    expect([...unfiled].map((node) => node.textContent?.trim())).toEqual(['Nishiki Market']);
+  });
+
+  it('should carry the stop number, its dates and its count on the group heading', () => {
+    render({ places });
+
+    const head = groupHeads()[0];
+
+    expect(head.querySelector('.atlas-plan__number')?.textContent?.trim()).toBe('01');
+    expect(head.querySelector('.atlas-plan__dates')?.textContent?.trim()).toBe('1 Apr – 4 Apr 2027');
+    expect(head.querySelector('.atlas-plan__count')?.textContent?.trim()).toBe('1 place');
+  });
+
+  it('should not repeat the stop on every place row', () => {
+    render({ places });
+
+    // The heading says it once; a `Near Rome` on the row would say it twice.
+    expect(placeRows()[0].textContent).not.toContain('Near');
+  });
+
+  it('should leave out a stop with nothing filed under it', () => {
+    render({ places });
+
+    expect(groupNames()).toEqual(['Rome', 'Not filed under a stop']);
+    expect(groupNames()).not.toContain('Amalfi');
+  });
+
+  it('should say how many places are in the unfiled group', () => {
+    render({ places });
+
+    expect(
+      groupHeads()[1].querySelector('.atlas-plan__count')?.textContent?.trim(),
+    ).toBe('1 place');
+  });
+
+  it('should name each list by its group heading', () => {
+    render({ places });
+
+    const head = groupHeads()[0];
+    const list = groups()[0].querySelector('.atlas-places');
+
+    expect(head.id).toBeTruthy();
+    expect(list?.getAttribute('aria-labelledby')).toBe(head.id);
+  });
+
+  it('should hint at filing only on the unfiled group', () => {
+    render({ places });
+
+    expect(groups()[0].querySelector('.atlas-plan__hint')).toBeNull();
+    expect(groups()[1].querySelector('.atlas-plan__hint')?.textContent).toContain(
+      'File a place under a stop',
+    );
+  });
+
   it('should list the saved places with their category and context', () => {
     render({ places });
 
@@ -197,20 +275,6 @@ describe('TripAtlasList', () => {
     expect(first.textContent).toContain('Fushimi Inari');
     expect(first.querySelector('.atlas-places__category')?.textContent).toContain('Sight');
     expect(first.querySelector('.atlas-places__where')?.textContent).toContain('Kyoto');
-  });
-
-  it('should say which stop a place is filed under', () => {
-    render({ places });
-
-    const first = placeRows()[0];
-
-    expect(first.querySelector('.atlas-places__stop')?.textContent).toContain('Near Rome');
-  });
-
-  it('should say nothing about a stop when a place is filed under none', () => {
-    render({ places });
-
-    expect(placeRows()[1].querySelector('.atlas-places__stop')).toBeNull();
   });
 
   it('should mark the selected place, and only the selected one', () => {
@@ -234,18 +298,19 @@ describe('TripAtlasList', () => {
     expect(chosen).toEqual([{ kind: 'place', id: 'p2' }]);
   });
 
-  it('should say how many places are saved', () => {
+  it('should count every place saved, filed or not', () => {
     render({ places });
 
-    expect(element().querySelector('.atlas-list__places-section .section-head__meta')?.textContent).toContain(
-      '2 places',
-    );
+    expect(
+      element().querySelector('.atlas-list__places-section .section-head__meta')?.textContent,
+    ).toContain('2 places');
   });
 
   it('should say when nothing is saved yet', () => {
     render();
 
     expect(element().textContent).toContain('Nothing saved yet');
+    expect(groups()).toHaveLength(0);
   });
 
   it('should say when the places are still loading, without hiding the route', () => {
@@ -277,10 +342,10 @@ describe('TripAtlasList', () => {
   });
 
   it('should treat a place filed under a stop that has gone as unfiled', () => {
-    render({
-      places: [{ ...places[0], destinationId: 'gone' }],
-    });
+    render({ places: [{ ...places[0], destinationId: 'gone' }] });
 
-    expect(placeRows()[0].querySelector('.atlas-places__stop')).toBeNull();
+    // The place is still saved to the trip, so it must still be listed.
+    expect(groupNames()).toEqual(['Not filed under a stop']);
+    expect(placeRows()).toHaveLength(1);
   });
 });

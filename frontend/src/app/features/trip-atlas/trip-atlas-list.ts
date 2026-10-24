@@ -4,14 +4,16 @@ import { TripDestination } from '../../core/models/trip';
 import { formatDestinationDates } from '../../shared/format/trip-dates';
 import { routeSummary } from '../../shared/format/trip-destinations';
 import { AtlasSelection } from '../../shared/map/map-engine';
+import { groupPlacesByStop, PlaceGroup } from './place-groups';
 
 /**
  * The trip as a list, and the accessible half of the atlas.
  *
  * It holds two different things. The route is the trip itself: ordered stops
  * that carry a place in the journey. The saved places are what is worth
- * seeing along the way — attractions, food, a hotel — and belong to no order
- * at all.
+ * seeing along the way — attractions, food, a hotel — and are read as a plan,
+ * grouped under the stop they are filed to so the list answers "what have I
+ * got for Kyoto?" rather than "when did I save this?".
  *
  * Every stop and every place is a button, so selecting one is reachable from
  * the keyboard and everything on the map can be read here instead. The list
@@ -43,6 +45,12 @@ export class TripAtlasList {
     [...this.destinations()].sort((left, right) => left.sortOrder - right.sortOrder),
   );
 
+  /**
+   * The plan: the places grouped under the stop they are filed to, in route
+   * order, with everything unfiled last.
+   */
+  protected readonly groups = computed(() => groupPlacesByStop(this.ordered(), this.places()));
+
   protected readonly locatedCount = computed(
     () => this.ordered().filter((destination) => this.isLocated(destination)).length,
   );
@@ -64,6 +72,7 @@ export class TripAtlasList {
     return located === 0 ? 'No stop is on the map yet' : `${located} of ${total} stops are on the map`;
   });
 
+  /** Every place saved to the trip, filed or not. */
   protected readonly placesSummary = computed(() => {
     const count = this.places().length;
 
@@ -96,16 +105,32 @@ export class TripAtlasList {
     return selection !== null && selection.kind === kind && selection.id === id;
   }
 
-  /**
-   * The stop a place is filed under, or null when it is under none — or under
-   * a stop that has since gone, which reads the same way rather than showing
-   * a name the trip no longer has.
-   */
-  protected association(place: SavedPlace): string | null {
-    if (place.destinationId === null) {
-      return null;
+  /** An id for a group's heading, stable from one render to the next. */
+  protected groupHeadingId(group: PlaceGroup): string {
+    return `atlas-plan-${group.destination?.id ?? 'unfiled'}`;
+  }
+
+  protected countLabel(group: PlaceGroup): string {
+    const count = group.places.length;
+
+    return count === 1 ? '1 place' : `${count} places`;
+  }
+
+  /** The stop's number on the route, so the group matches its map marker. */
+  protected numberFor(group: PlaceGroup): string {
+    const destination = group.destination;
+
+    if (destination === null) {
+      return '';
     }
 
-    return this.ordered().find((stop) => stop.id === place.destinationId)?.name ?? null;
+    const index = this.ordered().findIndex((stop) => stop.id === destination.id);
+
+    return index < 0 ? '' : this.position(index);
+  }
+
+  /** Whether a group holds the places filed under no stop. */
+  protected isUnfiled(group: PlaceGroup): boolean {
+    return group.destination === null;
   }
 }

@@ -129,6 +129,7 @@ export class TripAtlasMap implements OnDestroy {
     effect(() => {
       const selection = this.selection();
       this.handle?.setSelection(selection);
+      this.handle?.reveal(selection);
     });
 
     // A map that was hidden has no size to measure with, so it is asked to
@@ -183,6 +184,7 @@ export class TripAtlasMap implements OnDestroy {
     handle.setRoute(this.points());
     handle.setSelection(this.selection());
     handle.fitToTrip();
+    handle.reveal(this.selection());
   }
 
   ngOnDestroy(): void {

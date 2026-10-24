@@ -63,32 +63,48 @@
     } @else if (places().length === 0) {
       <p class="muted">Nothing saved yet. Add a place to keep somewhere worth going.</p>
     } @else {
-      <ul class="atlas-places">
-        @for (place of places(); track place.id) {
-          <li class="atlas-places__row">
-            <button
-              type="button"
-              class="atlas-places__item"
-              [class.atlas-places__item--selected]="isSelected('place', place.id)"
-              [attr.aria-pressed]="isSelected('place', place.id)"
-              (click)="select.emit({ kind: 'place', id: place.id })"
-            >
-              <span class="atlas-places__name">{{ place.name }}</span>
-              <span class="atlas-places__facts">
-                @if (place.category; as category) {
-                  <span class="atlas-places__category">{{ category }}</span>
-                }
-                @if (place.address; as address) {
-                  <span class="atlas-places__where">{{ address }}</span>
-                }
-                @if (association(place); as stop) {
-                  <span class="atlas-places__stop">Near {{ stop }}</span>
-                }
-              </span>
-            </button>
-          </li>
-        }
-      </ul>
+      @for (group of groups(); track groupHeadingId(group)) {
+        <div class="atlas-plan__group">
+          <h3 class="atlas-plan__head" [id]="groupHeadingId(group)">
+            @if (group.destination; as stop) {
+              <span class="atlas-plan__number" aria-hidden="true">{{ numberFor(group) }}</span>
+              <span class="atlas-plan__stop">{{ stop.name }}</span>
+              <span class="atlas-plan__dates">{{ datesFor(stop) }}</span>
+            } @else {
+              <span class="atlas-plan__stop">Not filed under a stop</span>
+            }
+            <span class="atlas-plan__count">{{ countLabel(group) }}</span>
+          </h3>
+
+          <ul class="atlas-places" [attr.aria-labelledby]="groupHeadingId(group)">
+            @for (place of group.places; track place.id) {
+              <li class="atlas-places__row">
+                <button
+                  type="button"
+                  class="atlas-places__item"
+                  [class.atlas-places__item--selected]="isSelected('place', place.id)"
+                  [attr.aria-pressed]="isSelected('place', place.id)"
+                  (click)="select.emit({ kind: 'place', id: place.id })"
+                >
+                  <span class="atlas-places__name">{{ place.name }}</span>
+                  <span class="atlas-places__facts">
+                    @if (place.category; as category) {
+                      <span class="atlas-places__category">{{ category }}</span>
+                    }
+                    @if (place.address; as address) {
+                      <span class="atlas-places__where">{{ address }}</span>
+                    }
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+
+          @if (isUnfiled(group)) {
+            <p class="atlas-plan__hint">File a place under a stop to put it in the plan.</p>
+          }
+        </div>
+      }
     }
   </div>
 </section>

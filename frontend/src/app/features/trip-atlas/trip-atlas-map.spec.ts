@@ -69,6 +69,7 @@ class FakeMapEngine {
   readonly placed: LocatedPoint[][] = [];
   readonly routed: AtlasPoint[][] = [];
   readonly selected: (AtlasSelection | null)[] = [];
+  readonly revealed: (AtlasSelection | null)[] = [];
 
   fitted = 0;
   resized = 0;
@@ -83,6 +84,7 @@ class FakeMapEngine {
     setPlaces: (points) => this.placed.push([...points]),
     setRoute: (points) => this.routed.push([...points]),
     setSelection: (selection) => this.selected.push(selection),
+    reveal: (selection) => this.revealed.push(selection),
     fitToTrip: () => {
       this.fitted += 1;
     },
@@ -259,6 +261,24 @@ describe('TripAtlasMap', () => {
     await fixture.whenStable();
 
     expect(engine.selected).toContainEqual({ kind: 'destination', id: 'd4' });
+  });
+
+  it('should ask the map to bring the selection into view', async () => {
+    await render({ selection: null });
+
+    engine.revealed.length = 0;
+
+    fixture.componentRef.setInput('selection', { kind: 'place', id: 'p1' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(engine.revealed).toContainEqual({ kind: 'place', id: 'p1' });
+  });
+
+  it('should ask the map to bring a selection made before it was drawn into view', async () => {
+    await render({ selection: { kind: 'destination', id: 'a1' } });
+
+    expect(engine.revealed).toContainEqual({ kind: 'destination', id: 'a1' });
   });
 
   it('should tell the map when the stops change after it is drawn', async () => {

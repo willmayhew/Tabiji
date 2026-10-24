@@ -67,6 +67,12 @@ export interface AtlasHandle {
   setRoute(points: readonly AtlasPoint[]): void;
   /** Marks one stop or place as selected, or clears the selection. */
   setSelection(selection: AtlasSelection | null): void;
+  /**
+   * Brings the selected stop or place into view, and does nothing when it is
+   * already visible. The zoom is kept: the reader asked to see a place, not to
+   * lose their bearings.
+   */
+  reveal(selection: AtlasSelection | null): void;
   /** Frames the trip, falling back to its places when no stop is located. */
   fitToTrip(): void;
   /** Re-measures the container, for a map that was hidden and has returned. */
@@ -411,6 +417,30 @@ export class MapEngine {
       setSelection: (next) => {
         selection = next;
         paintSelection();
+      },
+      reveal: (next) => {
+        if (next === null) {
+          return;
+        }
+
+        const point =
+          next.kind === 'destination'
+            ? destinations.find((candidate) => candidate.id === next.id)
+            : places.find((candidate) => candidate.id === next.id);
+
+        if (point === undefined) {
+          return;
+        }
+
+        const position: [number, number] = [point.longitude, point.latitude];
+
+        // Only when it cannot already be seen. A map that moves on every
+        // selection takes the reader's bearings away from them.
+        if (map.getBounds().contains(position)) {
+          return;
+        }
+
+        map.easeTo({ center: position });
       },
       fitToTrip: () => {
         // The stops are the trip; the places are what is worth seeing along the

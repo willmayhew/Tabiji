@@ -151,9 +151,11 @@
           [position]="selectedPosition()"
           [total]="ordered().length"
           [destinations]="ordered()"
+          [places]="places()"
           (changeLocation)="relocate($event)"
           (editPlace)="editPlace($event)"
           (deletePlace)="deletePlace($event)"
+          (selectPlace)="select({ kind: 'place', id: $event.id })"
         />
       </div>
     </div>

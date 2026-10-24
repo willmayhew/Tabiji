@@ -7,7 +7,7 @@
       }
     </div>
 
-    <h3 class="atlas-panel__name">{{ saved.name }}</h3>
+    <h3 #placeHeading class="atlas-panel__name" tabindex="-1">{{ saved.name }}</h3>
 
     <dl class="atlas-panel__list">
       @if (saved.address; as address) {
@@ -62,6 +62,32 @@
         <dd>{{ located() ? 'On the map' : 'Not on the map' }}</dd>
       </div>
     </dl>
+
+    <div class="atlas-panel__places">
+      <p class="atlas-panel__caption" id="stop-places-caption">
+        Saved places
+        @if (placesAtStop().length > 0) {
+          <span class="atlas-panel__count">{{ placesAtStopLabel() }}</span>
+        }
+      </p>
+
+      @if (placesAtStop().length === 0) {
+        <p class="atlas-panel__hint">Nothing saved here yet.</p>
+      } @else {
+        <ul class="atlas-panel__places-list" aria-labelledby="stop-places-caption">
+          @for (saved of placesAtStop(); track saved.id) {
+            <li>
+              <button type="button" class="atlas-panel__place" (click)="chooseFromStop(saved)">
+                <span class="atlas-panel__place-name">{{ saved.name }}</span>
+                @if (saved.category; as category) {
+                  <span class="atlas-panel__place-category">{{ category }}</span>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
 
     <button type="button" class="button button--secondary" (click)="changeLocation.emit(stop)">
       Change location

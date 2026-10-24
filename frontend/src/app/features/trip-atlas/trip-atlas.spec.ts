@@ -104,6 +104,7 @@ class FakeMapEngine {
     setPlaces: (points) => this.placed.push([...points]),
     setRoute: () => undefined,
     setSelection: (selection) => this.selected.push(selection),
+    reveal: () => undefined,
     fitToTrip: () => {
       this.fitted += 1;
     },
@@ -178,6 +179,18 @@ describe('TripAtlas', () => {
 
   function placeRow(name: string): HTMLButtonElement {
     return placeRows().find((row) => row.textContent?.includes(name)) as HTMLButtonElement;
+  }
+
+  /** The stop each group of the plan is filed under, in order. */
+  function groupNames(): string[] {
+    return [...element().querySelectorAll('.atlas-plan__stop')].map(
+      (node) => node.textContent?.trim() ?? '',
+    );
+  }
+
+  /** The places the panel lists for the selected stop. */
+  function panelPlaces(): HTMLButtonElement[] {
+    return [...element().querySelectorAll('.atlas-panel__place')] as HTMLButtonElement[];
   }
 
   async function settle(milliseconds = 0): Promise<void> {
@@ -285,8 +298,10 @@ describe('TripAtlas', () => {
 
     expect(placeRows()).toHaveLength(2);
     expect(placeRow('Fushimi Inari').textContent).toContain('Sight');
-    expect(placeRow('Fushimi Inari').textContent).toContain('Near Rome');
     expect(placeRow('Nishiki Market').textContent).toContain('Food');
+
+    // The plan is read by stop: Rome holds one, and the other is unfiled.
+    expect(groupNames()).toEqual(['Rome', 'Not filed under a stop']);
   });
 
   it('should draw the saved places on the map', async () => {
@@ -374,6 +389,35 @@ describe('TripAtlas', () => {
     expect(pressed).toHaveLength(1);
     expect(pressed[0].textContent).toContain('Nishiki Market');
     expect(element().querySelector('.atlas-panel__name')?.textContent).toContain('Nishiki Market');
+  });
+
+  it('should show the places filed under a selected stop', async () => {
+    await showAtlas({ places: [fushimi, nishiki] });
+
+    stopRows()[0].click();
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Stop 1 of 3');
+    expect(panelPlaces().map((row) => row.textContent?.trim())).toHaveLength(1);
+    expect(panelPlaces()[0].textContent).toContain('Fushimi Inari');
+    expect(element().querySelector('.atlas-panel__count')?.textContent).toContain('1 place');
+
+    // Nishiki Market is filed under no stop, so it is not offered under Rome.
+    expect(panelPlaces()[0].textContent).not.toContain('Nishiki Market');
+  });
+
+  it('should select a place chosen from a stop’s panel', async () => {
+    await showAtlas({ places: [fushimi, nishiki] });
+
+    stopRows()[0].click();
+    fixture.detectChanges();
+
+    panelPlaces()[0].click();
+    fixture.detectChanges();
+
+    // The panel becomes the place's, and the plan marks it as chosen.
+    expect(element().querySelector('.atlas-panel__name')?.textContent).toContain('Fushimi Inari');
+    expect(placeRow('Fushimi Inari').getAttribute('aria-pressed')).toBe('true');
   });
 
   it('should open the editor on an empty draft', async () => {
@@ -512,7 +556,8 @@ describe('TripAtlas', () => {
     request.flush({ ...fushimi, destinationId: null });
     await settle();
 
-    expect(placeRow('Fushimi Inari').textContent).not.toContain('Near Rome');
+    // It has left Rome's group and joined the places still to be filed.
+    expect(groupNames()).toEqual(['Not filed under a stop']);
   });
 
   it('should change nothing when an edit is cancelled', async () => {

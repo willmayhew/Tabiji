@@ -152,7 +152,70 @@
   white-space: nowrap;
 }
 
-.atlas-places__where,
-.atlas-places__stop {
+.atlas-places__where {
   overflow-wrap: anywhere;
+}
+
+/* The plan, by stop -----------------------------------------------------
+   Each group is a stop and the places filed under it. The heading carries the
+   number its marker has on the map, so the list and the map name the same
+   thing, and the count keeps a long group readable at a glance. */
+
+.atlas-plan__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  min-width: 0;
+}
+
+.atlas-plan__group + .atlas-plan__group {
+  margin-top: var(--space-md);
+}
+
+.atlas-plan__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-3xs) var(--space-2xs);
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.atlas-plan__number {
+  flex: none;
+  color: var(--color-terracotta-deep);
+  font-family: var(--font-body);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-plan__stop {
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+  overflow-wrap: anywhere;
+}
+
+.atlas-plan__dates,
+.atlas-plan__count {
+  color: var(--color-ink-faint);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-plan__count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.atlas-plan__hint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
 }
