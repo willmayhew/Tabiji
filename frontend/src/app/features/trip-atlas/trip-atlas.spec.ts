@@ -1,141 +1,206 @@
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { By } from '@angular/platform-browser';
+import { convertToParamMap, provideRouter } from '@angular/router';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter } from '@angular/router';
-import { BehaviorSubject, Observable, of } from 'rxjs';
-import { GeocodingService } from '../../core/api/geocoding.service';
-import { PlaceSuggestion, SavedPlace, SavedPlaceDraft } from '../../core/models/place';
-import { Trip } from '../../core/models/trip';
+import { ActivatedRoute } from '@angular/router';
+import { Observable, of } from 'rxjs';
+import { Trip, TripDestination, TripStop, TripStopUpdateDraft, UpdateTrip } from '../../core/models/trip';
+import { TripsService } from '../../core/api/trips.service';
 import {
   AtlasHandle,
-  AtlasOptions,
   AtlasPoint,
   AtlasSelection,
+  AtlasStopPoint,
   LocatedPoint,
   MapEngine,
 } from '../../shared/map/map-engine';
+import { DestinationEditor, NewPlaceDraft } from './destination-editor';
+import { StopEditor, StopDraft } from './stop-editor';
 import { TripAtlas } from './trip-atlas';
+import { TripAtlasPanel } from './trip-atlas-panel';
 
-const kyoto: PlaceSuggestion = {
+const gion: TripStop = {
+  id: 'gion',
+  name: 'Gion',
+  sortOrder: 0,
+  startsOn: null,
+  endsOn: null,
+  latitude: 35.0037,
+  longitude: 135.7788,
+  category: 'Sight',
+  address: 'Gion, Kyoto',
+  notes: 'Go early.',
+  plannedOn: '2027-04-02',
+};
+
+const kyoto: TripDestination = {
+  id: 'kyoto',
   name: 'Kyoto',
-  destinationName: 'Kyoto, Japan',
-  label: 'Kyoto, Japan',
-  latitude: 35.0116,
-  longitude: 135.7681,
+  sortOrder: 0,
+  startsOn: '2027-04-01',
+  endsOn: '2027-04-04',
+  latitude: 35,
+  longitude: 135,
+  stops: [gion],
+};
+
+const osaka: TripDestination = {
+  id: 'osaka',
+  name: 'Osaka',
+  sortOrder: 1,
+  startsOn: '2027-04-05',
+  endsOn: '2027-04-10',
+  latitude: 34.7,
+  longitude: 135.5,
+  stops: [],
+};
+
+const unfiled: TripStop = {
+  id: 'unfiled',
+  name: 'Someday',
+  sortOrder: 0,
+  startsOn: null,
+  endsOn: null,
+  latitude: 35,
+  longitude: 135,
+  category: 'Food',
+  address: 'Somewhere',
+  notes: 'One day.',
+  plannedOn: null,
 };
 
 const trip: Trip = {
-  id: '11111111-1111-1111-1111-111111111111',
-  name: 'Italy & Iceland',
-  destinations: [
-    {
-      id: 'a1',
-      name: 'Rome',
-      sortOrder: 0,
-      startsOn: '2027-04-01',
-      endsOn: '2027-04-04',
-      latitude: 41.9028,
-      longitude: 12.4964,
-    },
-    {
-      id: 'b2',
-      name: 'Amalfi',
-      sortOrder: 1,
-      startsOn: null,
-      endsOn: null,
-      latitude: null,
-      longitude: null,
-    },
-    {
-      id: 'd4',
-      name: 'Reykjavík',
-      sortOrder: 2,
-      startsOn: '2027-04-06',
-      endsOn: '2027-04-09',
-      latitude: 64.1466,
-      longitude: -21.9426,
-    },
-  ],
+  id: 'trip-1',
+  name: 'Japan',
+  destinations: [kyoto, osaka],
   startsOn: '2027-04-01',
   endsOn: '2027-04-10',
   status: 'Planning',
+  unfiledPlaces: [unfiled],
 };
 
-const fushimi: SavedPlace = {
-  id: 'p1',
-  destinationId: 'a1',
-  name: 'Fushimi Inari',
-  latitude: 34.9671,
-  longitude: 135.7727,
-  category: 'Sight',
-  address: '68 Fukakusa Yabunouchicho, Kyoto',
-  notes: 'Go early.',
-  createdAt: '2026-10-20T09:00:00+00:00',
-};
+function fromUpdate(body: UpdateTrip): Trip {
+  let next = 100;
 
-const nishiki: SavedPlace = {
-  id: 'p2',
-  destinationId: null,
-  name: 'Nishiki Market',
-  latitude: 35.005,
-  longitude: 135.7649,
-  category: 'Food',
-  address: null,
-  notes: null,
-  createdAt: '2026-10-20T10:00:00+00:00',
-};
+  const stopFromDraft = (draft: TripStopUpdateDraft, sortOrder: number): TripStop => ({
+    id: draft.id ?? `stop-${next++}`,
+    name: draft.name,
+    sortOrder,
+    startsOn: draft.startsOn,
+    endsOn: draft.endsOn,
+    latitude: draft.latitude,
+    longitude: draft.longitude,
+    category: draft.category,
+    address: draft.address,
+    notes: draft.notes,
+    plannedOn: draft.plannedOn,
+  });
 
-class FakeGeocodingService {
-  search = (): Observable<PlaceSuggestion[]> => of([kyoto]);
-  reverse = (): Observable<PlaceSuggestion | null> => of(null);
+  return {
+    id: 'trip-1',
+    name: body.name,
+    startsOn: body.startsOn,
+    endsOn: body.endsOn,
+    status: 'Planning',
+    destinations: body.destinations.map((destination, index) => ({
+      id: destination.id ?? `dest-${next++}`,
+      name: destination.name,
+      sortOrder: index,
+      startsOn: destination.startsOn,
+      endsOn: destination.endsOn,
+      latitude: destination.latitude,
+      longitude: destination.longitude,
+      category: destination.category,
+      address: destination.address,
+      notes: destination.notes,
+      plannedOn: destination.plannedOn,
+      stops: destination.stops.map(stopFromDraft),
+    })),
+    unfiledPlaces: (body.unfiledPlaces ?? []).map((place, index) => ({
+      id: place.id ?? `place-${next++}`,
+      name: place.name,
+      sortOrder: index,
+      startsOn: place.startsOn,
+      endsOn: place.endsOn,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      category: place.category,
+      address: place.address,
+      notes: place.notes,
+      plannedOn: place.plannedOn,
+    })),
+  };
+}
+
+class FakeTripsService {
+  readonly updates: UpdateTrip[] = [];
+
+  getById(): Observable<Trip> {
+    return of(trip);
+  }
+
+  update(_id: string, body: UpdateTrip): Observable<Trip> {
+    this.updates.push(body);
+    return of(fromUpdate(body));
+  }
+}
+
+class FakeHandle implements AtlasHandle {
+  destinations: AtlasPoint[][] = [];
+  stops: AtlasStopPoint[][] = [];
+  stopRoutes: LocatedPoint[][] = [];
+  selections: (AtlasSelection | null)[] = [];
+
+  setDestinations(points: readonly AtlasPoint[]): void {
+    this.destinations.push([...points]);
+  }
+
+  setStops(points: readonly AtlasStopPoint[]): void {
+    this.stops.push([...points]);
+  }
+
+  setRoute(): void {}
+
+  setStopRoute(points: readonly LocatedPoint[]): void {
+    this.stopRoutes.push([...points]);
+  }
+
+  setSelection(selection: AtlasSelection | null): void {
+    this.selections.push(selection);
+  }
+
+  reveal(): void {}
+
+  fitToTrip(): void {}
+
+  resize(): void {}
+
+  onSelect(): void {}
+
+  onError(): void {}
+
+  destroy(): void {}
 }
 
 class FakeMapEngine {
-  unavailable = false;
-  fitted = 0;
-  destroyed = 0;
-  readonly drawn: AtlasPoint[][] = [];
-  readonly placed: LocatedPoint[][] = [];
-  readonly selected: (AtlasSelection | null)[] = [];
-  selectHandler: ((selection: AtlasSelection) => void) | null = null;
+  readonly handle = new FakeHandle();
 
-  handle: AtlasHandle = {
-    setDestinations: (points) => this.drawn.push([...points]),
-    setPlaces: (points) => this.placed.push([...points]),
-    setRoute: () => undefined,
-    setSelection: (selection) => this.selected.push(selection),
-    reveal: () => undefined,
-    fitToTrip: () => {
-      this.fitted += 1;
-    },
-    resize: () => undefined,
-    onSelect: (handler) => {
-      this.selectHandler = handler;
-    },
-    onError: () => undefined,
-    destroy: () => {
-      this.destroyed += 1;
-    },
-  };
-
-  // The picker asks for a single-marker map; the atlas asks for the trip.
-  create = () => Promise.resolve(null);
-
-  createAtlas = (_container: HTMLElement, _options: AtlasOptions): Promise<AtlasHandle | null> =>
-    Promise.resolve(this.unavailable ? null : this.handle);
+  async createAtlas(): Promise<AtlasHandle> {
+    return this.handle;
+  }
 }
 
 describe('TripAtlas', () => {
   let fixture: ComponentFixture<TripAtlas>;
-  let http: HttpTestingController;
-  let paramMap: BehaviorSubject<ParamMap>;
-  let engine: FakeMapEngine;
+  let trips: FakeTripsService;
+  let map: FakeMapEngine;
+  let handle: FakeHandle;
 
   beforeEach(async () => {
-    TestBed.resetTestingModule();
-
-    paramMap = new BehaviorSubject<ParamMap>(convertToParamMap({ id: '' }));
-    engine = new FakeMapEngine();
+    trips = new FakeTripsService();
+    map = new FakeMapEngine();
+    handle = map.handle;
 
     await TestBed.configureTestingModule({
       imports: [TripAtlas],
@@ -143,581 +208,257 @@ describe('TripAtlas', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: ActivatedRoute, useValue: { paramMap } },
-        { provide: MapEngine, useValue: engine },
-        { provide: GeocodingService, useValue: new FakeGeocodingService() },
+        { provide: TripsService, useValue: trips },
+        { provide: MapEngine, useValue: map },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: of(convertToParamMap({ id: 'trip-1' })) },
+        },
       ],
     }).compileComponents();
 
-    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(TripAtlas);
   });
 
-  afterEach(() => {
-    http.verify();
-    vi.restoreAllMocks();
-  });
+  async function show(): Promise<void> {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
 
   function element(): HTMLElement {
     return fixture.nativeElement as HTMLElement;
   }
 
-  function button(text: string): HTMLButtonElement {
-    const found = [...element().querySelectorAll('button')].find((candidate) =>
-      candidate.textContent?.includes(text),
-    );
-
-    return found as HTMLButtonElement;
+  function component(): TripAtlas {
+    return fixture.componentInstance;
   }
 
-  function stopRows(): HTMLButtonElement[] {
-    return [...element().querySelectorAll('.atlas-list__item')] as HTMLButtonElement[];
+  function list(): HTMLElement {
+    return element().querySelector('.atlas-list') as HTMLElement;
   }
 
-  function placeRows(): HTMLButtonElement[] {
-    return [...element().querySelectorAll('.atlas-places__item')] as HTMLButtonElement[];
+  function panel(): TripAtlasPanel {
+    return fixture.debugElement.query(By.directive(TripAtlasPanel)).componentInstance;
   }
 
-  function placeRow(name: string): HTMLButtonElement {
-    return placeRows().find((row) => row.textContent?.includes(name)) as HTMLButtonElement;
+  function stopEditor(): StopEditor {
+    return fixture.debugElement.query(By.directive(StopEditor)).componentInstance;
   }
 
-  /** The stop each group of the plan is filed under, in order. */
-  function groupNames(): string[] {
-    return [...element().querySelectorAll('.atlas-plan__stop')].map(
-      (node) => node.textContent?.trim() ?? '',
-    );
+  function destinationEditor(): DestinationEditor {
+    return fixture.debugElement.query(By.directive(DestinationEditor)).componentInstance;
   }
 
-  /** The places the panel lists for the selected stop. */
-  function panelPlaces(): HTMLButtonElement[] {
-    return [...element().querySelectorAll('.atlas-panel__place')] as HTMLButtonElement[];
-  }
+  const draft: StopDraft = {
+    name: 'Fushimi Inari',
+    startsOn: null,
+    endsOn: null,
+    latitude: 34.9671,
+    longitude: 135.7727,
+    category: 'Sight',
+    address: 'Fushimi Inari Taisha',
+    notes: 'Many gates.',
+    plannedOn: '2027-04-03',
+  };
 
-  async function settle(milliseconds = 0): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, milliseconds));
-    fixture.detectChanges();
-  }
+  it('loads the trip and draws only the main route until a destination is opened', async () => {
+    await show();
 
-  function createComponent(id: string): void {
-    paramMap.next(convertToParamMap({ id }));
-    fixture = TestBed.createComponent(TripAtlas);
-    fixture.detectChanges();
-  }
+    expect(handle.destinations.at(-1)?.map((point) => point.label)).toEqual(['1', '2']);
+    expect(handle.stops.at(-1)).toEqual([]);
+    expect(handle.stopRoutes.at(-1)).toEqual([]);
+  });
 
-  /** Loads the trip and its places, and leaves the page showing both. */
-  async function showAtlas(options: { trip?: Trip; places?: SavedPlace[] } = {}): Promise<void> {
-    createComponent(trip.id);
+  it('adds a parent destination from the Route plus', async () => {
+    await show();
 
-    http.expectOne(`/api/trips/${trip.id}`).flush(options.trip ?? trip);
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    http.expectOne(`/api/trips/${trip.id}/places`).flush(options.places ?? []);
-    await settle();
-  }
-
-  async function openEditor(): Promise<void> {
-    button('Add a place').click();
-    fixture.detectChanges();
-    await settle();
-  }
-
-  async function chooseKyoto(): Promise<void> {
-    const box = element().querySelector('.editor__search-input') as HTMLInputElement;
-    box.value = 'kyoto';
-    box.dispatchEvent(new Event('input'));
-    await settle(350);
-
-    (element().querySelector('.editor__result') as HTMLButtonElement).click();
-    fixture.detectChanges();
-  }
-
-  function submitEditor(): void {
-    (element().querySelector('.editor form') as HTMLFormElement).dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
-  }
-
-  it('should show a loading state while the trip is fetched', () => {
-    createComponent(trip.id);
-
-    expect(element().textContent).toContain('Loading the atlas');
-
-    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
+    list().querySelector<HTMLButtonElement>('.atlas-list__plus')?.click();
     fixture.detectChanges();
 
-    // The places are asked for once the trip, and so its id, is known.
-    http.expectOne(`/api/trips/${trip.id}/places`).flush([]);
+    const newParent: NewPlaceDraft = {
+      name: 'Nara',
+      startsOn: '2027-04-08',
+      endsOn: '2027-04-10',
+      latitude: null,
+      longitude: null,
+    };
+
+    destinationEditor().save.emit(newParent);
+    await show();
+
+    const body = trips.updates[0];
+    expect(body.destinations.map((destination) => destination.name)).toEqual([
+      'Kyoto',
+      'Osaka',
+      'Nara',
+    ]);
+    expect(body.unfiledPlaces?.map((place) => place.id)).toEqual(['unfiled']);
+    expect(component().selection()?.kind).toBe('destination');
   });
 
-  it('should show the trip name as the only heading', async () => {
-    await showAtlas();
+  it('adds a stop from the plus beside the destination stop count', async () => {
+    await show();
 
-    const headings = element().querySelectorAll('h1');
-
-    expect(headings).toHaveLength(1);
-    expect(headings[0].textContent).toContain('Italy & Iceland');
-  });
-
-  it('should list every stop, including the ones with no location', async () => {
-    await showAtlas();
-
-    expect(stopRows()).toHaveLength(3);
-    expect(element().textContent).toContain('Amalfi');
-  });
-
-  it('should draw only the located stops on the map', async () => {
-    await showAtlas();
-
-    expect(engine.drawn.at(-1)?.map((point) => point.id)).toEqual(['a1', 'd4']);
-  });
-
-  it('should show an empty map state when there is nothing to draw', async () => {
-    await showAtlas({
-      trip: {
-        ...trip,
-        destinations: trip.destinations.map((destination) => ({
-          ...destination,
-          latitude: null,
-          longitude: null,
-        })),
-      },
-    });
-
-    expect(element().textContent).toContain('Nothing on the map yet');
-    expect(element().querySelector('app-trip-atlas-map')).toBeNull();
-  });
-
-  it('should own up to a route that is only partly on the map', async () => {
-    await showAtlas();
-
-    expect(element().textContent).toContain('2 of 3 stops are on the map');
-  });
-
-  it('should load the places saved to the trip', async () => {
-    await showAtlas({ places: [fushimi, nishiki] });
-
-    expect(placeRows()).toHaveLength(2);
-    expect(placeRow('Fushimi Inari').textContent).toContain('Sight');
-    expect(placeRow('Nishiki Market').textContent).toContain('Food');
-
-    // The plan is read by stop: Rome holds one, and the other is unfiled.
-    expect(groupNames()).toEqual(['Rome', 'Not filed under a stop']);
-  });
-
-  it('should draw the saved places on the map', async () => {
-    await showAtlas({ places: [fushimi] });
-
-    expect(engine.placed.at(-1)?.map((point) => point.id)).toEqual(['p1']);
-  });
-
-  it('should say when nothing is saved yet', async () => {
-    await showAtlas();
-
-    expect(element().textContent).toContain('Nothing saved yet');
-  });
-
-  it('should keep the route usable when the places cannot be loaded, and try again', async () => {
-    createComponent(trip.id);
-    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    http.expectOne(`/api/trips/${trip.id}/places`).flush(
-      { title: 'Server error', status: 500 },
-      { status: 500, statusText: 'Server Error' },
-    );
-    await settle();
-
-    // The trip, the route and the map are all still there.
-    expect(element().textContent).toContain('Server error');
-    expect(stopRows()).toHaveLength(3);
-
-    button('Try again').click();
-    await settle();
-
-    http.expectOne(`/api/trips/${trip.id}/places`).flush([fushimi]);
-    await settle();
-
-    expect(placeRows()).toHaveLength(1);
-  });
-
-  it('should select a stop from the list and show its details', async () => {
-    await showAtlas();
-
-    stopRows()[1].click();
+    const pluses = list().querySelectorAll<HTMLButtonElement>('.atlas-list__plus');
+    pluses[1].click();
     fixture.detectChanges();
 
-    expect(stopRows()[1].getAttribute('aria-pressed')).toBe('true');
-    expect(element().querySelector('.atlas-panel__name')?.textContent).toContain('Amalfi');
-    expect(element().textContent).toContain('Stop 2 of 3');
+    expect(component().stopEditorParent()?.id).toBe('kyoto');
+    expect(component().expanded().has('kyoto')).toBe(true);
+
+    stopEditor().save.emit(draft);
+    await show();
+
+    const body = trips.updates[0];
+    const kyotoDraft = body.destinations.find((destination) => destination.id === 'kyoto');
+    expect(kyotoDraft?.stops.map((stop) => stop.name)).toEqual(['Gion', 'Fushimi Inari']);
+
+    const created = kyotoDraft?.stops[1];
+    expect(created?.category).toBe('Sight');
+    expect(created?.address).toBe('Fushimi Inari Taisha');
+    expect(created?.notes).toBe('Many gates.');
+    expect(created?.plannedOn).toBe('2027-04-03');
+    expect(component().selection()?.kind).toBe('stop');
   });
 
-  it('should select a stop from the map', async () => {
-    await showAtlas();
-
-    engine.selectHandler?.({ kind: 'destination', id: 'd4' });
+  it('edits the selected stop and keeps its identity', async () => {
+    await show();
+    component().selection.set({ kind: 'stop', id: 'gion' });
     fixture.detectChanges();
 
-    const pressed = stopRows().filter((row) => row.getAttribute('aria-pressed') === 'true');
-
-    expect(pressed).toHaveLength(1);
-    expect(pressed[0].textContent).toContain('Reykjavík');
-  });
-
-  it('should select a saved place from the list and show its details', async () => {
-    await showAtlas({ places: [fushimi, nishiki] });
-
-    placeRow('Fushimi Inari').click();
+    panel().editStop.emit(gion);
     fixture.detectChanges();
 
-    expect(placeRow('Fushimi Inari').getAttribute('aria-pressed')).toBe('true');
-    expect(element().textContent).toContain('Saved place');
-    expect(element().querySelector('.atlas-panel__name')?.textContent).toContain('Fushimi Inari');
-    expect(element().textContent).toContain('68 Fukakusa Yabunouchicho, Kyoto');
-    expect(element().textContent).toContain('Go early.');
-    expect(element().textContent).toContain('Rome');
+    stopEditor().save.emit({ ...draft, name: 'Gion at night', plannedOn: null });
+    await show();
+
+    const body = trips.updates[0];
+    const kyotoDraft = body.destinations.find((destination) => destination.id === 'kyoto');
+    const edited = kyotoDraft?.stops.find((stop) => stop.id === 'gion');
+
+    expect(edited?.name).toBe('Gion at night');
+    expect(edited?.plannedOn).toBeNull();
+    expect(kyotoDraft?.stops.map((stop) => stop.id)).toEqual(['gion']);
   });
 
-  it('should select a saved place from the map', async () => {
-    await showAtlas({ places: [fushimi, nishiki] });
+  it('removes the selected stop after confirmation and returns to its destination', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    engine.selectHandler?.({ kind: 'place', id: 'p2' });
+    await show();
+    component().selection.set({ kind: 'stop', id: 'gion' });
     fixture.detectChanges();
 
-    const pressed = placeRows().filter((row) => row.getAttribute('aria-pressed') === 'true');
+    panel().removeStop.emit(gion);
+    await show();
 
-    expect(pressed).toHaveLength(1);
-    expect(pressed[0].textContent).toContain('Nishiki Market');
-    expect(element().querySelector('.atlas-panel__name')?.textContent).toContain('Nishiki Market');
+    const body = trips.updates[0];
+    const kyotoDraft = body.destinations.find((destination) => destination.id === 'kyoto');
+    expect(kyotoDraft?.stops).toEqual([]);
+    expect(component().selection()).toEqual({ kind: 'destination', id: 'kyoto' });
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Gion'));
+
+    confirm.mockRestore();
   });
 
-  it('should show the places filed under a selected stop', async () => {
-    await showAtlas({ places: [fushimi, nishiki] });
+  it('shares the expansion state with the map and clears the stop line on collapse', async () => {
+    await show();
+    component().expanded.set(new Set(['kyoto']));
+    component().selection.set({ kind: 'destination', id: 'kyoto' });
+    await show();
 
-    stopRows()[0].click();
-    fixture.detectChanges();
+    expect(handle.stops.at(-1)?.map((point) => point.id)).toEqual(['gion']);
+    expect(handle.stopRoutes.at(-1)?.map((point) => point.id)).toEqual(['gion']);
 
-    expect(element().textContent).toContain('Stop 1 of 3');
-    expect(panelPlaces().map((row) => row.textContent?.trim())).toHaveLength(1);
-    expect(panelPlaces()[0].textContent).toContain('Fushimi Inari');
-    expect(element().querySelector('.atlas-panel__count')?.textContent).toContain('1 place');
+    list().querySelector<HTMLButtonElement>('.atlas-list__chevron')?.click();
+    await show();
 
-    // Nishiki Market is filed under no stop, so it is not offered under Rome.
-    expect(panelPlaces()[0].textContent).not.toContain('Nishiki Market');
+    expect(component().expanded().has('kyoto')).toBe(false);
+    expect(handle.stops.at(-1)).toEqual([]);
+    expect(handle.stopRoutes.at(-1)).toEqual([]);
   });
 
-  it('should select a place chosen from a stop’s panel', async () => {
-    await showAtlas({ places: [fushimi, nishiki] });
+  it('shows the hierarchical label of a stop in the list and the panel', async () => {
+    await show();
+    component().expanded.set(new Set(['kyoto']));
+    component().selection.set({ kind: 'stop', id: 'gion' });
+    await show();
 
-    stopRows()[0].click();
-    fixture.detectChanges();
-
-    panelPlaces()[0].click();
-    fixture.detectChanges();
-
-    // The panel becomes the place's, and the plan marks it as chosen.
-    expect(element().querySelector('.atlas-panel__name')?.textContent).toContain('Fushimi Inari');
-    expect(placeRow('Fushimi Inari').getAttribute('aria-pressed')).toBe('true');
+    expect(
+      list().querySelector('.atlas-stops__node')?.textContent?.trim(),
+    ).toBe('1a');
+    expect(element().textContent).toContain('Stop 1a at Kyoto');
   });
 
-  it('should open the editor on an empty draft', async () => {
-    await showAtlas();
+  it('files a legacy unfiled place under a destination without duplicating it', async () => {
+    await show();
 
-    await openEditor();
+    const select = list().querySelector<HTMLSelectElement>('.atlas-list__file-select');
+    expect(select).not.toBeNull();
+    select!.value = 'kyoto';
 
-    expect(element().querySelector('.editor')?.hasAttribute('open')).toBe(true);
-    expect(element().querySelector('.editor__title')?.textContent).toContain('Add a place');
+    list()
+      .querySelector<HTMLButtonElement>('.atlas-places__file button')
+      ?.click();
+    await show();
+
+    const body = trips.updates[0];
+    const kyotoDraft = body.destinations.find((destination) => destination.id === 'kyoto');
+    const filed = kyotoDraft?.stops.find((stop) => stop.id === 'unfiled');
+
+    expect(filed?.name).toBe('Someday');
+    expect(filed?.category).toBe('Food');
+    expect(body.unfiledPlaces).toEqual([]);
+    expect(component().selection()).toEqual({ kind: 'stop', id: 'unfiled' });
   });
 
-  it('should save a place and only then show it', async () => {
-    await showAtlas();
+  it('turns a selected stop into its destination when the destination is collapsed', async () => {
+    await show();
+    component().expanded.set(new Set(['kyoto']));
+    component().selection.set({ kind: 'stop', id: 'gion' });
+    await show();
 
-    await openEditor();
-    await chooseKyoto();
-    submitEditor();
+    list().querySelector<HTMLButtonElement>('.atlas-list__chevron')?.click();
+    await show();
 
-    const request = http.expectOne(`/api/trips/${trip.id}/places`);
-
-    expect(request.request.method).toBe('POST');
-
-    const body = request.request.body as SavedPlaceDraft;
-
-    expect(body.name).toBe('Kyoto');
-    expect(body.latitude).toBe(35.0116);
-    expect(body.longitude).toBe(135.7681);
-    expect(body.address).toBe('Kyoto, Japan');
-    expect(body.destinationId).toBeNull();
-
-    // Nothing appears while the request is in flight.
-    expect(placeRows()).toHaveLength(0);
-
-    request.flush({
-      id: 'p3',
-      destinationId: null,
-      name: 'Kyoto',
-      latitude: 35.0116,
-      longitude: 135.7681,
-      category: null,
-      address: 'Kyoto, Japan',
-      notes: null,
-      createdAt: '2026-10-20T11:00:00+00:00',
-    });
-    await settle();
-
-    expect(placeRows()).toHaveLength(1);
-    expect(placeRow('Kyoto').getAttribute('aria-pressed')).toBe('true');
-    expect(engine.placed.at(-1)?.map((point) => point.id)).toEqual(['p3']);
-    expect(element().querySelector('.editor')?.hasAttribute('open')).toBe(false);
+    expect(component().selection()).toEqual({ kind: 'destination', id: 'kyoto' });
   });
 
-  it('should leave no phantom place when the save is refused', async () => {
-    await showAtlas();
+  it('returns to the overview when the selected destination is chosen again', async () => {
+    await show();
 
-    await openEditor();
-    await chooseKyoto();
-    submitEditor();
+    const destination = () => list().querySelector<HTMLButtonElement>('.atlas-list__item');
 
-    http
-      .expectOne(`/api/trips/${trip.id}/places`)
-      .flush(
-        { title: 'Invalid saved place', status: 400, detail: 'The saved place name is required.' },
-        { status: 400, statusText: 'Bad Request' },
-      );
-    await settle();
+    destination()?.click();
+    await show();
 
-    expect(element().textContent).toContain('The saved place name is required.');
-    expect(placeRows()).toHaveLength(0);
-    expect(engine.placed.at(-1)).toEqual([]);
+    expect(component().selection()).toEqual({ kind: 'destination', id: 'kyoto' });
+    expect(element().textContent).not.toContain('Back to overview');
 
-    // The editor stays open, holding what the reader wrote.
-    expect(element().querySelector('.editor')?.hasAttribute('open')).toBe(true);
-  });
+    destination()?.click();
+    await show();
 
-  it('should change a saved place', async () => {
-    await showAtlas({ places: [fushimi] });
-
-    placeRow('Fushimi Inari').click();
-    fixture.detectChanges();
-
-    button('Edit place').click();
-    fixture.detectChanges();
-    await settle();
-
-    const name = element().querySelector('#place-name') as HTMLInputElement;
-    name.value = 'Fushimi Inari Taisha';
-    name.dispatchEvent(new Event('input'));
-
-    const notes = element().querySelector('#place-notes') as HTMLTextAreaElement;
-    notes.value = '';
-    notes.dispatchEvent(new Event('input'));
-
-    submitEditor();
-
-    const request = http.expectOne(`/api/trips/${trip.id}/places/p1`);
-
-    expect(request.request.method).toBe('PUT');
-
-    const body = request.request.body as SavedPlaceDraft;
-
-    expect(body.name).toBe('Fushimi Inari Taisha');
-    expect(body.latitude).toBe(34.9671);
-    expect(body.longitude).toBe(135.7727);
-    expect(body.notes).toBeNull();
-
-    request.flush({ ...fushimi, name: 'Fushimi Inari Taisha', notes: null });
-    await settle();
-
-    expect(placeRow('Fushimi Inari Taisha')).toBeDefined();
-    expect(element().querySelector('.atlas-panel__name')?.textContent).toContain(
-      'Fushimi Inari Taisha',
+    expect(component().selection()).toBeNull();
+    expect(element().textContent).toContain(
+      'Select a destination, a stop or a place to see its details.',
     );
   });
 
-  it('should take a place off the route when the association is cleared', async () => {
-    await showAtlas({ places: [fushimi] });
+  it('returns to the overview when the selected stop is chosen again', async () => {
+    await show();
+    component().expanded.set(new Set(['kyoto']));
+    await show();
 
-    placeRow('Fushimi Inari').click();
-    fixture.detectChanges();
+    const stop = () => list().querySelector<HTMLButtonElement>('.atlas-list__item--stop');
 
-    button('Edit place').click();
-    fixture.detectChanges();
-    await settle();
+    stop()?.click();
+    await show();
 
-    const stop = element().querySelector('#place-destination') as HTMLSelectElement;
-    stop.value = '';
-    stop.dispatchEvent(new Event('change'));
+    expect(component().selection()).toEqual({ kind: 'stop', id: 'gion' });
 
-    submitEditor();
+    stop()?.click();
+    await show();
 
-    const request = http.expectOne(`/api/trips/${trip.id}/places/p1`);
-
-    expect((request.request.body as SavedPlaceDraft).destinationId).toBeNull();
-
-    request.flush({ ...fushimi, destinationId: null });
-    await settle();
-
-    // It has left Rome's group and joined the places still to be filed.
-    expect(groupNames()).toEqual(['Not filed under a stop']);
-  });
-
-  it('should change nothing when an edit is cancelled', async () => {
-    await showAtlas({ places: [fushimi] });
-
-    placeRow('Fushimi Inari').click();
-    fixture.detectChanges();
-
-    button('Edit place').click();
-    fixture.detectChanges();
-    await settle();
-
-    const name = element().querySelector('#place-name') as HTMLInputElement;
-    name.value = 'Something else';
-    name.dispatchEvent(new Event('input'));
-
-    button('Cancel').click();
-    fixture.detectChanges();
-    await settle();
-
-    http.expectNone(`/api/trips/${trip.id}/places/p1`);
-    expect(placeRow('Fushimi Inari')).toBeDefined();
-  });
-
-  it('should remove a place once the reader has agreed', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-    await showAtlas({ places: [fushimi, nishiki] });
-
-    placeRow('Fushimi Inari').click();
-    fixture.detectChanges();
-
-    button('Delete place').click();
-    await settle();
-
-    expect(window.confirm).toHaveBeenCalled();
-
-    const request = http.expectOne(`/api/trips/${trip.id}/places/p1`);
-    expect(request.request.method).toBe('DELETE');
-
-    request.flush(null, { status: 204, statusText: 'No Content' });
-    await settle();
-
-    expect(placeRows()).toHaveLength(1);
-    expect(engine.placed.at(-1)?.map((point) => point.id)).toEqual(['p2']);
-  });
-
-  it('should remove nothing when the reader changes their mind', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
-
-    await showAtlas({ places: [fushimi] });
-
-    placeRow('Fushimi Inari').click();
-    fixture.detectChanges();
-
-    button('Delete place').click();
-    await settle();
-
-    http.expectNone(`/api/trips/${trip.id}/places/p1`);
-    expect(placeRows()).toHaveLength(1);
-  });
-
-  it('should keep a place when the removal fails', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-    await showAtlas({ places: [fushimi] });
-
-    placeRow('Fushimi Inari').click();
-    fixture.detectChanges();
-
-    button('Delete place').click();
-    await settle();
-
-    http
-      .expectOne(`/api/trips/${trip.id}/places/p1`)
-      .flush(
-        { title: 'Server error', status: 500 },
-        { status: 500, statusText: 'Server Error' },
-      );
-    await settle();
-
-    expect(element().querySelector('[role="alert"]')?.textContent).toContain('Server error');
-    expect(placeRows()).toHaveLength(1);
-  });
-
-  it('should keep the list usable when the map cannot be drawn', async () => {
-    engine.unavailable = true;
-
-    await showAtlas({ places: [fushimi] });
-
-    expect(element().textContent).toContain('The map could not be drawn');
-    expect(placeRows()).toHaveLength(1);
-    expect(stopRows()).toHaveLength(3);
-  });
-
-  it('should frame the trip when it is asked to', async () => {
-    await showAtlas();
-
-    engine.fitted = 0;
-    button('Frame the trip').click();
-
-    expect(engine.fitted).toBe(1);
-  });
-
-  it('should take turns between the map and the list on a narrow screen', async () => {
-    await showAtlas();
-
-    expect(element().querySelector('.atlas__body')?.classList.contains('atlas__body--map')).toBe(
-      true,
-    );
-
-    button('List').click();
-    fixture.detectChanges();
-
-    expect(element().querySelector('.atlas__body')?.classList.contains('atlas__body--list')).toBe(
-      true,
-    );
-    expect(button('List').getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('should show a not found state for an unknown trip', () => {
-    createComponent('99999999-9999-9999-9999-999999999999');
-
-    http
-      .expectOne('/api/trips/99999999-9999-9999-9999-999999999999')
-      .flush({ title: 'Trip not found', status: 404 }, { status: 404, statusText: 'Not Found' });
-    fixture.detectChanges();
-
-    expect(element().textContent).toContain('That trip could not be found');
-  });
-
-  it('should show an error state and try again', async () => {
-    createComponent(trip.id);
-
-    http
-      .expectOne(`/api/trips/${trip.id}`)
-      .flush({ title: 'Server error', status: 500 }, { status: 500, statusText: 'Server Error' });
-    fixture.detectChanges();
-
-    expect(element().textContent).toContain('Server error');
-
-    element().querySelector('.empty-state button')?.dispatchEvent(new Event('click'));
-    fixture.detectChanges();
-
-    http.expectOne(`/api/trips/${trip.id}`).flush(trip);
-    await fixture.whenStable();
-
-    http.expectOne(`/api/trips/${trip.id}/places`).flush([]);
-    await settle();
-
-    expect(element().textContent).toContain('Italy & Iceland');
-  });
-
-  it('should link back to the trip', async () => {
-    await showAtlas();
-
-    const back = [...element().querySelectorAll('a')].find((anchor) =>
-      anchor.textContent?.includes('Back to the trip'),
-    ) as HTMLAnchorElement;
-
-    expect(back.getAttribute('href')).toBe(`/trips/${trip.id}`);
+    expect(component().selection()).toBeNull();
   });
 });

@@ -8,11 +8,16 @@ namespace Tabiji.Tests;
 /// The rule is forgiving about missing dates and strict about contradictory
 /// ones. A stop may have no dates, or only one of them. What it may not do
 /// is contradict the stops that come before it on the route.
+///
+/// The same class answers the smaller question of whether a single day is one
+/// the trip has, which a place planned for a day is measured against.
 /// </summary>
 public sealed class TripScheduleTests
 {
     private static readonly DateOnly TripStartsOn = new(2027, 5, 16);
     private static readonly DateOnly TripEndsOn = new(2027, 6, 5);
+
+    private const string Subject = "Fushimi Inari";
 
     private static TripDestinationDraft Stop(
         string name,
@@ -202,4 +207,43 @@ public sealed class TripScheduleTests
             Stop("Ise"),
             Stop("Tokyo", May(26), June(5)));
     }
+
+    [Theory]
+    [InlineData(2027, 5, 16)]
+    [InlineData(2027, 5, 20)]
+    [InlineData(2027, 5, 31)]
+    [InlineData(2027, 6, 1)]
+    [InlineData(2027, 6, 5)]
+    public void ADayInsideTheTripIsAccepted(int year, int month, int day)
+    {
+        Plans(new DateOnly(year, month, day));
+    }
+
+    [Theory]
+    [InlineData(2027, 5, 15)]
+    [InlineData(2027, 1, 1)]
+    public void ADayBeforeTheTripIsRefusedAndNamesTheSubject(int year, int month, int day)
+    {
+        var exception = RefusesTheDay(new DateOnly(year, month, day));
+
+        Assert.Contains(Subject, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("before the trip starts", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(2027, 6, 6)]
+    [InlineData(2028, 5, 16)]
+    public void ADayAfterTheTripIsRefusedAndNamesTheSubject(int year, int month, int day)
+    {
+        var exception = RefusesTheDay(new DateOnly(year, month, day));
+
+        Assert.Contains(Subject, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("after the trip ends", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static void Plans(DateOnly day) =>
+        TripSchedule.EnsureIsATripDay(TripStartsOn, TripEndsOn, day, Subject);
+
+    private static ArgumentException RefusesTheDay(DateOnly day) =>
+        Assert.Throws<ArgumentException>(() => Plans(day));
 }

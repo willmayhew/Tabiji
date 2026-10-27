@@ -73,29 +73,12 @@
   color: var(--color-rule-strong);
 }
 
-/* The map and the list, on a phone, take turns. ----------------------- */
+/* The map and the list, on a phone, take turns. The shared segmented control
+   gives this `display: flex`; a component stylesheet comes after the global
+   one, so this hides it until the screen is narrow enough to need it. */
 
 .atlas__toggle {
   display: none;
-  gap: var(--space-4xs);
-}
-
-.atlas__toggle-button {
-  padding: 0.4rem 0.9rem;
-  border: 1px solid var(--color-rule-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-ink-soft);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.atlas__toggle-button[aria-pressed='true'] {
-  border-color: var(--color-forest);
-  background: var(--color-forest);
-  color: var(--color-surface);
 }
 
 /* The body. On a wide screen the map and its panel stand beside the list;

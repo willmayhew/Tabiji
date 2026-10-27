@@ -16,4 +16,5 @@ public sealed record UpdateTripRequest(
     string Name,
     IReadOnlyList<TripDestinationUpdateRequest>? Destinations,
     DateOnly StartsOn,
-    DateOnly EndsOn);
+    DateOnly EndsOn,
+    IReadOnlyList<TripStopUpdateRequest>? UnfiledPlaces = null);

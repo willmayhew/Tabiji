@@ -35,16 +35,16 @@ describe('routeLabel', () => {
 
 describe('routeSummary', () => {
   it('should count the stops in words', () => {
-    expect(routeSummary(route)).toBe('3 stops');
+    expect(routeSummary(route)).toBe('3 destinations');
   });
 
   it('should use the singular for one stop', () => {
     expect(
       routeSummary([{ id: 'a1', name: 'Rome', sortOrder: 0, startsOn: null, endsOn: null, latitude: null, longitude: null }]),
-    ).toBe('1 stop');
+    ).toBe('1 destination');
   });
 
   it('should count no stops', () => {
-    expect(routeSummary([])).toBe('0 stops');
+    expect(routeSummary([])).toBe('0 destinations');
   });
 });

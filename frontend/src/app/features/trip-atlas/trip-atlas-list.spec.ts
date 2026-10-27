@@ -1,78 +1,56 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { SavedPlace } from '../../core/models/place';
-import { TripDestination } from '../../core/models/trip';
+import { TripDestination, TripStop } from '../../core/models/trip';
+import { AtlasSelection } from '../../shared/map/map-engine';
 import { TripAtlasList } from './trip-atlas-list';
 
-const route: TripDestination[] = [
-  {
-    id: 'a1',
-    name: 'Rome',
-    sortOrder: 0,
-    startsOn: '2027-04-01',
-    endsOn: '2027-04-04',
-    latitude: 41.9028,
-    longitude: 12.4964,
-  },
-  {
-    id: 'b2',
-    name: 'Amalfi',
-    sortOrder: 1,
+function stop(
+  id: string,
+  sortOrder: number,
+  overrides: Partial<TripStop> = {},
+): TripStop {
+  return {
+    id,
+    name: id,
+    sortOrder,
     startsOn: null,
     endsOn: null,
     latitude: null,
     longitude: null,
-  },
-  {
-    id: 'c3',
-    name: 'Naples',
-    sortOrder: 2,
-    startsOn: null,
-    endsOn: null,
-    latitude: null,
-    longitude: null,
-  },
-  {
-    id: 'd4',
-    name: 'Reykjavík',
-    sortOrder: 3,
-    startsOn: '2027-04-06',
-    endsOn: '2027-04-09',
-    latitude: 64.1466,
-    longitude: -21.9426,
-  },
-];
+    ...overrides,
+  };
+}
 
-const places: SavedPlace[] = [
-  {
-    id: 'p1',
-    destinationId: 'a1',
-    name: 'Fushimi Inari',
-    latitude: 34.9671,
-    longitude: 135.7727,
-    category: 'Sight',
-    address: '68 Fukakusa Yabunouchicho, Kyoto',
-    notes: null,
-    createdAt: '2026-10-20T09:00:00+00:00',
-  },
-  {
-    id: 'p2',
-    destinationId: null,
-    name: 'Nishiki Market',
-    latitude: 35.005,
-    longitude: 135.7649,
-    category: 'Food',
-    address: null,
-    notes: null,
-    createdAt: '2026-10-20T10:00:00+00:00',
-  },
-];
+const gion = stop('Gion', 0, { latitude: 35, longitude: 135 });
+const arashiyama = stop('Arashiyama', 1, { plannedOn: '2027-04-02' });
+
+const kyoto: TripDestination = {
+  id: 'kyoto',
+  name: 'Kyoto',
+  sortOrder: 0,
+  startsOn: '2027-04-01',
+  endsOn: '2027-04-04',
+  latitude: 35,
+  longitude: 135,
+  stops: [gion, arashiyama],
+};
+
+const osaka: TripDestination = {
+  id: 'osaka',
+  name: 'Osaka',
+  sortOrder: 1,
+  startsOn: '2027-04-05',
+  endsOn: '2027-04-07',
+  latitude: 34.7,
+  longitude: 135.5,
+  stops: [],
+};
+
+const unfiled = stop('Someday', 0, { category: 'Sight' });
 
 describe('TripAtlasList', () => {
   let fixture: ComponentFixture<TripAtlasList>;
 
   beforeEach(async () => {
-    TestBed.resetTestingModule();
-
     await TestBed.configureTestingModule({
       imports: [TripAtlasList],
     }).compileComponents();
@@ -80,272 +58,163 @@ describe('TripAtlasList', () => {
     fixture = TestBed.createComponent(TripAtlasList);
   });
 
+  function show(
+    options: {
+      destinations?: TripDestination[];
+      unfiledPlaces?: TripStop[];
+      expanded?: Set<string>;
+      selection?: AtlasSelection | null;
+    } = {},
+  ): void {
+    fixture.componentRef.setInput('destinations', options.destinations ?? [kyoto, osaka]);
+    fixture.componentRef.setInput('unfiledPlaces', options.unfiledPlaces ?? []);
+    fixture.componentRef.setInput('startsOn', '2027-04-01');
+    fixture.componentRef.setInput('endsOn', '2027-04-07');
+    fixture.componentRef.setInput('expanded', options.expanded ?? new Set<string>());
+    fixture.componentRef.setInput('selection', options.selection ?? null);
+    fixture.detectChanges();
+  }
+
   function element(): HTMLElement {
     return fixture.nativeElement as HTMLElement;
   }
 
-  function render(
-    options: {
-      destinations?: TripDestination[];
-      places?: SavedPlace[];
-      selection?: { kind: 'destination' | 'place'; id: string } | null;
-      placesLoading?: boolean;
-      placesError?: string | null;
-    } = {},
-  ): void {
-    fixture.componentRef.setInput('destinations', options.destinations ?? route);
-    fixture.componentRef.setInput('places', options.places ?? []);
-    fixture.componentRef.setInput('selection', options.selection ?? null);
-    fixture.componentRef.setInput('placesLoading', options.placesLoading ?? false);
-    fixture.componentRef.setInput('placesError', options.placesError ?? null);
-    fixture.detectChanges();
-  }
+  it('adds a parent destination from the plus beside the Route heading', () => {
+    show();
+    const emitted: void[] = [];
+    fixture.componentInstance.addDestination.subscribe(() => emitted.push(undefined));
 
-  function stopRows(): HTMLButtonElement[] {
-    return [...element().querySelectorAll('.atlas-list__item')] as HTMLButtonElement[];
-  }
+    const plus = element().querySelector<HTMLButtonElement>('.atlas-list__plus');
+    expect(plus?.getAttribute('aria-label')).toBe('Add destination');
 
-  function placeRows(): HTMLButtonElement[] {
-    return [...element().querySelectorAll('.atlas-places__item')] as HTMLButtonElement[];
-  }
+    plus?.click();
 
-  function groups(): HTMLElement[] {
-    return [...element().querySelectorAll('.atlas-plan__group')] as HTMLElement[];
-  }
+    expect(emitted).toHaveLength(1);
+  });
 
-  function groupHeads(): HTMLElement[] {
-    return [...element().querySelectorAll('.atlas-plan__head')] as HTMLElement[];
-  }
+  it('adds a stop from the plus beside a destination stop count, with that destination', () => {
+    show();
+    const emitted: TripDestination[] = [];
+    fixture.componentInstance.addStop.subscribe((destination) => emitted.push(destination));
 
-  function groupNames(): string[] {
-    return groupHeads().map(
-      (head) => head.querySelector('.atlas-plan__stop')?.textContent?.trim() ?? '',
-    );
-  }
+    const pluses = element().querySelectorAll<HTMLButtonElement>('.atlas-list__plus');
+    expect(pluses[1].getAttribute('aria-label')).toBe('Add a stop in Kyoto');
 
-  it('should list every stop, in order', () => {
-    render();
+    pluses[1].click();
 
+    expect(emitted.map((destination) => destination.id)).toEqual(['kyoto']);
+  });
+
+  it('is a real button with an accessible expand/collapse label', () => {
+    show();
+
+    const chevrons = element().querySelectorAll<HTMLButtonElement>('.atlas-list__chevron');
+    expect(chevrons).toHaveLength(2);
+    expect(chevrons[0].tagName).toBe('BUTTON');
+    expect(chevrons[0].getAttribute('aria-expanded')).toBe('false');
+    expect(chevrons[0].getAttribute('aria-label')).toBe('Show stops in Kyoto');
+    expect(chevrons[0].getAttribute('aria-controls')).toBe('atlas-stops-kyoto');
+  });
+
+  it('emits the destination to toggle and shows its stops when expanded', () => {
+    show();
+    const emitted: string[] = [];
+    fixture.componentInstance.toggleDestination.subscribe((id) => emitted.push(id));
+
+    element().querySelectorAll<HTMLButtonElement>('.atlas-list__chevron')[0].click();
+
+    expect(emitted).toEqual(['kyoto']);
+
+    show({ expanded: new Set(['kyoto']) });
+
+    const panel = element().querySelector<HTMLElement>('#atlas-stops-kyoto');
+    expect(panel?.hidden).toBe(false);
     expect(
-      stopRows().map((row) => row.querySelector('.atlas-list__name')?.textContent?.trim()),
-    ).toEqual(['Rome', 'Amalfi', 'Naples', 'Reykjavík']);
+      [...element().querySelectorAll('.atlas-stops__node')].map((node) => node.textContent?.trim()),
+    ).toEqual(['1a', '1b']);
+    expect(
+      element().querySelectorAll<HTMLButtonElement>('.atlas-list__chevron')[0].getAttribute(
+        'aria-expanded',
+      ),
+    ).toBe('true');
   });
 
-  it('should number the stops on the whole route', () => {
-    render();
+  it('hides the stops of a collapsed destination and leaves another independent', () => {
+    show({ expanded: new Set(['kyoto']) });
 
-    const numbers = [...element().querySelectorAll('.route__node')].map((node) =>
-      node.textContent?.trim(),
-    );
+    const panels = element().querySelectorAll<HTMLElement>('.atlas-list__stops');
+    expect(panels[0].hidden).toBe(false);
+    expect(panels[1].hidden).toBe(true);
 
-    expect(numbers).toEqual(['01', '02', '03', '04']);
+    const chevrons = element().querySelectorAll<HTMLButtonElement>('.atlas-list__chevron');
+    expect(chevrons[0].getAttribute('aria-expanded')).toBe('true');
+    expect(chevrons[1].getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('should read the dates of a stop, or say they are not decided', () => {
-    render();
+  it('labels more than twenty-six stops without colliding', () => {
+    const many = Array.from({ length: 27 }, (_, index) => stop(`Stop ${index}`, index));
+    show({
+      destinations: [{ ...kyoto, stops: many }],
+      expanded: new Set(['kyoto']),
+    });
 
-    const facts = [...element().querySelectorAll('.route__dates-text')].map((node) =>
-      node.textContent?.trim(),
-    );
+    const labels = [
+      ...element().querySelectorAll('.atlas-stops__node'),
+    ].map((node) => node.textContent?.trim());
 
-    expect(facts).toEqual([
-      '1 Apr – 4 Apr 2027',
-      'Dates not decided',
-      'Dates not decided',
-      '6 Apr – 9 Apr 2027',
+    expect(labels[0]).toBe('1a');
+    expect(labels[25]).toBe('1z');
+    expect(labels[26]).toBe('1aa');
+    expect(new Set(labels).size).toBe(27);
+  });
+
+  it('selects a destination, a stop and an unfiled place', () => {
+    show({ unfiledPlaces: [unfiled] });
+    const selected: AtlasSelection[] = [];
+    fixture.componentInstance.select.subscribe((selection) => selected.push(selection));
+
+    element().querySelector<HTMLButtonElement>('.atlas-list__item')?.click();
+    show({ unfiledPlaces: [unfiled], expanded: new Set(['kyoto']) });
+    const stopButton = element().querySelector<HTMLButtonElement>('.atlas-list__item--stop');
+    stopButton?.click();
+    element()
+      .querySelector<HTMLButtonElement>('.atlas-list__unfiled-section .atlas-places__item')
+      ?.click();
+
+    expect(selected).toEqual([
+      { kind: 'destination', id: 'kyoto' },
+      { kind: 'stop', id: 'Gion' },
+      { kind: 'place', id: 'Someday' },
     ]);
   });
 
-  it('should mark a stop that is not on the map', () => {
-    render();
+  it('reads the planned places by day', () => {
+    show({ expanded: new Set(['kyoto']) });
 
-    const flags = [...element().querySelectorAll('.atlas-list__flag')].map((node) =>
-      node.textContent?.trim(),
-    );
+    const text = element().textContent ?? '';
 
-    expect(flags).toEqual(['Not on the map', 'Not on the map']);
+    expect(text).toContain('Plan by day');
+    expect(text).toContain('Arashiyama');
+    expect(text).toContain('Kyoto');
   });
 
-  it('should own up to a route that is only partly on the map', () => {
-    render();
+  it('keeps a legacy unfiled place accessible and can file it under a destination', () => {
+    show({ unfiledPlaces: [unfiled] });
 
-    expect(element().querySelector('.atlas-list__note')?.textContent).toContain(
-      '2 of 4 stops are on the map',
-    );
-  });
+    expect(element().textContent).toContain('Not yet in a destination');
+    expect(element().textContent).toContain('Sightseeing');
 
-  it('should say when there are no stops at all', () => {
-    render({ destinations: [] });
+    const select = element().querySelector<HTMLSelectElement>('.atlas-list__file-select');
+    if (select !== null) {
+      select.value = 'kyoto';
+    }
 
-    expect(element().textContent).toContain('No destinations recorded');
-    expect(stopRows()).toHaveLength(0);
-  });
+    const emitted: { place: TripStop; parentId: string }[] = [];
+    fixture.componentInstance.filePlace.subscribe((event) => emitted.push(event));
 
-  it('should mark the selected stop', () => {
-    render({ selection: { kind: 'destination', id: 'd4' } });
+    const buttons = element().querySelectorAll<HTMLButtonElement>('.atlas-places__file button');
+    buttons[0].click();
 
-    const pressed = stopRows().filter((row) => row.getAttribute('aria-pressed') === 'true');
-
-    expect(pressed).toHaveLength(1);
-    expect(pressed[0].textContent).toContain('Reykjavík');
-  });
-
-  it('should say which stop was chosen', () => {
-    render();
-
-    const chosen: { kind: string; id: string }[] = [];
-    fixture.componentInstance.select.subscribe((selection) => chosen.push(selection));
-
-    stopRows()[2].click();
-
-    expect(chosen).toEqual([{ kind: 'destination', id: 'c3' }]);
-  });
-
-  it('should read the saved places as a plan, grouped by the stop they are filed to', () => {
-    render({ places });
-
-    expect(groupNames()).toEqual(['Rome', 'Not filed under a stop']);
-    expect(groups()).toHaveLength(2);
-
-    const rome = groups()[0].querySelectorAll('.atlas-places__name');
-    const unfiled = groups()[1].querySelectorAll('.atlas-places__name');
-
-    expect([...rome].map((node) => node.textContent?.trim())).toEqual(['Fushimi Inari']);
-    expect([...unfiled].map((node) => node.textContent?.trim())).toEqual(['Nishiki Market']);
-  });
-
-  it('should carry the stop number, its dates and its count on the group heading', () => {
-    render({ places });
-
-    const head = groupHeads()[0];
-
-    expect(head.querySelector('.atlas-plan__number')?.textContent?.trim()).toBe('01');
-    expect(head.querySelector('.atlas-plan__dates')?.textContent?.trim()).toBe('1 Apr – 4 Apr 2027');
-    expect(head.querySelector('.atlas-plan__count')?.textContent?.trim()).toBe('1 place');
-  });
-
-  it('should not repeat the stop on every place row', () => {
-    render({ places });
-
-    // The heading says it once; a `Near Rome` on the row would say it twice.
-    expect(placeRows()[0].textContent).not.toContain('Near');
-  });
-
-  it('should leave out a stop with nothing filed under it', () => {
-    render({ places });
-
-    expect(groupNames()).toEqual(['Rome', 'Not filed under a stop']);
-    expect(groupNames()).not.toContain('Amalfi');
-  });
-
-  it('should say how many places are in the unfiled group', () => {
-    render({ places });
-
-    expect(
-      groupHeads()[1].querySelector('.atlas-plan__count')?.textContent?.trim(),
-    ).toBe('1 place');
-  });
-
-  it('should name each list by its group heading', () => {
-    render({ places });
-
-    const head = groupHeads()[0];
-    const list = groups()[0].querySelector('.atlas-places');
-
-    expect(head.id).toBeTruthy();
-    expect(list?.getAttribute('aria-labelledby')).toBe(head.id);
-  });
-
-  it('should hint at filing only on the unfiled group', () => {
-    render({ places });
-
-    expect(groups()[0].querySelector('.atlas-plan__hint')).toBeNull();
-    expect(groups()[1].querySelector('.atlas-plan__hint')?.textContent).toContain(
-      'File a place under a stop',
-    );
-  });
-
-  it('should list the saved places with their category and context', () => {
-    render({ places });
-
-    expect(placeRows()).toHaveLength(2);
-
-    const first = placeRows()[0];
-
-    expect(first.textContent).toContain('Fushimi Inari');
-    expect(first.querySelector('.atlas-places__category')?.textContent).toContain('Sight');
-    expect(first.querySelector('.atlas-places__where')?.textContent).toContain('Kyoto');
-  });
-
-  it('should mark the selected place, and only the selected one', () => {
-    render({ places, selection: { kind: 'place', id: 'p2' } });
-
-    const pressed = placeRows().filter((row) => row.getAttribute('aria-pressed') === 'true');
-
-    expect(pressed).toHaveLength(1);
-    expect(pressed[0].textContent).toContain('Nishiki Market');
-    expect(stopRows().some((row) => row.getAttribute('aria-pressed') === 'true')).toBe(false);
-  });
-
-  it('should say which place was chosen', () => {
-    render({ places });
-
-    const chosen: { kind: string; id: string }[] = [];
-    fixture.componentInstance.select.subscribe((selection) => chosen.push(selection));
-
-    placeRows()[1].click();
-
-    expect(chosen).toEqual([{ kind: 'place', id: 'p2' }]);
-  });
-
-  it('should count every place saved, filed or not', () => {
-    render({ places });
-
-    expect(
-      element().querySelector('.atlas-list__places-section .section-head__meta')?.textContent,
-    ).toContain('2 places');
-  });
-
-  it('should say when nothing is saved yet', () => {
-    render();
-
-    expect(element().textContent).toContain('Nothing saved yet');
-    expect(groups()).toHaveLength(0);
-  });
-
-  it('should say when the places are still loading, without hiding the route', () => {
-    render({ placesLoading: true });
-
-    expect(element().textContent).toContain('Loading saved places');
-    expect(stopRows()).toHaveLength(4);
-  });
-
-  it('should say when the places could not be loaded, and offer to try again', () => {
-    render({ placesError: 'The Tabiji API could not be reached.' });
-
-    expect(element().textContent).toContain('The Tabiji API could not be reached.');
-
-    // The route is still there: a failure of the places is not a failure of
-    // the trip.
-    expect(stopRows()).toHaveLength(4);
-
-    let retried = false;
-    fixture.componentInstance.retryPlaces.subscribe(() => (retried = true));
-
-    const retry = [...element().querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('Try again'),
-    ) as HTMLButtonElement;
-
-    retry.click();
-
-    expect(retried).toBe(true);
-  });
-
-  it('should treat a place filed under a stop that has gone as unfiled', () => {
-    render({ places: [{ ...places[0], destinationId: 'gone' }] });
-
-    // The place is still saved to the trip, so it must still be listed.
-    expect(groupNames()).toEqual(['Not filed under a stop']);
-    expect(placeRows()).toHaveLength(1);
+    expect(emitted).toEqual([{ place: unfiled, parentId: 'kyoto' }]);
   });
 });

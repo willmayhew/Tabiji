@@ -28,69 +28,98 @@ import { environment } from '../../../environments/environment';
 import { GeocodingService } from '../../core/api/geocoding.service';
 import { describeHttpError } from '../../core/api/http-error';
 import {
-  PLACE_CATEGORIES,
-  PLACE_NAME_MAX_LENGTH,
   PLACE_NOTES_MAX_LENGTH,
   PlaceCategory,
   PlaceSuggestion,
-  SavedPlace,
-  SavedPlaceDraft,
 } from '../../core/models/place';
-import { TripDestination } from '../../core/models/trip';
+import {
+  PLACE_ADDRESS_MAX_LENGTH,
+  TripDestination,
+  TripStop,
+  TRIP_DESTINATION_MAX_LENGTH,
+} from '../../core/models/trip';
+import {
+  PLACE_CATEGORIES_ALPHABETICALLY,
+  placeCategoryLabel,
+} from '../../shared/format/place-labels';
+import { validatePlaceDay } from '../../shared/validate/place-day';
 
 /** How long the editor waits after a keystroke before asking the geocoder. */
 const SEARCH_DEBOUNCE_MS = 300;
 
+/** What the stop editor hands back, before the screen writes the trip. */
+export interface StopDraft {
+  name: string;
+  startsOn: string | null;
+  endsOn: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  category: PlaceCategory | null;
+  address: string | null;
+  notes: string | null;
+  plannedOn: string | null;
+}
+
 /**
- * Adds a place to a trip, or changes one that is already saved.
+ * Adds or edits a stop within a parent destination.
  *
- * The editor holds a **draft**. Searching and choosing a result fills the
- * draft and nothing else: the place is written only when the reader confirms,
- * so backing out leaves the trip exactly as it was.
+ * A stop is a place: its name, position, category, address, notes and planned
+ * day are all part of the same row. The stay dates are optional and separate
+ * from the planned day: the stay is bounded by the destination when it has
+ * dates, the planned day by the trip.
  *
- * The search talks to the geocoder through `GeocodingService`, the same
- * abstraction the map picker uses, so the provider can be replaced without
- * touching this dialog. The place itself is written by the screen above, which
- * owns the request and its failures — this only says what the reader wants
- * saved.
+ * The editor holds a draft. Nothing is written until the reader confirms; the
+ * screen above owns the request and its failures.
  */
 @Component({
-  selector: 'app-place-editor',
+  selector: 'app-stop-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './place-editor.html',
-  styleUrl: './place-editor.css',
+  templateUrl: './stop-editor.html',
+  styleUrl: './stop-editor.css',
 })
-export class PlaceEditor {
+export class StopEditor {
   private readonly geocoding = inject(GeocodingService);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** Whether the editor is on screen. The parent owns this. */
   readonly open = input(false);
 
-  /** The place being changed, or null when one is being added. */
-  readonly place = input<SavedPlace | null>(null);
+  /** The destination the stop belongs to. */
+  readonly parent = input<TripDestination | null>(null);
 
-  /** The trip's stops, so a place can be filed under one of them. */
-  readonly destinations = input<readonly TripDestination[]>([]);
+  /** The stop being changed, or null when one is being added. */
+  readonly stop = input<TripStop | null>(null);
 
-  /** Whether the screen above is writing the place. */
+  /** The first day of the trip. */
+  readonly tripStartsOn = input('');
+
+  /** The last day of the trip. */
+  readonly tripEndsOn = input('');
+
   readonly saving = input(false);
 
-  /** What the screen above was told when the write failed. */
   readonly error = input<string | null>(null);
 
-  /** Emits the draft the reader confirmed. */
-  readonly save = output<SavedPlaceDraft>();
+  readonly save = output<StopDraft>();
 
-  /** Emits when the reader backs out. Nothing is changed. */
   readonly dismissed = output<void>();
 
-  protected readonly categories = PLACE_CATEGORIES;
-  protected readonly nameMaxLength = PLACE_NAME_MAX_LENGTH;
+  protected readonly categories = PLACE_CATEGORIES_ALPHABETICALLY;
+  protected readonly categoryLabel = placeCategoryLabel;
+  protected readonly nameMaxLength = TRIP_DESTINATION_MAX_LENGTH;
   protected readonly notesMaxLength = PLACE_NOTES_MAX_LENGTH;
   protected readonly attribution = environment.map.attribution;
 
-  protected readonly editing = computed(() => this.place() !== null);
+  protected readonly editing = computed(() => this.stop() !== null);
+
+  protected readonly title = computed(() => {
+    if (this.editing()) {
+      return `Edit ${this.stop()?.name ?? 'stop'}`;
+    }
+
+    const parent = this.parent();
+
+    return parent === null ? 'Add a stop' : `Add a stop in ${parent.name}`;
+  });
 
   // Search state, kept apart from the draft.
   protected readonly query = signal('');
@@ -105,9 +134,10 @@ export class PlaceEditor {
   protected readonly longitude = signal<number | null>(null);
   protected readonly address = signal<string | null>(null);
   protected readonly category = signal<PlaceCategory | null>(null);
-  protected readonly destinationId = signal<string | null>(null);
+  protected readonly plannedOn = signal<string | null>(null);
+  protected readonly startsOn = signal('');
+  protected readonly endsOn = signal('');
   protected readonly notes = signal('');
-
   protected readonly submitted = signal(false);
 
   /** The position the draft carries, in words, so it can be checked by eye. */
@@ -131,23 +161,85 @@ export class PlaceEditor {
       return 'This field is required.';
     }
 
-    return value.length > PLACE_NAME_MAX_LENGTH
-      ? `Use at most ${PLACE_NAME_MAX_LENGTH} characters.`
+    return value.length > TRIP_DESTINATION_MAX_LENGTH
+      ? `Use at most ${TRIP_DESTINATION_MAX_LENGTH} characters.`
       : null;
   });
 
-  protected readonly positionError = computed(() => {
-    if (!this.submitted()) {
-      return null;
+  /** The lower bound of the stay: the destination's start, or the trip's. */
+  protected readonly lowerBound = computed(() => {
+    const parent = this.parent();
+
+    return parent?.startsOn ?? this.tripStartsOn();
+  });
+
+  /** The upper bound of the stay: the destination's end, or the trip's. */
+  protected readonly upperBound = computed(() => {
+    const parent = this.parent();
+
+    return parent?.endsOn ?? this.tripEndsOn();
+  });
+
+  protected readonly lowerLabel = computed(() =>
+    this.parent()?.startsOn != null ? 'the destination starts' : 'the trip starts',
+  );
+
+  protected readonly upperLabel = computed(() =>
+    this.parent()?.endsOn != null ? 'the destination ends' : 'the trip ends',
+  );
+
+  /**
+   * The stay's own dates. They are optional, but when they are given they must
+   * fall inside the destination when it has dates, and inside the trip
+   * everywhere else. Editing a stop never changes its destination's dates.
+   */
+  protected readonly dateError = computed(() => {
+    const startsOn = this.startsOn();
+    const endsOn = this.endsOn();
+
+    if (startsOn.length > 0 && endsOn.length > 0 && endsOn < startsOn) {
+      return 'The end date must be on or after the start date.';
     }
 
-    return this.latitude() === null || this.longitude() === null
-      ? 'Choose a place from the search first.'
-      : null;
+    const lower = this.lowerBound();
+    const upper = this.upperBound();
+
+    if (startsOn.length > 0 && lower.length > 0 && startsOn < lower) {
+      return `The first day cannot be before ${this.lowerLabel()}.`;
+    }
+
+    if (startsOn.length > 0 && upper.length > 0 && startsOn > upper) {
+      return `The first day cannot be after ${this.upperLabel()}.`;
+    }
+
+    if (endsOn.length > 0 && lower.length > 0 && endsOn < lower) {
+      return `The last day cannot be before ${this.lowerLabel()}.`;
+    }
+
+    if (endsOn.length > 0 && upper.length > 0 && endsOn > upper) {
+      return `The last day cannot be after ${this.upperLabel()}.`;
+    }
+
+    return null;
   });
 
+  /**
+   * The planned day is a calendar day of the trip, independent of the stay.
+   * It is shown as soon as it is wrong, because the reader picked it from a
+   * calendar; the API remains the authority.
+   */
+  protected readonly dayError = computed(() =>
+    validatePlaceDay(this.tripStartsOn(), this.tripEndsOn(), this.plannedOn(), this.name()),
+  );
+
   protected readonly canSave = computed(
-    () => this.name().trim().length > 0 && this.latitude() !== null && this.longitude() !== null,
+    () =>
+      this.name().trim().length > 0 &&
+      this.name().trim().length <= TRIP_DESTINATION_MAX_LENGTH &&
+      this.dayError() === null &&
+      this.dateError() === null &&
+      this.notes().trim().length <= PLACE_NOTES_MAX_LENGTH &&
+      (this.address()?.length ?? 0) <= PLACE_ADDRESS_MAX_LENGTH,
   );
 
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dialog');
@@ -188,9 +280,6 @@ export class PlaceEditor {
         this.searched.set(true);
       });
 
-    // Only `open` decides whether the dialog is shown. Everything the opening
-    // and closing do is untracked, so editing the draft never runs the effect
-    // again and never resets what the reader has written.
     effect(() => {
       const open = this.open();
 
@@ -238,13 +327,13 @@ export class PlaceEditor {
   /**
    * Fills the draft from a search result. The name is the place's own short
    * name and the address is the fuller line that tells it apart, so two
-   * places with the same name remain distinct in a list.
+   * places with the same name remain distinct.
    */
   protected choose(place: PlaceSuggestion): void {
     this.name.set(place.name);
     this.latitude.set(place.latitude);
     this.longitude.set(place.longitude);
-    this.address.set(place.label);
+    this.address.set(place.label.slice(0, PLACE_ADDRESS_MAX_LENGTH));
 
     this.query.set('');
     this.results.set([]);
@@ -263,10 +352,19 @@ export class PlaceEditor {
     this.category.set(value === '' ? null : (value as PlaceCategory));
   }
 
-  protected onDestination(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
+  /** An emptied date field leaves the plan or the stay unset. */
+  protected onPlannedOn(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
 
-    this.destinationId.set(value === '' ? null : value);
+    this.plannedOn.set(value === '' ? null : value);
+  }
+
+  protected onStartsOn(event: Event): void {
+    this.startsOn.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onEndsOn(event: Event): void {
+    this.endsOn.set((event.target as HTMLInputElement).value);
   }
 
   protected onNotes(event: Event): void {
@@ -277,10 +375,7 @@ export class PlaceEditor {
     event.preventDefault();
     this.submitted.set(true);
 
-    const latitude = this.latitude();
-    const longitude = this.longitude();
-
-    if (!this.canSave() || latitude === null || longitude === null) {
+    if (!this.canSave()) {
       return;
     }
 
@@ -288,12 +383,14 @@ export class PlaceEditor {
 
     this.save.emit({
       name: this.name().trim(),
-      latitude,
-      longitude,
+      startsOn: this.startsOn() || null,
+      endsOn: this.endsOn() || null,
+      latitude: this.latitude(),
+      longitude: this.longitude(),
       category: this.category(),
       address: this.address(),
       notes: notes.length > 0 ? notes : null,
-      destinationId: this.destinationId(),
+      plannedOn: this.plannedOn(),
     });
   }
 
@@ -302,7 +399,6 @@ export class PlaceEditor {
     this.dismissed.emit();
   }
 
-  /** A click on the dialog's backdrop, but not on the panel itself. */
   protected onBackdropClick(event: MouseEvent): void {
     if (event.target === this.dialog()?.nativeElement) {
       this.dismiss();
@@ -361,35 +457,27 @@ export class PlaceEditor {
     this.longitude.set(null);
     this.address.set(null);
     this.category.set(null);
-    this.destinationId.set(null);
+    this.plannedOn.set(null);
+    this.startsOn.set('');
+    this.endsOn.set('');
     this.notes.set('');
   }
 
   private seedDraft(): void {
-    const place = this.place();
+    const stop = this.stop();
 
-    if (place === null) {
+    if (stop === null) {
       return;
     }
 
-    this.name.set(place.name);
-    this.latitude.set(place.latitude);
-    this.longitude.set(place.longitude);
-    this.address.set(place.address);
-    this.category.set(place.category);
-    this.destinationId.set(this.knownDestinationId(place.destinationId));
-    this.notes.set(place.notes ?? '');
-  }
-
-  /**
-   * A place filed under a stop that has since gone is offered as unassigned,
-   * so the selector cannot show a stop the trip no longer has.
-   */
-  private knownDestinationId(destinationId: string | null): string | null {
-    if (destinationId === null) {
-      return null;
-    }
-
-    return this.destinations().some((stop) => stop.id === destinationId) ? destinationId : null;
+    this.name.set(stop.name);
+    this.latitude.set(stop.latitude);
+    this.longitude.set(stop.longitude);
+    this.address.set(stop.address ?? null);
+    this.category.set(stop.category ?? null);
+    this.plannedOn.set(stop.plannedOn ?? null);
+    this.startsOn.set(stop.startsOn ?? '');
+    this.endsOn.set(stop.endsOn ?? '');
+    this.notes.set(stop.notes ?? '');
   }
 }

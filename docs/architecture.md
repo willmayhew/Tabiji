@@ -152,17 +152,50 @@ public sealed class TripDestination
 
     public Guid Id { get; private set; }
     public Guid TripId { get; private set; }
+    public Guid? ParentDestinationId { get; private set; }
+    public TripPlaceKind Kind { get; private set; }
     public string Name { get; private set; }
     public int SortOrder { get; private set; }
     public DateOnly? StartsOn { get; private set; }
     public DateOnly? EndsOn { get; private set; }
     public double? Latitude { get; private set; }
     public double? Longitude { get; private set; }
+    public PlaceCategory? Category { get; private set; }
+    public string? Address { get; private set; }
+    public string? Notes { get; private set; }
+    public DateOnly? PlannedOn { get; private set; }
+    public DateTimeOffset? CreatedAt { get; private set; }
 }
 ```
 
 `TripDestination.Create` is `internal`, so the owning trip is the only thing that can make
 one, and it is the only thing that can put it on a route.
+
+**A destination, a stop and a legacy place.** `Kind` says what a row is:
+`Destination` is a parent on the main route, `Stop` is a place within one of those
+destinations, and `Place` is a legacy saved place that has not been filed under a
+destination. A destination and a place carry a null `ParentDestinationId`; a stop carries
+its destination's id. A trip's route is `Trip.ParentDestinations`, ordered by `SortOrder`;
+a destination's stops are `Trip.StopsOf(parentId)`, ordered within that destination;
+`Trip.UnfiledPlaces` is the legacy `Place` rows. `Trip.Destinations` is the flat list of
+every row, which is what EF Core loads.
+
+The hierarchy is deliberately **one level**. A stop may name a destination as its parent;
+it may never be a parent itself. The domain enforces that, and
+`TripDestination.ParentDestinationId` is not a recursive navigation: only the parent id is
+stored. `Trip.ReorderDestinations` moves destinations; `Trip.ReorderStops` moves stops
+within one destination; neither ever promotes a stop to the main route. A stop's dates must
+fall inside its destination's dates when the destination has them, and inside the trip
+everywhere else; there is no chronological requirement among stops, because a stop is a
+part of the place rather than a leg of the journey.
+
+**A stop is the place.** It carries its own name, optional stay dates, optional
+coordinates, optional category, optional address, optional notes and an optional planned
+day. There is no parallel saved-place list in the Atlas: the Add a stop action under a
+destination is the one way to add a place, and the stop itself holds every field a saved
+place used to hold. Planned days keep their meaning — a calendar day of the trip, not a
+day of the stay — and `TripSchedule.EnsureIsATripDay` validates them in the same aggregate
+that owns the trip.
 
 **The dates describe the planned stay at a stop.** They are the days the traveller expects
 to be there, not a replacement for the trip's own dates. Both are optional, and either may
@@ -255,8 +288,55 @@ is refused; a stop the drafts leave out is removed.
 ```csharp
 public sealed record TripDestinationDraft(
     Guid? Id, string Name, DateOnly? StartsOn, DateOnly? EndsOn,
-    double? Latitude = null, double? Longitude = null);
+    double? Latitude = null, double? Longitude = null,
+    IReadOnlyList<TripStopDraft>? Stops = null,
+    PlaceCategory? Category = null, string? Address = null,
+    string? Notes = null, DateOnly? PlannedOn = null,
+    DateTimeOffset? CreatedAt = null);
 ```
+
+`TripStopDraft` carries the same place fields, plus the stop's own `Id`. A draft without
+an identity is a new stop; an identity names a stop, or a legacy unfiled place being
+filed, and is kept. A stop left out of its destination's drafts is removed.
+
+### 5.1.3 A place's details and its planned day
+
+A stop is the place. Its name, position, category, address, notes and planned day are
+columns on the same `TripDestinations` row, not a parallel `SavedPlace` aggregate. That is
+what makes the Atlas's one Add a stop action possible: the stop the reader adds under a
+destination is the same row that holds the category, the address, the note and the day.
+
+The optional `PlannedOn` is the day of the trip the place is planned for. It is a
+**calendar day, not a count of days from the start**, so a plan names the same day however
+the trip is described. It is independent of the stop's stay dates: a stop may be stayed at
+for three days and planned for one of them, or planned for a different day of the trip.
+
+**The planned day must be one of the trip's days.** `TripSchedule.EnsureIsATripDay`
+compares it against the trip's own dates with both ends inclusive — the inclusivity a
+stop's dates already obey — and refuses it in the same voice:
+
+```
+"Fushimi Inari" is planned for 12 April 2027, which is after the trip ends on 10 April 2027.
+```
+
+The rule runs in `Trip.ApplyRoute`/`Trip.Create`, so it is checked before anything is
+changed. Only the **trip's** dates bound the plan; the stop's stay dates do not, because a
+place may be visited on another day of the trip. The day plan shows which stop covers a
+day instead.
+
+**A rescheduled trip does not rewrite a plan.** Shortening a trip can leave a planned day
+outside the new dates. Such a day is read under **"Outside the trip's dates"** and kept
+until the reader moves it or takes it off. Refusing the trip edit would block a page that
+cannot show places, and clearing the day would destroy a plan the reader made; showing it
+does neither. The database has no check constraint on the day, because the bounds live in
+another row; the domain is the authority.
+
+**The legacy unfiled places.** A `Place` row is a saved place that was never filed under a
+destination. New places are never created as `Place`; the row exists so the migration can
+keep old saved places readable. The Atlas shows them in a transitional "Not yet in a
+destination" section, and filing one turns it into a `Stop` with the same identity and all
+of its details. The read-only `GET /api/trips/{tripId}/places` route maps the same rows for
+one release; the trip API is the only writer.
 
 
 ### 5.2 Application
@@ -293,16 +373,37 @@ entity configurations found in its own assembly.
 |---|---|---|
 | `Id` | `Id` | `uniqueidentifier` |
 | `TripId` | `TripId` | `uniqueidentifier` |
+| `ParentDestinationId` | `ParentDestinationId` | `uniqueidentifier`, nullable |
+| `Kind` | `Kind` | `nvarchar(20)` |
 | `Name` | `Name` | `nvarchar(200)` |
 | `SortOrder` | `SortOrder` | `int` |
 | `StartsOn` | `StartsOn` | `date`, nullable |
 | `EndsOn` | `EndsOn` | `date`, nullable |
 | `Latitude` | `Latitude` | `float`, nullable |
 | `Longitude` | `Longitude` | `float`, nullable |
+| `Category` | `Category` | `nvarchar(30)`, nullable |
+| `Address` | `Address` | `nvarchar(300)`, nullable |
+| `Notes` | `Notes` | `nvarchar(1000)`, nullable |
+| `PlannedOn` | `PlannedOn` | `date`, nullable |
+| `CreatedAt` | `CreatedAt` | `datetimeoffset`, nullable |
 
-The foreign key to `Trips` cascades, and a **unique** index on `(TripId, SortOrder)` makes
-it impossible for a trip to hold two stops in the same position. The same index covers the
-foreign-key lookup, so one index does both jobs.
+The `Kind` column is stored as a string (`Destination`, `Stop`, `Place`). The
+**unique** index is on `(TripId, Kind, ParentDestinationId, SortOrder)`: it makes it
+impossible for a trip to hold two places in the same position of the same scope. The kind
+keeps the two parentless scopes — the main route and the legacy unfiled places — apart,
+while a stop is scoped by its parent. A separate index on `ParentDestinationId` covers the
+self-foreign-key lookup.
+
+`CK_TripDestinations_Kind` states the single-row shape: a `Stop` has a parent; a
+`Destination` or a `Place` does not. Deeper nesting and same-trip ownership remain domain
+rules.
+
+The self-key to `TripDestinations` is **NO ACTION** rather than Cascade. A cascading key
+from `Trips` to `TripDestinations` and a cascading self-key would give SQL Server two
+cascade paths to the same table, which it refuses. `TripRepository` removes the stops in the
+same transaction that removes their destination. A check constraint
+`CK_TripDestinations_Parent` refuses a row that names itself as its parent; one-level
+nesting and same-trip ownership are domain rules.
 
 A **check constraint** `CK_TripDestinations_Dates` refuses a stop that ends before it
 starts. It is a belt-and-braces guard on a single row: the domain is the authority on this,
@@ -311,6 +412,13 @@ and the rule that spans the whole route cannot be written in SQL at all.
 A second check constraint, `CK_TripDestinations_Coordinates`, refuses a row that carries
 half a pair of coordinates or a pair off the globe. It is the same kind of guard: the
 domain is the authority, and the database is the backstop.
+
+The unified migration adds one column that is **not** part of the EF model:
+`MigratedFromSavedPlace`. It marks the rows copied from the old `SavedPlaces` table so the
+Down migration can move exactly those rows back without touching a stop that was already
+part of the hierarchy. The old table is renamed to `SavedPlaces_Legacy` and kept for one
+release as an archive; its foreign keys are dropped so it cannot block a destination
+deletion. The app does not map it and does not write to it.
 
 `Status` is stored as a string rather than an integer so that the stored value stays
 readable and adding an enum member cannot silently change the meaning of existing rows.
@@ -417,6 +525,75 @@ Every existing stop gets `NULL` for both, which reads as *"this place was typed 
 the honest answer for a stop that never came from a map. The client sends coordinates only
 when a place is chosen from the map, so nothing in the existing data needs a backfill.
 
+### 5.3.5 The migration that gave destinations their stops
+
+`<timestamp>_AddDestinationHierarchy` is additive and moves no data. It adds the nullable
+`ParentDestinationId` column, replaces the old unique index on `(TripId, SortOrder)` with
+the scope-aware unique index, adds the parent index, the self-key and the self-parent check
+constraint:
+
+```sql
+ALTER TABLE [TripDestinations] ADD [ParentDestinationId] uniqueidentifier NULL;
+
+DROP INDEX [IX_TripDestinations_TripId_SortOrder] ON [TripDestinations];
+
+CREATE UNIQUE INDEX [IX_TripDestinations_TripId_ParentDestinationId_SortOrder]
+    ON [TripDestinations] ([TripId], [ParentDestinationId], [SortOrder]);
+
+CREATE INDEX [IX_TripDestinations_ParentDestinationId]
+    ON [TripDestinations] ([ParentDestinationId]);
+
+ALTER TABLE [TripDestinations] ADD CONSTRAINT [FK_TripDestinations_TripDestinations_ParentDestinationId]
+    FOREIGN KEY ([ParentDestinationId]) REFERENCES [TripDestinations] ([Id])
+    ON DELETE NO ACTION;
+
+ALTER TABLE [TripDestinations] ADD CONSTRAINT [CK_TripDestinations_Parent]
+    CHECK ([ParentDestinationId] IS NULL OR [ParentDestinationId] <> [Id]);
+```
+
+Every existing row keeps `ParentDestinationId = NULL`, so every existing destination becomes
+a **destination on the main route**. No parent-child relationship is invented, and no ID,
+date, coordinate, route position or saved-place association changes. `Down` refuses to run
+while a nested stop exists, so a rollback cannot silently destroy a hierarchy; with only
+parent rows it drops everything it added and recreates the old index.
+`backend/verify-migration.sql` holds the queries that confirm the preservation and the
+hierarchy's shape.
+
+`TripRepository.UpdateAsync` parks every position in the trip at a unique parked value, then
+writes the destination each kept stop belongs to, then writes the final positions. Parking
+with a global row number (rather than a constant offset per scope) is what lets two stops
+swap destinations in one transaction without colliding on the unique index. A removed stop
+is the place itself, so deleting the row removes its category, address, notes and planned
+day with it; there is no separate saved-place association to unlink. Unfiled places are not
+children of a stop, so they survive a destination or stop removal.
+
+### 5.3.6 The migration that unified stops and saved places
+
+`<timestamp>_UnifyStopsAndSavedPlaces` makes `TripDestinations` the one place table. It
+adds `Kind`, `Category`, `Address`, `Notes`, `PlannedOn`, `CreatedAt` and the rollback
+marker `MigratedFromSavedPlace`; backfills existing rows as `Destination` or `Stop`; and
+copies every `SavedPlaces` row into the table in one transaction:
+
+- a saved place filed under a parent becomes a `Stop` under that parent;
+- a saved place filed under a nested stop is flattened to that stop's parent, because the
+  hierarchy is one level;
+- an unfiled saved place becomes a `Place` with no parent;
+- the saved-place ID, name, coordinates, category, address, notes, planned day and
+  `CreatedAt` are preserved. Duplicate positions are appended after the existing stops of
+  the same parent; unfiled places get their own per-trip order.
+
+It then creates the `(TripId, Kind, ParentDestinationId, SortOrder)` unique index and
+`CK_TripDestinations_Kind`, renames the old table to `SavedPlaces_Legacy`, and drops its
+foreign keys so the archive cannot block a destination deletion. The archive is kept for
+one release; the app does not map it. `Down` recreates `SavedPlaces`, copies only the rows
+marked `MigratedFromSavedPlace`, deletes those rows from the unified table, restores the old
+index and drops the new columns and the archive. A real-database test applies the Up and
+the Down and checks the preserved row and the original destination.
+
+`backend/verify-migration.sql` holds the preservation and shape queries, including the
+legacy-ID comparison, the `Kind`/parent invariant, the duplicate-position check and the
+planned-day and coordinate checks.
+
 ### 5.4 API
 
 `Program.cs` is a thin composition root. It calls `AddApplication()`,
@@ -431,23 +608,59 @@ Endpoints:
 | `POST` | `/api/trips` | Creates a trip. `201` with the trip, `400` on invalid input. |
 | `GET` | `/api/trips/{id}` | Returns a trip, or `404`. |
 | `PUT` | `/api/trips/{id}` | Replaces a trip and its route. `200` with the trip, `400` on invalid input, `404` when there is no such trip. |
+| `GET` | `/api/trips/{tripId}/places` | Read-only compatibility view of the places that carry a position. It maps stop and unfiled-place rows; the write routes are retired. |
+| `GET` | `/api/trips/{tripId}/places/{placeId}` | The read-only compatibility view of one such place. |
 | `GET` | `/health` | Liveness. Never touches the database. |
 | `GET` | `/health/ready` | Readiness. Verifies the database is reachable. |
 | `GET` | `/openapi/v1.json` | The OpenAPI document. |
 
-**Creating a trip takes an ordered array of stops.** The order of the array is the order of
-the stops, and each stop carries the optional days of its stay:
+**Creating a trip takes an ordered array of destinations, each with its stops.** The order
+of the array is the order of the main route; the order of each `stops` array is the order
+within that destination. A stop never becomes a destination on the route:
 
 ```json
 {
   "name": "Japan Adventure",
-  "startsOn": "2027-05-16",
-  "endsOn": "2027-06-05",
+  "startsOn": "2027-05-08",
+  "endsOn": "2027-05-29",
   "destinations": [
-    { "name": "Osaka", "startsOn": "2027-05-16", "endsOn": "2027-05-20", "latitude": 34.6937, "longitude": 135.5023 },
-    { "name": "Kyoto", "startsOn": "2027-05-20", "endsOn": "2027-05-24" },
-    { "name": "Ise", "startsOn": null, "endsOn": null },
-    { "name": "Tokyo", "startsOn": "2027-05-26", "endsOn": "2027-06-05" }
+    {
+      "name": "Osaka",
+      "startsOn": "2027-05-08",
+      "endsOn": "2027-05-12",
+      "latitude": 34.6937,
+      "longitude": 135.5023,
+      "stops": [
+        {
+          "name": "Namba",
+          "latitude": 34.6660,
+          "longitude": 135.5000,
+          "category": "Food",
+          "address": "Namba, Osaka",
+          "notes": "Eat here.",
+          "plannedOn": "2027-05-09"
+        },
+        { "name": "Umeda", "latitude": 34.7025, "longitude": 135.4959 }
+      ]
+    },
+    {
+      "name": "Kyoto",
+      "startsOn": "2027-05-13",
+      "endsOn": "2027-05-17",
+      "stops": [
+        { "name": "Gion" },
+        { "name": "Arashiyama" }
+      ]
+    },
+    {
+      "name": "Tokyo",
+      "startsOn": "2027-05-20",
+      "endsOn": "2027-05-29",
+      "stops": [
+        { "name": "Shibuya" },
+        { "name": "Akihabara" }
+      ]
+    }
   ]
 }
 ```
@@ -457,16 +670,63 @@ the stops, and each stop carries the optional days of its stay:
   "id": "c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa",
   "name": "Japan Adventure",
   "destinations": [
-    { "id": "…", "name": "Osaka", "sortOrder": 0, "startsOn": "2027-05-16", "endsOn": "2027-05-20", "latitude": 34.6937, "longitude": 135.5023 },
-    { "id": "…", "name": "Kyoto", "sortOrder": 1, "startsOn": "2027-05-20", "endsOn": "2027-05-24", "latitude": null, "longitude": null },
-    { "id": "…", "name": "Ise", "sortOrder": 2, "startsOn": null, "endsOn": null, "latitude": null, "longitude": null },
-    { "id": "…", "name": "Tokyo", "sortOrder": 3, "startsOn": "2027-05-26", "endsOn": "2027-06-05", "latitude": null, "longitude": null }
+    {
+      "id": "…",
+      "name": "Osaka",
+      "sortOrder": 0,
+      "startsOn": "2027-05-08",
+      "endsOn": "2027-05-12",
+      "latitude": 34.6937,
+      "longitude": 135.5023,
+      "stops": [
+        {
+          "id": "…",
+          "name": "Namba",
+          "sortOrder": 0,
+          "startsOn": null,
+          "endsOn": null,
+          "latitude": 34.6660,
+          "longitude": 135.5000,
+          "category": "Food",
+          "address": "Namba, Osaka",
+          "notes": "Eat here.",
+          "plannedOn": "2027-05-09"
+        },
+        { "id": "…", "name": "Umeda", "sortOrder": 1, "startsOn": null, "endsOn": null, "latitude": 34.7025, "longitude": 135.4959 }
+      ]
+    },
+    {
+      "id": "…",
+      "name": "Kyoto",
+      "sortOrder": 1,
+      "startsOn": "2027-05-13",
+      "endsOn": "2027-05-17",
+      "latitude": null,
+      "longitude": null,
+      "stops": [
+        { "id": "…", "name": "Gion", "sortOrder": 0, "startsOn": null, "endsOn": null, "latitude": null, "longitude": null },
+        { "id": "…", "name": "Arashiyama", "sortOrder": 1, "startsOn": null, "endsOn": null, "latitude": null, "longitude": null }
+      ]
+    }
   ],
-  "startsOn": "2027-05-16",
-  "endsOn": "2027-06-05",
-  "status": "Planning"
+  "startsOn": "2027-05-08",
+  "endsOn": "2027-05-29",
+  "status": "Planning",
+  "unfiledPlaces": []
 }
 ```
+
+The response nests every stop under its destination and orders both scopes by `SortOrder`.
+A client that ignores `stops` still reads the main route; an existing trip, which has no
+nested stops, carries `"stops": []` on each destination.
+
+**A stop carries the whole place.** `category`, `address`, `notes` and `plannedOn` are
+optional on every stop, and on the destination too. `PUT` accepts the same fields on each
+stop and an optional `unfiledPlaces` array. When the array is omitted, the trip's unfiled
+places are left alone, so a client that predates the unified model cannot delete them by
+omission. A legacy unfiled place named in a destination's `stops` is filed there with its
+existing identity; one omitted from both lists is removed. The stop's own stay dates
+(`startsOn`/`endsOn`) remain separate from `plannedOn`.
 
 **A stop may carry the coordinates of a place chosen from a map.** `latitude` and
 `longitude` are optional and always travel together: a place chosen from the map has both,
@@ -485,23 +745,38 @@ in five places and leaving the trip half-saved between two calls.
 
 | In the request | Meaning |
 |---|---|
-| `"id": "<guid>"` | An existing stop. It is renamed, rescheduled and moved to its new position, and keeps its identity. |
-| `"id": null` | A **new** stop. The server generates the identity. |
-| A stop absent from the array | **Removed.** |
-| The order of the array | **The route order.** |
+| `"id": "<guid>"` | An existing destination. It is renamed, rescheduled and moved to its new position, and keeps its identity. |
+| `"id": null` | A **new** destination. The server generates the identity. |
+| A destination absent from the array | **Removed, with its stops.** |
+| The order of the array | **The main-route order.** |
 | `"startsOn": null` | **Cleared.** The same for `"endsOn"`. |
+| `stops` | The stops within that destination. The same `id`/order/omission rules apply within the destination; a stop named under another destination is moved there and keeps its identity and its place details (category, address, notes, planned day). |
+| `unfiledPlaces` | Optional. The legacy places that are still not in a destination. Omit the whole array to leave them alone; send the complete list to reconcile them. A place named under a destination's `stops` is filed there with its existing identity. |
 
 ```json
 {
   "name": "Japan Adventure",
-  "startsOn": "2027-05-16",
-  "endsOn": "2027-06-05",
+  "startsOn": "2027-05-08",
+  "endsOn": "2027-05-29",
   "destinations": [
-    { "id": "6d343873-45bc-42c6-abc2-5c271f99354a", "name": "Osaka", "startsOn": "2027-05-16", "endsOn": "2027-05-20" },
-    { "id": null, "name": "Nagoya", "startsOn": null, "endsOn": null }
+    {
+      "id": "6d343873-45bc-42c6-abc2-5c271f99354a",
+      "name": "Osaka",
+      "startsOn": "2027-05-08",
+      "endsOn": "2027-05-12",
+      "stops": [
+        { "id": "…", "name": "Namba" },
+        { "id": null, "name": "Tennoji" }
+      ]
+    },
+    { "id": null, "name": "Nagoya", "startsOn": null, "endsOn": null, "stops": [] }
   ]
 }
 ```
+
+The order of a destination's `stops` is its order within that destination. A stop is never
+part of the main route, so adding, renaming or reordering one never changes the route
+numbering.
 
 The request is checked in full before anything is written, so a refused request leaves the
 trip exactly as it was. The refusals say which stop is at fault and, where the dates
@@ -635,15 +910,29 @@ page's edit mode — so a stop's name and its dates share a line on either, and 
 screens cannot drift apart.
 
 **The editor is shared.** `shared/form/trip-form.ts` is the route builder, and it is used
-by two screens: the create page, and the trip page in its edit mode. The stops live in a
-`FormArray`, so each one is validated on its own, and the whole route is validated by
+by two screens: the create page, and the trip page in its edit mode. The destinations live
+in a `FormArray`, and each destination carries its own `FormArray` of stops. Each place is
+validated on its own, and the whole route is validated by
 `shared/validate/trip-destinations.ts`, a pure function wrapped in a `ValidatorFn` exactly
-like the date rule beside it. The stops are moved with **move up and move down buttons**
+like the date rule beside it. The places are moved with **move up and move down buttons**
 rather than by dragging, so reordering is keyboard-accessible without a library and
 without a pointer implementation. The template tracks each control rather than its
 position, so a moved row is moved in the document and **the focus follows it**. Adding or
-removing a stop moves the focus deliberately, and a polite live region says what
+removing a place moves the focus deliberately, and a polite live region says what
 happened.
+
+**A destination may hold stops, and the editor says so.** Each destination row has a
+disclosure control; opening it shows the stops within that destination, their own add,
+remove and move controls, and an `Add a stop` button. The panel stays in the document when
+it is closed, so collapsing a destination never loses a stop the reader entered. A stop's
+node is a small hollow mark and never a main-route number; the main route is the
+destination rows only. A destination's removal takes its stops with it and says so. The
+stop's dates are checked against its destination's dates when the destination has them,
+and against the trip everywhere else. The form opens every destination before it shows the
+errors of a refused submission, so a collapsed destination can never hide the reason it
+cannot be sent. Both date fields in a row share one fixed width (`--route-date-width`), so
+Arrive and Leave always match and the native picker never clips; the pair wraps on a narrow
+screen rather than shrinking.
 
 **A destination can be chosen from a map, or typed by hand.** Every stop's name field
 carries a small map button. Pressing it opens one shared `app-location-picker`, which is a
@@ -665,11 +954,66 @@ one place that calls `TripsService`: it owns the form, the validation, the focus
 and the saving, so that neither screen has to repeat them. It still never touches
 `HttpClient` — only `core/api/` does that.
 
-**A trip can be changed in place.** The trip page grows an edit mode: the masthead offers
-*Edit trip*, and the page then shows the editor in place of the read-only route. The
-editor saves the whole trip in one request, so every change is persisted together or not
-at all. A `CanDeactivate` guard asks before the reader leaves a page with an unsaved
-change, and only when there is one.
+**The atlas is a journey you can open.** `features/trip-atlas/` is a sibling of the trip
+page at `/trips/:id/atlas`. Its **overview is the main route**: only destinations are drawn
+on the map, labelled by their place on the route (`1`, `2`, ...), joined by the dashed
+route line. No stop is drawn until the reader selects and expands a destination, which is
+what keeps a place from looking like an unconnected route entry.
+
+**A destination's stops are opened with a separate control.** The Route heading carries a
+compact plus for adding a destination; each destination's stop-count heading carries a plus
+for adding a stop **in that destination**, and a separate chevron button with
+`aria-expanded` and `aria-controls` for opening or closing its stops. The count is text,
+not a button. The plus and the chevron are distinct buttons, so adding a stop can never be
+confused with opening the list. The expansion state belongs to the screen, not the list, so
+the map and the list agree: collapsing a destination hides its stops and its stop line
+without touching the trip, and clears a selected stop to its destination. State is keyed by
+destination ID, so it survives a refresh and is pruned when a destination goes.
+
+**A stop is a place, and it is edited where it is read.** A selected stop shows its
+category, address, notes, planned day, stay dates and coordinates, with `Edit stop` and
+`Remove stop`. The editor is the refactored stop editor: it fixes the parent, allows a
+name, a search result or a hand-typed place, a category, a planned day, Arrive/Leave dates
+and notes, and it keeps the two date fields at the same fixed width as the trip editor so
+neither clips. The planned day is bounded by the trip; the stay by the destination when it
+has dates. Saving and removal send the whole trip, and nothing is shown until the API
+accepts it. Removal is confirmed and says that the stop's own category, address, notes and
+planned day go with it.
+
+**The labels are hierarchical, and presentation-only.** A destination keeps the main-route
+number; a stop is labelled with that number and a spreadsheet-style suffix: `1a`, `1b`, ...
+`1z`, `1aa`, `1ab`, ... The same helper (`shared/format/place-labels.ts`) is used by the
+Route panel, the map markers, the stop panel and the accessible names. Reordering a parent
+changes its prefix; reordering a stop changes its suffix; neither changes an ID. Nothing is
+persisted.
+
+**The stop line is separate from the route line.** The map engine keeps the main route
+source/layer through parents only, and a second, dotted forest line through the located
+stops of the selected destination, in their own order. The stop line is drawn beneath the
+main route, needs at least two located stops, ignores stops without coordinates and is
+emptied when the destination is collapsed or deselected. It is updated by the same signals
+that update the markers, and the layer, source and markers are removed on destroy. Stop
+markers are small labelled pills (`1a`), not main-route pins; the main route never changes
+when a stop is selected.
+
+**There is no separate saved-place list.** The unified stop is the place. The Route list
+shows every stop under its destination; the plan is a second reading of the same stops by
+`plannedOn`; a transitional `Not yet in a destination` section holds the legacy `Place`
+rows and lets the reader file one under a destination without duplicating it. The map
+engine has no saved-place marker set. The read-only `GET /api/trips/{tripId}/places` is the
+only compatibility surface, and the trip API is the only writer.
+
+The atlas offers two contextual add actions: the **plus beside Route** adds a parent
+destination, and the **plus beside a destination's stop count** adds a stop in that exact
+destination. There is no separate Add saved place. The parent uses
+`destination-editor` (name and optional dates); the stop uses `stop-editor` (name,
+location, address, category, planned day, Arrive/Leave and notes). Each sends the whole
+trip in one `PUT`, and the trip only changes once the API has accepted it, so a refused
+addition leaves no phantom row or marker. The Route list shows the stops; the `Plan by day`
+reading is a second view of the same stops by `plannedOn`, and it names the stop whose
+stay covers the day before falling back to its destination. A place's day is bounded by the
+trip's dates, not by its stop's, exactly as the API says. Legacy unfiled places stay in a
+transitional section until the reader files one under a destination.
 
 **The schedule is read back honestly.** A stop with dates shows them; a stop without them
 says *Dates not decided*, and the route says how many stops have been decided. A partly
@@ -767,7 +1111,8 @@ developer and every build uses the same compiler.
 | Suite | Location | Scope | Needs a database? |
 |---|---|---|---|
 | Domain and use-case tests | `backend/Tabiji.Tests/TripTests.cs` | Invariants, validation, the service, the list order | No |
-| The chronological rule | `backend/Tabiji.Tests/TripScheduleTests.cs` | The rule on its own, case by case | No |
+| The hierarchy | `backend/Tabiji.Tests/TripHierarchyTests.cs` | Destinations and stops, identity, reordering, reparenting, removal | No |
+| The chronological rule | `backend/Tabiji.Tests/TripScheduleTests.cs` | The rule on its own, case by case, and a stop inside its destination | No |
 | Health endpoint tests | `backend/Tabiji.Tests/HealthEndpointTests.cs` | The health probes, via `WebApplicationFactory` | No |
 | Trip endpoint tests | `backend/Tabiji.Tests/TripEndpointTests.cs` | The trip HTTP surface, via `WebApplicationFactory` | No |
 | Migration tests | `backend/Tabiji.Tests/*MigrationTests.cs` | The operations of a migration, inspected by reflection | No |

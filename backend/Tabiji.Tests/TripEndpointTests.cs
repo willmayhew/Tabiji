@@ -120,6 +120,33 @@ public sealed class TripEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task Delete_RemovesTheTripAndReturnsNoContent()
+    {
+        using var client = _factory.CreateClient();
+
+        var tripId = (await _factory.Repository.ListAsync()).First(trip => trip.Name == "Rome").Id;
+
+        var response = await client.DeleteAsync($"/api/trips/{tripId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var trips = await client.GetFromJsonAsync<TripResponse[]>($"/api/trips", JsonOptions);
+
+        Assert.NotNull(trips);
+        Assert.DoesNotContain(trips, trip => trip.Id == tripId);
+    }
+
+    [Fact]
+    public async Task Delete_ReturnsNotFoundForAnUnknownId()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.DeleteAsync($"/api/trips/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Create_ReturnsCreatedAndTheTripAppearsInTheList()
     {
         using var client = _factory.CreateClient();
@@ -639,6 +666,311 @@ public sealed class TripEndpointTests : IDisposable
         var response = await client.PutAsJsonAsync($"/api/trips/{kyoto.Id}", request);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_KeepsTheStopsNestedUnderTheirDestination()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Japan",
+            [
+                new(
+                    "Osaka",
+                    new DateOnly(2027, 5, 8),
+                    new DateOnly(2027, 5, 12),
+                    34.6937,
+                    135.5023,
+                    [
+                        new("Namba", null, null, 34.6660, 135.5000),
+                        new("Umeda", null, null),
+                    ]),
+                new(
+                    "Tokyo",
+                    new DateOnly(2027, 5, 15),
+                    new DateOnly(2027, 5, 29),
+                    null,
+                    null,
+                    [new("Shibuya", null, null)]),
+            ],
+            new DateOnly(2027, 5, 8),
+            new DateOnly(2027, 5, 29));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(payload);
+
+        var destinations = payload!.Destinations;
+
+        Assert.Equal(["Osaka", "Tokyo"], destinations.Select(d => d.Name));
+        Assert.Equal([0, 1], destinations.Select(d => d.SortOrder));
+
+        var osakaStops = destinations[0].Stops ?? [];
+        Assert.Equal(["Namba", "Umeda"], osakaStops.Select(s => s.Name));
+        Assert.Equal([0, 1], osakaStops.Select(s => s.SortOrder));
+        Assert.All(osakaStops, stop => Assert.NotEqual(Guid.Empty, stop.Id));
+        Assert.Equal(34.6660, osakaStops[0].Latitude);
+        Assert.Equal(135.5000, osakaStops[0].Longitude);
+
+        var tokyoStops = destinations[1].Stops ?? [];
+        Assert.Equal(["Shibuya"], tokyoStops.Select(s => s.Name));
+    }
+
+    [Fact]
+    public async Task Create_KeepsTheDetailsOfAStop()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Japan",
+            [
+                new(
+                    "Kyoto",
+                    new DateOnly(2027, 5, 8),
+                    new DateOnly(2027, 5, 12),
+                    null,
+                    null,
+                    [
+                        new(
+                            "Gion",
+                            null,
+                            null,
+                            35.0037,
+                            135.7788,
+                            PlaceCategory.Sight,
+                            "Gion, Kyoto",
+                            "Go early.",
+                            new DateOnly(2027, 5, 9)),
+                    ]),
+            ],
+            new DateOnly(2027, 5, 8),
+            new DateOnly(2027, 5, 29));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(payload);
+
+        var stop = Assert.Single(payload!.Destinations[0].Stops ?? []);
+
+        Assert.Equal("Gion", stop.Name);
+        Assert.Equal(PlaceCategory.Sight, stop.Category);
+        Assert.Equal("Gion, Kyoto", stop.Address);
+        Assert.Equal("Go early.", stop.Notes);
+        Assert.Equal(new DateOnly(2027, 5, 9), stop.PlannedOn);
+        Assert.Equal(35.0037, stop.Latitude);
+        Assert.Equal(135.7788, stop.Longitude);
+    }
+
+    [Fact]
+    public async Task Create_ReturnsAnEmptyStopsArrayForAParentOnlyTrip()
+    {
+        using var client = _factory.CreateClient();
+
+        var id = (await _factory.Repository.ListAsync()).First(trip => trip.Name == "Rome").Id;
+        var trip = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
+
+        Assert.NotNull(trip);
+        Assert.All(trip!.Destinations, destination => Assert.Empty(destination.Stops ?? []));
+    }
+
+    [Fact]
+    public async Task Create_ReturnsBadRequestWhenAStopFallsOutsideItsDestination()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Japan",
+            [
+                new(
+                    "Osaka",
+                    new DateOnly(2027, 5, 8),
+                    new DateOnly(2027, 5, 12),
+                    null,
+                    null,
+                    [new("Namba", new DateOnly(2027, 5, 13), new DateOnly(2027, 5, 14))]),
+            ],
+            new DateOnly(2027, 5, 8),
+            new DateOnly(2027, 5, 29));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+
+        Assert.NotNull(problem);
+        Assert.Contains("Namba", problem!.Detail, StringComparison.Ordinal);
+        Assert.Contains("Osaka", problem.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Create_ReturnsBadRequestWhenAStopNameIsBlank()
+    {
+        using var client = _factory.CreateClient();
+
+        var request = new CreateTripRequest(
+            "Japan",
+            [new("Osaka", null, null, null, null, [new("   ", null, null)])],
+            new DateOnly(2027, 5, 8),
+            new DateOnly(2027, 5, 29));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_ReturnsBadRequestWhenThereAreTooManyStopsInOneDestination()
+    {
+        using var client = _factory.CreateClient();
+
+        var stops = Enumerable.Range(1, Trip.MaxStopsPerDestination + 1)
+            .Select(index => new TripStopRequest($"Stop {index}", null, null))
+            .ToArray();
+
+        var request = new CreateTripRequest(
+            "Japan",
+            [new("Osaka", null, null, null, null, stops)],
+            new DateOnly(2027, 5, 8),
+            new DateOnly(2027, 5, 29));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_AddsAndRemovesStopsAndKeepsTheIdentityOfTheOnesThatStay()
+    {
+        using var client = _factory.CreateClient();
+
+        var created = await CreateJapanWithStops(client);
+
+        var osaka = created.Destinations[0];
+        var namba = osaka.Stops![0];
+
+        // Add Umeda, keep Namba.
+        var add = await client.PutAsJsonAsync($"/api/trips/{created.Id}", new UpdateTripRequest(
+            "Japan",
+            [
+                new(osaka.Id, "Osaka", osaka.StartsOn, osaka.EndsOn, null, null,
+                    [
+                        new(namba.Id, "Namba", null, null),
+                        new(null, "Umeda", null, null),
+                    ]),
+                new(created.Destinations[1].Id, "Kyoto", created.Destinations[1].StartsOn, created.Destinations[1].EndsOn, null, null, []),
+            ],
+            created.StartsOn,
+            created.EndsOn));
+
+        Assert.Equal(HttpStatusCode.OK, add.StatusCode);
+
+        var added = await add.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(added);
+
+        var addedStops = added!.Destinations[0].Stops ?? [];
+        Assert.Equal(["Namba", "Umeda"], addedStops.Select(stop => stop.Name));
+        Assert.Equal(namba.Id, addedStops[0].Id);
+        Assert.NotEqual(namba.Id, addedStops[1].Id);
+
+        // Drop Namba, keep Umeda.
+        var remove = await client.PutAsJsonAsync($"/api/trips/{created.Id}", new UpdateTripRequest(
+            "Japan",
+            [
+                new(osaka.Id, "Osaka", osaka.StartsOn, osaka.EndsOn, null, null,
+                    [new(addedStops[1].Id, "Umeda", null, null)]),
+                new(created.Destinations[1].Id, "Kyoto", created.Destinations[1].StartsOn, created.Destinations[1].EndsOn, null, null, []),
+            ],
+            created.StartsOn,
+            created.EndsOn));
+
+        Assert.Equal(HttpStatusCode.OK, remove.StatusCode);
+
+        var removed = await remove.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(removed);
+
+        var remaining = Assert.Single(removed!.Destinations[0].Stops ?? []);
+        Assert.Equal("Umeda", remaining.Name);
+        Assert.Equal(addedStops[1].Id, remaining.Id);
+    }
+
+    [Fact]
+    public async Task Update_MovesAStopBetweenExistingDestinationsAndKeepsItsIdentity()
+    {
+        using var client = _factory.CreateClient();
+
+        var created = await CreateJapanWithStops(client);
+
+        var osaka = created.Destinations[0];
+        var kyoto = created.Destinations[1];
+        var namba = osaka.Stops![0];
+
+        var response = await client.PutAsJsonAsync($"/api/trips/{created.Id}", new UpdateTripRequest(
+            "Japan",
+            [
+                new(osaka.Id, "Osaka", osaka.StartsOn, osaka.EndsOn, null, null,
+                    [new(osaka.Stops[1].Id, "Umeda", null, null)]),
+                new(kyoto.Id, "Kyoto", kyoto.StartsOn, kyoto.EndsOn, null, null,
+                    [
+                        new(kyoto.Stops![0].Id, "Gion", null, null),
+                        new(namba.Id, "Namba", null, null),
+                    ]),
+            ],
+            created.StartsOn,
+            created.EndsOn));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+        Assert.NotNull(payload);
+
+        var osakaStops = payload!.Destinations[0].Stops ?? [];
+        var kyotoStops = payload.Destinations[1].Stops ?? [];
+
+        Assert.Equal(["Umeda"], osakaStops.Select(stop => stop.Name));
+        Assert.Equal(["Gion", "Namba"], kyotoStops.Select(stop => stop.Name));
+        Assert.Equal(namba.Id, kyotoStops[1].Id);
+    }
+
+    private static async Task<TripResponse> CreateJapanWithStops(HttpClient client)
+    {
+        var request = new CreateTripRequest(
+            "Japan",
+            [
+                new(
+                    "Osaka",
+                    new DateOnly(2027, 5, 8),
+                    new DateOnly(2027, 5, 12),
+                    null,
+                    null,
+                    [new("Namba", null, null), new("Umeda", null, null)]),
+                new(
+                    "Kyoto",
+                    new DateOnly(2027, 5, 13),
+                    new DateOnly(2027, 5, 17),
+                    null,
+                    null,
+                    [new("Gion", null, null)]),
+            ],
+            new DateOnly(2027, 5, 8),
+            new DateOnly(2027, 5, 17));
+
+        var response = await client.PostAsJsonAsync("/api/trips", request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<TripResponse>(JsonOptions);
+
+        Assert.NotNull(payload);
+
+        return payload!;
     }
 
     private sealed record ProblemDetails(string? Title, string? Detail, int? Status);

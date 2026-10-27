@@ -1,4 +1,4 @@
-import { formatTripDates } from './trip-dates';
+import { formatPlanDay, formatTripDates } from './trip-dates';
 
 describe('formatTripDates', () => {
   it('should format a trip that starts and ends in the same month', () => {
@@ -50,5 +50,27 @@ describe('formatTripDates', () => {
     expect(formatTripDates('not-a-date', '2027-04-14')).toBeNull();
     expect(formatTripDates('2027-04-01', 'not-a-date')).toBeNull();
     expect(formatTripDates('', '')).toBeNull();
+  });
+});
+
+describe('formatPlanDay', () => {
+  it('should lead with the day of the week', () => {
+    // 2 April 2027 is a Friday.
+    expect(formatPlanDay('2027-04-02')).toBe('Fri 2 Apr 2027');
+  });
+
+  it('should carry the year, so a stranded day is not mistaken for one nearby', () => {
+    expect(formatPlanDay('2027-04-02')).toContain('2027');
+  });
+
+  it('should not shift a day across a day boundary', () => {
+    // A naive local-time parse would name the previous day west of UTC, or
+    // the next one east of it.
+    expect(formatPlanDay('2027-01-01')).toBe('Fri 1 Jan 2027');
+  });
+
+  it('should return null for a value that is not an ISO date', () => {
+    expect(formatPlanDay('not-a-date')).toBeNull();
+    expect(formatPlanDay('')).toBeNull();
   });
 });

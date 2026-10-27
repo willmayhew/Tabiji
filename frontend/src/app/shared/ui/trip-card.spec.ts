@@ -189,7 +189,7 @@ describe('TripCard', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     expect(element.querySelector('.trip-card__note')?.textContent).toContain(
-      'Dates are set for 1 of 2 stops',
+      'Dates are set for 1 of 2 destinations',
     );
   });
 

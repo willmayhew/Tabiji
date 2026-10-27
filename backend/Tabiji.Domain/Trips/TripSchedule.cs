@@ -40,6 +40,196 @@ public static class TripSchedule
     }
 
     /// <summary>
+    /// Checks that a day is one the trip has: on or after the day it starts,
+    /// and on or before the day it ends. Both ends are themselves days of the
+    /// trip, exactly as they are for a stop's dates.
+    ///
+    /// The subject is the thing that was planned for the day, so that the
+    /// refusal names it and reads like the rest of the schedule's refusals.
+    /// </summary>
+    public static void EnsureIsATripDay(
+        DateOnly tripStartsOn,
+        DateOnly tripEndsOn,
+        DateOnly day,
+        string subject)
+    {
+        if (day < tripStartsOn)
+        {
+            throw new ArgumentException(
+                $"\"{subject}\" is planned for {Format(day)}, " +
+                $"which is before the trip starts on {Format(tripStartsOn)}.",
+                nameof(day));
+        }
+
+        if (day > tripEndsOn)
+        {
+            throw new ArgumentException(
+                $"\"{subject}\" is planned for {Format(day)}, " +
+                $"which is after the trip ends on {Format(tripEndsOn)}.",
+                nameof(day));
+        }
+    }
+
+    /// <summary>
+    /// Checks every stop against the destination it belongs to.
+    ///
+    /// A stop may not end before it starts. Its dates must fall inside its
+    /// destination's dates when the destination has dates; when the
+    /// destination has only one of them, the stop is bounded by that one and
+    /// by the trip's other end. A destination without dates leaves the trip's
+    /// own dates as the only bound.
+    ///
+    /// The stops are not required to run in order within their destination.
+    /// A stop is a part of the place, not a leg of the journey.
+    /// </summary>
+    public static void EnsureStopsWithinDestinations(
+        DateOnly tripStartsOn,
+        DateOnly tripEndsOn,
+        IReadOnlyList<TripDestinationDraft> destinations)
+    {
+        foreach (var destination in destinations)
+        {
+            foreach (var stop in destination.Stops ?? [])
+            {
+                var problem = StopProblem(
+                    tripStartsOn,
+                    tripEndsOn,
+                    destination.Name,
+                    destination.StartsOn,
+                    destination.EndsOn,
+                    stop);
+
+                if (problem is not null)
+                {
+                    throw new ArgumentException(problem, nameof(destinations));
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks one stop against the destination it belongs to. Used by the
+    /// aggregate when a stop is added on its own rather than through a whole
+    /// route.
+    /// </summary>
+    public static void EnsureStopWithinDestination(
+        DateOnly tripStartsOn,
+        DateOnly tripEndsOn,
+        string parentName,
+        DateOnly? parentStartsOn,
+        DateOnly? parentEndsOn,
+        TripStopDraft stop)
+    {
+        var problem = StopProblem(
+            tripStartsOn,
+            tripEndsOn,
+            parentName,
+            parentStartsOn,
+            parentEndsOn,
+            stop);
+
+        if (problem is not null)
+        {
+            throw new ArgumentException(problem, nameof(stop));
+        }
+    }
+
+    /// <summary>
+    /// Checks every planned day against the trip it belongs to. A planned day
+    /// is a calendar day of the trip, independent of the place's stay dates;
+    /// a place may be planned for a day outside its stay but inside the trip.
+    /// </summary>
+    public static void EnsurePlannedOnIsATripDay(
+        DateOnly tripStartsOn,
+        DateOnly tripEndsOn,
+        IReadOnlyList<TripDestinationDraft> destinations,
+        IReadOnlyList<TripStopDraft>? unfiledPlaces = null)
+    {
+        foreach (var destination in destinations)
+        {
+            if (destination.PlannedOn is DateOnly destinationDay)
+            {
+                EnsureIsATripDay(tripStartsOn, tripEndsOn, destinationDay, destination.Name);
+            }
+
+            foreach (var stop in destination.Stops ?? [])
+            {
+                if (stop.PlannedOn is DateOnly stopDay)
+                {
+                    EnsureIsATripDay(tripStartsOn, tripEndsOn, stopDay, stop.Name);
+                }
+            }
+        }
+
+        foreach (var place in unfiledPlaces ?? [])
+        {
+            if (place.PlannedOn is DateOnly placeDay)
+            {
+                EnsureIsATripDay(tripStartsOn, tripEndsOn, placeDay, place.Name);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks a legacy unfiled place's optional stay dates against the trip.
+    /// An unfiled place has no destination to bound it, so the trip is the
+    /// only bound.
+    /// </summary>
+    public static void EnsurePlacesWithinTrip(
+        DateOnly tripStartsOn,
+        DateOnly tripEndsOn,
+        IReadOnlyList<TripStopDraft> places)
+    {
+        foreach (var place in places)
+        {
+            var reversed = Reversed(place.Name, place.StartsOn, place.EndsOn);
+
+            if (reversed is not null)
+            {
+                throw new ArgumentException(reversed, nameof(places));
+            }
+
+            if (place.StartsOn is DateOnly startsOn)
+            {
+                if (startsOn < tripStartsOn)
+                {
+                    throw new ArgumentException(
+                        $"\"{place.Name}\" starts on {Format(startsOn)}, " +
+                        $"which is before the trip starts on {Format(tripStartsOn)}.",
+                        nameof(places));
+                }
+
+                if (startsOn > tripEndsOn)
+                {
+                    throw new ArgumentException(
+                        $"\"{place.Name}\" starts on {Format(startsOn)}, " +
+                        $"which is after the trip ends on {Format(tripEndsOn)}.",
+                        nameof(places));
+                }
+            }
+
+            if (place.EndsOn is DateOnly endsOn)
+            {
+                if (endsOn < tripStartsOn)
+                {
+                    throw new ArgumentException(
+                        $"\"{place.Name}\" ends on {Format(endsOn)}, " +
+                        $"which is before the trip starts on {Format(tripStartsOn)}.",
+                        nameof(places));
+                }
+
+                if (endsOn > tripEndsOn)
+                {
+                    throw new ArgumentException(
+                        $"\"{place.Name}\" ends on {Format(endsOn)}, " +
+                        $"which is after the trip ends on {Format(tripEndsOn)}.",
+                        nameof(places));
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// The first thing that is wrong with the route, or null when the route
     /// is sound.
     /// </summary>
@@ -110,15 +300,90 @@ public static class TripSchedule
     }
 
     /// <summary>
-    /// Checks that a stop does not end before it starts.
+    /// Checks that a destination does not end before it starts.
     /// </summary>
-    private static string? Reversed(TripDestinationDraft destination)
+    private static string? Reversed(TripDestinationDraft destination) =>
+        Reversed(destination.Name, destination.StartsOn, destination.EndsOn);
+
+    /// <summary>
+    /// Checks that a place does not end before it starts.
+    /// </summary>
+    private static string? Reversed(string name, DateOnly? startsOn, DateOnly? endsOn)
     {
-        if (destination.StartsOn is DateOnly startsOn &&
-            destination.EndsOn is DateOnly endsOn &&
-            endsOn < startsOn)
+        if (startsOn is DateOnly start && endsOn is DateOnly end && end < start)
         {
-            return $"\"{destination.Name}\" ends on {Format(endsOn)} and starts on {Format(startsOn)}.";
+            return $"\"{name}\" ends on {Format(end)} and starts on {Format(start)}.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The first thing that is wrong with a stop, or null when the stop is
+    /// sound.
+    ///
+    /// The bounds are the destination's own dates where it has them, and the
+    /// trip's dates everywhere else. A stop is a part of the place, so it can
+    /// never run outside the days the traveller is there.
+    /// </summary>
+    private static string? StopProblem(
+        DateOnly tripStartsOn,
+        DateOnly tripEndsOn,
+        string parentName,
+        DateOnly? parentStartsOn,
+        DateOnly? parentEndsOn,
+        TripStopDraft stop)
+    {
+        var reversed = Reversed(stop.Name, stop.StartsOn, stop.EndsOn);
+
+        if (reversed is not null)
+        {
+            return reversed;
+        }
+
+        var lower = parentStartsOn ?? tripStartsOn;
+        var upper = parentEndsOn ?? tripEndsOn;
+
+        if (stop.StartsOn is DateOnly startsOn)
+        {
+            if (startsOn < lower)
+            {
+                return parentStartsOn is not null
+                    ? $"\"{stop.Name}\", a stop at \"{parentName}\", starts on {Format(startsOn)}, " +
+                      $"which is before \"{parentName}\" starts on {Format(lower)}."
+                    : $"\"{stop.Name}\", a stop at \"{parentName}\", starts on {Format(startsOn)}, " +
+                      $"which is before the trip starts on {Format(lower)}.";
+            }
+
+            if (startsOn > upper)
+            {
+                return parentEndsOn is not null
+                    ? $"\"{stop.Name}\", a stop at \"{parentName}\", starts on {Format(startsOn)}, " +
+                      $"which is after \"{parentName}\" ends on {Format(upper)}."
+                    : $"\"{stop.Name}\", a stop at \"{parentName}\", starts on {Format(startsOn)}, " +
+                      $"which is after the trip ends on {Format(upper)}.";
+            }
+        }
+
+        if (stop.EndsOn is DateOnly endsOn)
+        {
+            if (endsOn < lower)
+            {
+                return parentStartsOn is not null
+                    ? $"\"{stop.Name}\", a stop at \"{parentName}\", ends on {Format(endsOn)}, " +
+                      $"which is before \"{parentName}\" starts on {Format(lower)}."
+                    : $"\"{stop.Name}\", a stop at \"{parentName}\", ends on {Format(endsOn)}, " +
+                      $"which is before the trip starts on {Format(lower)}.";
+            }
+
+            if (endsOn > upper)
+            {
+                return parentEndsOn is not null
+                    ? $"\"{stop.Name}\", a stop at \"{parentName}\", ends on {Format(endsOn)}, " +
+                      $"which is after \"{parentName}\" ends on {Format(upper)}."
+                    : $"\"{stop.Name}\", a stop at \"{parentName}\", ends on {Format(endsOn)}, " +
+                      $"which is after the trip ends on {Format(upper)}.";
+            }
         }
 
         return null;

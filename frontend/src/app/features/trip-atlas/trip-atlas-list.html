@@ -1,7 +1,18 @@
 <section class="atlas-list">
   <div class="atlas-list__route-section">
     <div class="section-head">
-      <h2>Route</h2>
+      <div class="section-head__title">
+        <h2>Route</h2>
+        <button
+          type="button"
+          class="atlas-list__plus"
+          aria-label="Add destination"
+          title="Add destination"
+          (click)="addDestination.emit()"
+        >
+          +
+        </button>
+      </div>
       @if (ordered().length > 0) {
         <p class="section-head__meta">{{ summary() }}</p>
       }
@@ -13,98 +24,268 @@
       <ol class="route route--readout atlas-list__route">
         @for (destination of ordered(); track destination.id; let index = $index) {
           <li class="route__row">
-            <span class="route__node" aria-hidden="true">{{ position(index) }}</span>
-            <button
-              type="button"
-              class="atlas-list__item"
-              [class.atlas-list__item--selected]="isSelected('destination', destination.id)"
-              [attr.aria-pressed]="isSelected('destination', destination.id)"
-              (click)="select.emit({ kind: 'destination', id: destination.id })"
-            >
-              <span class="atlas-list__name">{{ destination.name }}</span>
-              <span class="atlas-list__facts">
-                <span
-                  class="route__dates-text"
-                  [class.route__dates-text--undecided]="!hasDates(destination)"
-                  >{{ datesFor(destination) }}</span
+            <span class="route__node" aria-hidden="true">{{ parentLabel(index) }}</span>
+
+            <div class="route__stop">
+              <button
+                type="button"
+                class="atlas-list__item"
+                [class.atlas-list__item--selected]="isSelected('destination', destination.id)"
+                [attr.aria-pressed]="isSelected('destination', destination.id)"
+                (click)="selectDestination(destination)"
+              >
+                <span class="visually-hidden">{{ parentLabel(index) }}</span>
+                <span class="atlas-list__name">{{ destination.name }}</span>
+                <span class="atlas-list__facts">
+                  <span
+                    class="route__dates-text"
+                    [class.route__dates-text--undecided]="!hasDates(destination)"
+                    >{{ datesFor(destination) }}</span
+                  >
+                  @if (!isLocated(destination)) {
+                    <span class="atlas-list__flag">Not on the map</span>
+                  }
+                </span>
+              </button>
+
+              <div class="atlas-list__stops-head">
+                <span class="atlas-list__stop-count">{{ stopCount(destination) }}</span>
+
+                <button
+                  type="button"
+                  class="atlas-list__chevron"
+                  [attr.aria-expanded]="isExpanded(destination)"
+                  [attr.aria-controls]="stopsPanelId(destination)"
+                  [attr.aria-label]="
+                    (isExpanded(destination) ? 'Hide' : 'Show') +
+                    ' stops in ' +
+                    destination.name
+                  "
+                  (click)="toggle(destination)"
                 >
-                @if (!isLocated(destination)) {
-                  <span class="atlas-list__flag">Not on the map</span>
-                }
-              </span>
-            </button>
+                  <span aria-hidden="true">{{ isExpanded(destination) ? '▾' : '▸' }}</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="atlas-list__plus"
+                  [attr.aria-label]="'Add a stop in ' + destination.name"
+                  [attr.title]="'Add a stop in ' + destination.name"
+                  (click)="requestStop(destination)"
+                >
+                  +
+                </button>
+
+              </div>
+            </div>
+
+            <div
+              class="atlas-list__stops"
+              [id]="stopsPanelId(destination)"
+              [hidden]="!isExpanded(destination)"
+            >
+              @if (stopsOf(destination).length === 0) {
+                <p class="atlas-list__note">No stops in this destination yet.</p>
+              } @else {
+                <ol class="atlas-stops">
+                  @for (stop of stopsOf(destination); track stop.id; let stopIndex = $index) {
+                    <li class="atlas-stops__row">
+                      <span class="atlas-stops__node" aria-hidden="true">{{
+                        stopLabel(index, stopIndex)
+                      }}</span>
+                      <button
+                        type="button"
+                        class="atlas-list__item atlas-list__item--stop"
+                        [class.atlas-list__item--selected]="isSelected('stop', stop.id)"
+                        [attr.aria-pressed]="isSelected('stop', stop.id)"
+                        (click)="selectStop(stop)"
+                      >
+                        <span class="visually-hidden">{{ stopLabel(index, stopIndex) }}</span>
+                        <span class="atlas-list__name">{{ stop.name }}</span>
+                        <span class="atlas-list__facts">
+                          @if (stop.category; as category) {
+                            <span class="atlas-list__category">{{ categoryLabel(category) }}</span>
+                          }
+                          @if (stop.plannedOn; as day) {
+                            <span class="atlas-list__planned">{{ dayLabel(day) }}</span>
+                          }
+                          <span
+                            class="route__dates-text"
+                            [class.route__dates-text--undecided]="!hasDates(stop)"
+                            >{{ datesFor(stop) }}</span
+                          >
+                          @if (!isLocated(stop)) {
+                            <span class="atlas-list__flag">Not on the map</span>
+                          }
+                        </span>
+                      </button>
+                    </li>
+                  }
+                </ol>
+              }
+            </div>
           </li>
         }
       </ol>
 
       @if (mapNote(); as note) {
-        <p class="atlas-list__note">{{ note }}</p>
+        <p class="atlas-list__note atlas-list__map-note">{{ note }}</p>
       }
     }
   </div>
 
-  <div class="atlas-list__places-section">
-    <div class="section-head">
-      <h2>Saved places</h2>
-      @if (places().length > 0) {
-        <p class="section-head__meta">{{ placesSummary() }}</p>
-      }
-    </div>
-
-    @if (placesError(); as message) {
-      <div class="callout callout--danger">
-        <p>{{ message }}</p>
-        <button type="button" class="button button--secondary" (click)="retryPlaces.emit()">
-          Try again
-        </button>
+  @if (hasPlan()) {
+    <div class="atlas-list__plan-section">
+      <div class="section-head">
+        <h2>Plan by day</h2>
+        @if (planNote(); as note) {
+          <p class="section-head__meta">{{ note }}</p>
+        }
       </div>
-    } @else if (placesLoading()) {
-      <p class="muted" aria-busy="true">Loading saved places&hellip;</p>
-    } @else if (places().length === 0) {
-      <p class="muted">Nothing saved yet. Add a place to keep somewhere worth going.</p>
-    } @else {
-      @for (group of groups(); track groupHeadingId(group)) {
+
+      @for (group of plan().planned; track group.date) {
         <div class="atlas-plan__group">
-          <h3 class="atlas-plan__head" [id]="groupHeadingId(group)">
-            @if (group.destination; as stop) {
-              <span class="atlas-plan__number" aria-hidden="true">{{ numberFor(group) }}</span>
-              <span class="atlas-plan__stop">{{ stop.name }}</span>
-              <span class="atlas-plan__dates">{{ datesFor(stop) }}</span>
-            } @else {
-              <span class="atlas-plan__stop">Not filed under a stop</span>
+          <h3 class="atlas-plan__head" [id]="dayHeadingId(group.date)">
+            <span class="atlas-plan__day">{{ dayLabel(group.date) }}</span>
+            @if (group.stop; as stop) {
+              <span class="atlas-plan__where">
+                {{ stop.name }}
+                @if (stop.parentName) {
+                  <span class="atlas-plan__where-parent">· {{ stop.parentName }}</span>
+                }
+              </span>
             }
-            <span class="atlas-plan__count">{{ countLabel(group) }}</span>
+            <span class="atlas-plan__count">{{ placesLabel(group.places.length) }}</span>
           </h3>
 
-          <ul class="atlas-places" [attr.aria-labelledby]="groupHeadingId(group)">
+          <ul class="atlas-places" [attr.aria-labelledby]="dayHeadingId(group.date)">
             @for (place of group.places; track place.id) {
-              <li class="atlas-places__row">
-                <button
-                  type="button"
-                  class="atlas-places__item"
-                  [class.atlas-places__item--selected]="isSelected('place', place.id)"
-                  [attr.aria-pressed]="isSelected('place', place.id)"
-                  (click)="select.emit({ kind: 'place', id: place.id })"
-                >
-                  <span class="atlas-places__name">{{ place.name }}</span>
-                  <span class="atlas-places__facts">
-                    @if (place.category; as category) {
-                      <span class="atlas-places__category">{{ category }}</span>
-                    }
-                    @if (place.address; as address) {
-                      <span class="atlas-places__where">{{ address }}</span>
-                    }
-                  </span>
-                </button>
-              </li>
+              <ng-container [ngTemplateOutlet]="placeRow" [ngTemplateOutletContext]="{ place }" />
             }
           </ul>
-
-          @if (isUnfiled(group)) {
-            <p class="atlas-plan__hint">File a place under a stop to put it in the plan.</p>
-          }
         </div>
       }
-    }
-  </div>
+
+      @if (plan().outside.length > 0) {
+        <section class="atlas-plan__region" [attr.aria-labelledby]="outsideHeadingId">
+          <h3 class="atlas-plan__region-head" [id]="outsideHeadingId">
+            <span class="atlas-plan__region-label">Outside the trip&rsquo;s dates</span>
+            <span class="atlas-plan__count">{{ placesLabel(outsideCount()) }}</span>
+          </h3>
+          <p class="atlas-plan__hint">
+            The trip no longer runs on these days. Move a place to a day it does, or leave it
+            where it is.
+          </p>
+
+          @for (group of plan().outside; track group.date) {
+            <div class="atlas-plan__group">
+              <h3 class="atlas-plan__head" [id]="dayHeadingId(group.date)">
+                <span class="atlas-plan__day">{{ dayLabel(group.date) }}</span>
+                <span class="atlas-plan__count">{{ placesLabel(group.places.length) }}</span>
+              </h3>
+
+              <ul class="atlas-places" [attr.aria-labelledby]="dayHeadingId(group.date)">
+                @for (place of group.places; track place.id) {
+                  <ng-container
+                    [ngTemplateOutlet]="placeRow"
+                    [ngTemplateOutletContext]="{ place }"
+                  />
+                }
+              </ul>
+            </div>
+          }
+        </section>
+      }
+
+      @if (unplannedCount() > 0) {
+        <p class="atlas-list__note">
+          {{ placesLabel(unplannedCount()) }} have no day yet. Open a stop to plan one.
+        </p>
+      }
+    </div>
+  }
+
+  @if (unfiled().length > 0) {
+    <div class="atlas-list__unfiled-section">
+      <div class="section-head">
+        <h2>Not yet in a destination</h2>
+        <p class="section-head__meta">{{ placesLabel(unfiled().length) }}</p>
+      </div>
+      <p class="atlas-list__note">
+        These places were saved before stops were unified. File one under a destination to put
+        it back on the journey.
+      </p>
+
+      <ul class="atlas-places">
+        @for (place of unfiled(); track place.id) {
+          <li class="atlas-places__row atlas-places__row--file">
+            <button
+              type="button"
+              class="atlas-places__item"
+              [class.atlas-places__item--selected]="isSelected('place', place.id)"
+              [attr.aria-pressed]="isSelected('place', place.id)"
+              (click)="selectUnfiled(place)"
+            >
+              <span class="atlas-places__name">{{ place.name }}</span>
+              <span class="atlas-places__facts">
+                @if (place.category; as category) {
+                  <span class="atlas-places__category">{{ categoryLabel(category) }}</span>
+                }
+                @if (place.address; as address) {
+                  <span class="atlas-places__where">{{ address }}</span>
+                }
+              </span>
+            </button>
+
+            <div class="atlas-places__file">
+              <select
+                #parentSelect
+                class="atlas-list__file-select"
+                [attr.aria-label]="'File ' + place.name + ' under a destination'"
+              >
+                <option value="">Choose a destination</option>
+                @for (destination of ordered(); track destination.id) {
+                  <option [value]="destination.id">{{ destination.name }}</option>
+                }
+              </select>
+              <button
+                type="button"
+                class="button button--secondary"
+                (click)="fileUnfiled(place, parentSelect.value)"
+              >
+                File
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  }
 </section>
+
+<ng-template #placeRow let-place="place">
+  <li class="atlas-places__row">
+    <button
+      type="button"
+      class="atlas-places__item"
+      [class.atlas-places__item--selected]="
+        isSelected(parentOf(place) ? 'stop' : 'place', place.id)
+      "
+      [attr.aria-pressed]="isSelected(parentOf(place) ? 'stop' : 'place', place.id)"
+      (click)="parentOf(place) ? selectStop(place) : selectUnfiled(place)"
+    >
+      <span class="atlas-places__name">{{ place.name }}</span>
+      <span class="atlas-places__facts">
+        @if (place.category; as category) {
+          <span class="atlas-places__category">{{ categoryLabel(category) }}</span>
+        }
+        @if (parentOf(place); as parent) {
+          <span class="atlas-places__where">{{ parent.name }}</span>
+        }
+        @if (place.address; as address) {
+          <span class="atlas-places__where">{{ address }}</span>
+        }
+      </span>
+    </button>
+  </li>
+</ng-template>

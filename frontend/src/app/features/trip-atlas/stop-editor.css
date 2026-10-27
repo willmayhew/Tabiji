@@ -42,6 +42,13 @@
   font-size: var(--text-xl);
 }
 
+.editor__parent {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
 /* Search --------------------------------------------------------------- */
 
 .editor__search {
@@ -149,6 +156,36 @@
 
 .editor__row select {
   width: 100%;
+}
+
+/* The stay's two dates share one fixed width, exactly as the trip editor's
+   Arrive/Leave do, so neither can clip the native date value. */
+.stop-editor__dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.stop-editor__date {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 0 0 auto;
+}
+
+.stop-editor__date-label {
+  color: var(--color-ink-faint);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.stop-editor__date-input {
+  inline-size: var(--route-date-width);
+  min-inline-size: var(--route-date-width);
+  flex: 0 0 auto;
+  box-sizing: border-box;
 }
 
 .editor__actions {

@@ -53,4 +53,10 @@ internal sealed class FakeTripRepository : ITripRepository
 
         return Task.CompletedTask;
     }
+
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var removed = _trips.Remove(id);
+        return Task.FromResult(removed);
+    }
 }

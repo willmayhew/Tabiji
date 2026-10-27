@@ -36,6 +36,7 @@
             [trip]="found"
             (saved)="onSaved($event)"
             (cancelled)="cancelEditing()"
+            (deleted)="onDeleted()"
           />
         </div>
       } @else {

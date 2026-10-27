@@ -23,4 +23,9 @@ public interface ITripRepository
     /// left half changed.
     /// </summary>
     Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes the trip and its route when found.
+    /// </summary>
+    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

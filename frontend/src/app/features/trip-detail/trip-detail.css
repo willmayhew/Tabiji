@@ -114,7 +114,6 @@
 
 .detail__list {
   margin: 0;
-  border-top: var(--rule-hairline) solid var(--color-rule);
 }
 
 .detail__row {

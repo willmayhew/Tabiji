@@ -135,6 +135,10 @@
      edit mode lay the route out the same way. It is generous on purpose: a
      stop's name keeps a wide field of its own beside its dates. */
   --editor-width: 56rem;
+  /* The width of one date field in the route editor. It is fixed so that
+     Arrive and Leave always match, and it is wide enough for the longest
+     date the product supports plus the native picker's own chrome. */
+  --route-date-width: 11.5rem;
   --measure: 62ch;
   --measure-tight: 24ch;
   --measure-editorial: 46ch;

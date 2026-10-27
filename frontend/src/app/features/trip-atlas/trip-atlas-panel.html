@@ -1,86 +1,137 @@
-@if (place(); as saved) {
+@if (stop(); as selected) {
   <section class="atlas-panel" aria-labelledby="atlas-panel-title">
     <div class="section-head">
-      <h2 id="atlas-panel-title">Saved place</h2>
-      @if (saved.category; as category) {
-        <p class="section-head__meta">{{ category }}</p>
+      <h2 id="atlas-panel-title">Selected stop</h2>
+      @if (stopLabel(); as label) {
+        <p class="section-head__meta">
+          Stop {{ label }} at {{ parent()?.name ?? 'its destination' }}
+        </p>
       }
     </div>
 
-    <h3 #placeHeading class="atlas-panel__name" tabindex="-1">{{ saved.name }}</h3>
+    <h3 class="atlas-panel__name">{{ selected.name }}</h3>
 
     <dl class="atlas-panel__list">
-      @if (saved.address; as address) {
+      <div class="atlas-panel__row">
+        <dt>Destination</dt>
+        <dd>{{ parent()?.name ?? '—' }}</dd>
+      </div>
+      <div class="atlas-panel__row">
+        <dt>Dates</dt>
+        <dd [class.atlas-panel__undecided]="selected.startsOn === null && selected.endsOn === null">
+          {{ dates() }}
+        </dd>
+      </div>
+      @if (categoryOf(selected); as category) {
+        <div class="atlas-panel__row">
+          <dt>Category</dt>
+          <dd>{{ categoryLabel(category) }}</dd>
+        </div>
+      }
+      @if (addressOf(selected); as address) {
         <div class="atlas-panel__row">
           <dt>Address</dt>
           <dd>{{ address }}</dd>
         </div>
       }
       <div class="atlas-panel__row">
-        <dt>Stops</dt>
-        <dd>{{ filedUnder() }}</dd>
+        <dt>Planned day</dt>
+        <dd [class.atlas-panel__undecided]="selected.plannedOn == null">{{ plannedDay() }}</dd>
       </div>
-      <div class="atlas-panel__row">
-        <dt>Coordinates</dt>
-        <dd>{{ coordinates() }}</dd>
-      </div>
-    </dl>
-
-    @if (saved.notes; as notes) {
-      <p class="atlas-panel__notes">{{ notes }}</p>
-    }
-
-    <div class="atlas-panel__actions">
-      <button type="button" class="button button--secondary" (click)="editPlace.emit(saved)">
-        Edit place
-      </button>
-      <button type="button" class="button button--secondary" (click)="deletePlace.emit(saved)">
-        Delete place
-      </button>
-    </div>
-  </section>
-} @else if (destination(); as stop) {
-  <section class="atlas-panel" aria-labelledby="atlas-panel-title">
-    <div class="section-head">
-      <h2 id="atlas-panel-title">Selected stop</h2>
-      @if (position(); as place) {
-        <p class="section-head__meta">Stop {{ place }} of {{ total() }}</p>
+      @if (coordinates(); as position) {
+        <div class="atlas-panel__row">
+          <dt>Coordinates</dt>
+          <dd>{{ position }}</dd>
+        </div>
       }
-    </div>
-
-    <h3 class="atlas-panel__name">{{ stop.name }}</h3>
-
-    <dl class="atlas-panel__list">
-      <div class="atlas-panel__row">
-        <dt>Dates</dt>
-        <dd [class.atlas-panel__undecided]="stop.startsOn === null && stop.endsOn === null">
-          {{ dates() }}
-        </dd>
-      </div>
       <div class="atlas-panel__row">
         <dt>Location</dt>
         <dd>{{ located() ? 'On the map' : 'Not on the map' }}</dd>
       </div>
     </dl>
 
+    @if (notesOf(selected); as notes) {
+      <p class="atlas-panel__notes">{{ notes }}</p>
+    }
+
+    <div class="atlas-panel__actions">
+      <button type="button" class="button button--secondary" (click)="editStop.emit(selected)">
+        Edit stop
+      </button>
+      <button type="button" class="button button--secondary" (click)="removeStop.emit(selected)">
+        Remove stop
+      </button>
+    </div>
+  </section>
+} @else if (destination(); as selected) {
+  <section class="atlas-panel" aria-labelledby="atlas-panel-title">
+    <div class="section-head">
+      <h2 id="atlas-panel-title">Selected destination</h2>
+      @if (position(); as place) {
+        <p class="section-head__meta">Destination {{ place }} of {{ total() }}</p>
+      }
+    </div>
+
+    <h3 class="atlas-panel__name">{{ selected.name }}</h3>
+
+    <dl class="atlas-panel__list">
+      <div class="atlas-panel__row">
+        <dt>Dates</dt>
+        <dd [class.atlas-panel__undecided]="selected.startsOn === null && selected.endsOn === null">
+          {{ dates() }}
+        </dd>
+      </div>
+      @if (categoryOf(selected); as category) {
+        <div class="atlas-panel__row">
+          <dt>Category</dt>
+          <dd>{{ categoryLabel(category) }}</dd>
+        </div>
+      }
+      @if (addressOf(selected); as address) {
+        <div class="atlas-panel__row">
+          <dt>Address</dt>
+          <dd>{{ address }}</dd>
+        </div>
+      }
+      @if (selected.plannedOn) {
+        <div class="atlas-panel__row">
+          <dt>Planned day</dt>
+          <dd>{{ plannedDay() }}</dd>
+        </div>
+      }
+      <div class="atlas-panel__row">
+        <dt>Location</dt>
+        <dd>{{ located() ? 'On the map' : 'Not on the map' }}</dd>
+      </div>
+    </dl>
+
+    @if (notesOf(selected); as notes) {
+      <p class="atlas-panel__notes">{{ notes }}</p>
+    }
+
     <div class="atlas-panel__places">
-      <p class="atlas-panel__caption" id="stop-places-caption">
-        Saved places
-        @if (placesAtStop().length > 0) {
-          <span class="atlas-panel__count">{{ placesAtStopLabel() }}</span>
-        }
+      <p class="atlas-panel__caption" id="destination-stops-caption">
+        Stops
+        <span class="atlas-panel__count">{{ stopCountLabel(selected) }}</span>
       </p>
 
-      @if (placesAtStop().length === 0) {
-        <p class="atlas-panel__hint">Nothing saved here yet.</p>
+      @if (stopsAtDestination().length === 0) {
+        <p class="atlas-panel__hint">
+          No stops in this destination yet. Add one with the + beside its stop count.
+        </p>
       } @else {
-        <ul class="atlas-panel__places-list" aria-labelledby="stop-places-caption">
-          @for (saved of placesAtStop(); track saved.id) {
+        <ul class="atlas-panel__places-list" aria-labelledby="destination-stops-caption">
+          @for (stop of stopsAtDestination(); track stop.id; let index = $index) {
             <li>
-              <button type="button" class="atlas-panel__place" (click)="chooseFromStop(saved)">
-                <span class="atlas-panel__place-name">{{ saved.name }}</span>
-                @if (saved.category; as category) {
-                  <span class="atlas-panel__place-category">{{ category }}</span>
+              <button
+                type="button"
+                class="atlas-panel__place atlas-panel__place--stop"
+                (click)="selectStop.emit(stop)"
+              >
+                <span class="atlas-panel__place-label">{{ labelFor(index) }}</span>
+                <span class="atlas-panel__place-name">{{ stop.name }}</span>
+                @if (!isStopLocated(stop)) {
+                  <span class="atlas-panel__place-category">Not on the map</span>
                 }
               </button>
             </li>
@@ -89,14 +140,51 @@
       }
     </div>
 
-    <button type="button" class="button button--secondary" (click)="changeLocation.emit(stop)">
-      Change location
-    </button>
-
     <p class="atlas-panel__hint">
       The name, the order and the dates are changed on the trip page.
     </p>
   </section>
+} @else if (place(); as saved) {
+  <section class="atlas-panel" aria-labelledby="atlas-panel-title">
+    <div class="section-head">
+      <h2 id="atlas-panel-title">Not yet in a destination</h2>
+    </div>
+
+    <h3 class="atlas-panel__name">{{ saved.name }}</h3>
+
+    <dl class="atlas-panel__list">
+      @if (categoryOf(saved); as category) {
+        <div class="atlas-panel__row">
+          <dt>Category</dt>
+          <dd>{{ categoryLabel(category) }}</dd>
+        </div>
+      }
+      @if (addressOf(saved); as address) {
+        <div class="atlas-panel__row">
+          <dt>Address</dt>
+          <dd>{{ address }}</dd>
+        </div>
+      }
+      <div class="atlas-panel__row">
+        <dt>Planned day</dt>
+        <dd [class.atlas-panel__undecided]="saved.plannedOn == null">{{ plannedDay() }}</dd>
+      </div>
+      @if (coordinates(); as position) {
+        <div class="atlas-panel__row">
+          <dt>Coordinates</dt>
+          <dd>{{ position }}</dd>
+        </div>
+      }
+    </dl>
+
+    @if (notesOf(saved); as notes) {
+      <p class="atlas-panel__notes">{{ notes }}</p>
+    }
+
+    <p class="atlas-panel__hint">
+      File this place under a destination from the Route list to put it back on the journey.
+    </p>
+  </section>
 } @else {
-  <p class="atlas-panel__empty">Select a stop or a saved place to see its details.</p>
+  <p class="atlas-panel__empty">Select a destination, a stop or a place to see its details.</p>
 }

@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { delay, Observable, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { CreateTrip, Trip, UpdateTrip } from '../models/trip';
 
@@ -26,5 +26,10 @@ export class TripsService {
    */
   update(id: string, request: UpdateTrip): Observable<Trip> {
     return this.http.put<Trip>(`${environment.apiBaseUrl}/api/trips/${id}`, request);
+  }
+
+  /** Deletes a trip and everything on its route. */
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/api/trips/${id}`);
   }
 }

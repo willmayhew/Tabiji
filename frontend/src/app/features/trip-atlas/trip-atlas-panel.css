@@ -143,6 +143,17 @@
   color: var(--color-forest);
 }
 
+.atlas-panel__place-label {
+  flex: none;
+  min-width: 1.5rem;
+  color: var(--color-terracotta-deep);
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .atlas-panel__place-name {
   min-width: 0;
   overflow-wrap: anywhere;

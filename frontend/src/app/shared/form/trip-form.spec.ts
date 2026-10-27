@@ -43,6 +43,41 @@ const existingTrip: Trip = {
   status: 'Planning',
 };
 
+/** A trip whose stop carries the details the Atlas stop editor writes. */
+const detailedTrip: Trip = {
+  id: '9c4d5e6f-0000-0000-0000-000000000000',
+  name: 'Japan',
+  destinations: [
+    {
+      id: 'd4000000-0000-0000-0000-000000000000',
+      name: 'Kyoto',
+      sortOrder: 0,
+      startsOn: '2027-04-01',
+      endsOn: '2027-04-05',
+      latitude: null,
+      longitude: null,
+      stops: [
+        {
+          id: 'e5000000-0000-0000-0000-000000000000',
+          name: 'Gion',
+          sortOrder: 0,
+          startsOn: null,
+          endsOn: null,
+          latitude: null,
+          longitude: null,
+          category: 'Sight',
+          address: 'Gion, Kyoto',
+          notes: 'Go early.',
+          plannedOn: '2027-04-02',
+        },
+      ],
+    },
+  ],
+  startsOn: '2027-04-01',
+  endsOn: '2027-04-14',
+  status: 'Planning',
+};
+
 /** A trip whose first stop was chosen from a map. */
 const mappedTrip: Trip = {
   id: '7a1b2c3d-0000-0000-0000-000000000000',
@@ -120,15 +155,59 @@ describe('TripForm', () => {
     fixture.detectChanges();
   }
 
-  function addStop(): void {
-    const button = element().querySelector('.route__add button') as HTMLButtonElement;
+  function addDestination(): void {
+    const button = [...element().querySelectorAll('.route__add button')].find(
+      (candidate) => candidate.textContent?.trim() === 'Add a destination',
+    ) as HTMLButtonElement | undefined;
 
-    button.click();
+    button?.click();
     fixture.detectChanges();
   }
 
   function action(label: string): HTMLButtonElement {
     return element().querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement;
+  }
+
+  function addChildStop(destinationIndex: number): void {
+    const panel = element().querySelectorAll('.route__stops')[destinationIndex] as
+      | HTMLElement
+      | undefined;
+
+    const button = [...(panel?.querySelectorAll('button') ?? [])].find(
+      (candidate) => candidate.textContent?.trim() === 'Add a stop',
+    ) as HTMLButtonElement | undefined;
+
+    button?.click();
+    fixture.detectChanges();
+  }
+
+  function childStopInput(destinationIndex: number, stopIndex: number): HTMLInputElement {
+    return element().querySelector(
+      `#trip-stop-${destinationIndex}-${stopIndex}`,
+    ) as HTMLInputElement;
+  }
+
+  function typeChildStop(destinationIndex: number, stopIndex: number, value: string): void {
+    const field = childStopInput(destinationIndex, stopIndex);
+
+    field.value = value;
+    field.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+  }
+
+  function typeChildDate(
+    destinationIndex: number,
+    stopIndex: number,
+    field: 'startsOn' | 'endsOn',
+    value: string,
+  ): void {
+    const date = element().querySelector(
+      `#trip-stop-${destinationIndex}-${stopIndex}-${field}`,
+    ) as HTMLInputElement;
+
+    date.value = value;
+    date.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
   }
 
   /** Fills the route, in order, through the interface a reader would use. */
@@ -142,7 +221,7 @@ describe('TripForm', () => {
     }
 
     while (rows().length < names.length) {
-      addStop();
+      addDestination();
     }
 
     names.forEach((name, index) => type(index, name));
@@ -247,9 +326,9 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05', latitude: null, longitude: null },
-      { name: 'Amalfi', startsOn: '2027-04-05', endsOn: '2027-04-08', latitude: null, longitude: null },
-      { name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null },
+      { name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-05', latitude: null, longitude: null, stops: [] },
+      { name: 'Amalfi', startsOn: '2027-04-05', endsOn: '2027-04-08', latitude: null, longitude: null, stops: [] },
+      { name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null, stops: [] },
     ]);
   });
 
@@ -262,7 +341,7 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Rome', startsOn: null, endsOn: null, latitude: null, longitude: null },
+      { name: 'Rome', startsOn: null, endsOn: null, latitude: null, longitude: null, stops: [] },
     ]);
   });
 
@@ -278,7 +357,7 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Rome', startsOn: '2027-04-01', endsOn: null, latitude: null, longitude: null },
+      { name: 'Rome', startsOn: '2027-04-01', endsOn: null, latitude: null, longitude: null, stops: [] },
     ]);
   });
 
@@ -334,10 +413,72 @@ describe('TripForm', () => {
     expect(message?.textContent).toContain('Kyoto');
   });
 
-  it('should add a stop', () => {
-    addStop();
+  it('should add a destination', () => {
+    addDestination();
 
     expect(rows().length).toBe(2);
+  });
+
+  it('should keep a stop out of the main route count', () => {
+    setDestinations(['Osaka']);
+
+    addChildStop(0);
+
+    // The destination row is the route; the stop is nested inside it.
+    expect(rows()).toHaveLength(1);
+    expect(element().querySelectorAll('.stops__row')).toHaveLength(1);
+  });
+
+  it('should send a stop nested under its destination', () => {
+    setDestinations(['Osaka', 'Kyoto']);
+    setTripFields();
+
+    addChildStop(0);
+    typeChildStop(0, 0, 'Namba');
+    addChildStop(0);
+    typeChildStop(0, 1, 'Umeda');
+
+    submit();
+
+    const request = http.expectOne('/api/trips');
+
+    expect(request.request.body.destinations).toEqual([
+      {
+        name: 'Osaka',
+        startsOn: null,
+        endsOn: null,
+        latitude: null,
+        longitude: null,
+        stops: [
+          { name: 'Namba', startsOn: null, endsOn: null, latitude: null, longitude: null },
+          { name: 'Umeda', startsOn: null, endsOn: null, latitude: null, longitude: null },
+        ],
+      },
+      {
+        name: 'Kyoto',
+        startsOn: null,
+        endsOn: null,
+        latitude: null,
+        longitude: null,
+        stops: [],
+      },
+    ]);
+  });
+
+  it('should refuse a stop that falls outside its destination', () => {
+    setDestinations(['Osaka']);
+    setTripFields();
+    typeDate(0, 'startsOn', '2027-04-01');
+    typeDate(0, 'endsOn', '2027-04-05');
+
+    addChildStop(0);
+    typeChildStop(0, 0, 'Namba');
+    typeChildDate(0, 0, 'startsOn', '2027-04-10');
+
+    submit();
+
+    http.expectNone('/api/trips');
+    expect(element().textContent).toContain('after "Osaka" ends');
   });
 
   it('should remove a stop', () => {
@@ -511,6 +652,34 @@ describe('TripForm', () => {
     expect(fixture.componentInstance.form.controls.startsOn.value).toBe('2027-04-01');
   });
 
+  it("should carry a stop's details back when the trip is edited", () => {
+    fixture.componentRef.setInput('trip', detailedTrip);
+    fixture.detectChanges();
+
+    submit();
+
+    const request = http.expectOne(`/api/trips/${detailedTrip.id}`);
+    const body = request.request.body as {
+      destinations: {
+        stops: {
+          id: string;
+          category: string | null;
+          address: string | null;
+          notes: string | null;
+          plannedOn: string | null;
+        }[];
+      }[];
+    };
+
+    expect(body.destinations[0].stops[0]).toMatchObject({
+      id: 'e5000000-0000-0000-0000-000000000000',
+      category: 'Sight',
+      address: 'Gion, Kyoto',
+      notes: 'Go early.',
+      plannedOn: '2027-04-02',
+    });
+  });
+
   it('should offer to save rather than to create when it is editing', () => {
     fixture.componentRef.setInput('trip', existingTrip);
     fixture.detectChanges();
@@ -524,7 +693,7 @@ describe('TripForm', () => {
     fixture.detectChanges();
 
     type(0, 'Roma');
-    addStop();
+    addDestination();
     type(2, 'Naples');
 
     submit();
@@ -543,6 +712,7 @@ describe('TripForm', () => {
           endsOn: '2027-04-05',
           latitude: null,
           longitude: null,
+          stops: [],
         },
         {
           id: 'b2000000-0000-0000-0000-000000000000',
@@ -551,8 +721,9 @@ describe('TripForm', () => {
           endsOn: null,
           latitude: null,
           longitude: null,
+          stops: [],
         },
-        { id: null, name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null },
+        { id: null, name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null, stops: [] },
       ],
     });
   });
@@ -694,7 +865,7 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Kyoto', startsOn: null, endsOn: null, latitude: 35.0116, longitude: 135.7681 },
+      { name: 'Kyoto', startsOn: null, endsOn: null, latitude: 35.0116, longitude: 135.7681, stops: [] },
     ]);
   });
 
@@ -709,7 +880,7 @@ describe('TripForm', () => {
     const request = http.expectOne('/api/trips');
 
     expect(request.request.body.destinations).toEqual([
-      { name: 'Kyoto, Japan', startsOn: null, endsOn: null, latitude: null, longitude: null },
+      { name: 'Kyoto, Japan', startsOn: null, endsOn: null, latitude: null, longitude: null, stops: [] },
     ]);
   });
 

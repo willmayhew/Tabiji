@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
@@ -35,6 +35,7 @@ interface TripDetailResult {
 export class TripDetail {
   private readonly tripsService = inject(TripsService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Emits when the reader asks to try the request again. */
@@ -48,6 +49,9 @@ export class TripDetail {
   /** Whether the trip is being changed. */
   readonly editing = signal(false);
 
+  /** Set once the trip is deleted, so the unsaved-changes guard stays out of the way. */
+  private readonly deleted = signal(false);
+
   /** The editor, when the page is in edit mode. */
   private readonly tripForm = viewChild(TripForm);
 
@@ -60,6 +64,7 @@ export class TripDetail {
           this.error.set(null);
           this.notFound.set(false);
           this.editing.set(false);
+          this.deleted.set(false);
         }),
         map((params) => params.get('id') ?? ''),
         switchMap((id) =>
@@ -111,12 +116,18 @@ export class TripDetail {
     this.editing.set(false);
   }
 
+  protected onDeleted(): void {
+    this.deleted.set(true);
+    this.editing.set(false);
+    void this.router.navigate(['/trips']);
+  }
+
   /**
    * Whether the reader has a change they have not saved. The guard on the
    * route asks about it before the reader goes anywhere else.
    */
   hasUnsavedChanges(): boolean {
-    return this.editing() && (this.tripForm()?.isDirty() ?? false);
+    return !this.deleted() && this.editing() && (this.tripForm()?.isDirty() ?? false);
   }
 
   protected readonly dates = computed(() => {
@@ -161,7 +172,7 @@ export class TripDetail {
 
     return dated === 0
       ? null
-      : `Dates are set for ${dated} of ${found.destinations.length} stops`;
+      : `Dates are set for ${dated} of ${found.destinations.length} destinations`;
   });
 
   /** The dates of one stop, or a note that they have not been decided. */

@@ -37,6 +37,11 @@ const dayMonthYear = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
 });
 
+const weekdayShort = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'short',
+  timeZone: 'UTC',
+});
+
 /** Parses `YYYY-MM-DD` as a UTC date, or returns null when it is not one. */
 function parseIsoDate(value: string): Date | null {
   const match = ISO_DATE.exec(value);
@@ -132,4 +137,26 @@ export function formatDestinationDates(
   return startsOn !== null
     ? `From ${dayMonthYear.format(single)}`
     : `Until ${dayMonthYear.format(single)}`;
+}
+
+/**
+ * Formats the day a place is planned for, as "Wed 1 Apr 2027".
+ *
+ * The day of the week comes first because that is how an itinerary is read:
+ * a plan is a week of days, not a list of dates. It is the same day the API
+ * holds, parsed and formatted in UTC like every other date here, so a plan
+ * never lands a day early or late.
+ *
+ * The weekday and the date are formatted separately and joined, rather than
+ * asked for together: asked for together, the pattern puts a comma after the
+ * weekday, and nothing else written here carries punctuation between its
+ * parts.
+ *
+ * Returns `null` when the value is not a plain `YYYY-MM-DD` date, so the
+ * caller can fall back to showing the raw value rather than inventing a day.
+ */
+export function formatPlanDay(value: string): string | null {
+  const date = parseIsoDate(value);
+
+  return date === null ? null : `${weekdayShort.format(date)} ${dayMonthYear.format(date)}`;
 }

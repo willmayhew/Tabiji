@@ -28,16 +28,113 @@
   order: 3;
 }
 
-/* A stop's own message runs under the whole row, not under its input. */
+/* A place's own message runs under the whole row, not under its input. */
 .form .route__row .field-error {
   grid-column: 1 / -1;
   margin: 0;
+}
+
+.form .stops__row .field-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* The stops within a destination ---------------------------------------
+   The panel is a grid item of the destination row, spanning every column,
+   so it sits under the destination without disturbing the hairline that
+   joins the destinations. The controls are kept in the document when the
+   panel is closed, so collapsing never loses what the reader entered. */
+
+.route__stops {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0 0 var(--space-2xs) 2.125rem;
+  padding-inline-start: var(--space-sm);
+  border-inline-start: 1px solid var(--color-rule);
+}
+
+.route__stops[hidden] {
+  display: none;
+}
+
+.route__stops-caption {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-eyebrow);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.stops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stops__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-xs);
+  padding-block: var(--space-3xs);
+}
+
+/* A stop is a part of the place, not a leg of the journey: its node is a
+   small hollow dot and never carries a main-route number. */
+.stops__node {
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 1rem;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.stops__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.stops__row .route__actions {
+  margin-top: 0.5rem;
+}
+
+.route__toggle {
+  font-size: var(--text-xs);
+}
+
+.route__add--stop {
+  padding-top: 0;
 }
 
 .form__actions {
   display: flex;
   flex-direction: column;
   gap: var(--space-2xs);
+}
+
+.form__actions-row {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+/* Cancel takes three parts, Delete one. `flex-basis: 0` makes the ratio
+   independent of the labels' own widths. */
+.form__actions-main {
+  flex: 3 1 0;
+}
+
+.form__actions-side {
+  flex: 1 1 0;
 }
 
 @media (max-width: 40rem) {
@@ -53,5 +150,21 @@
 
   .form .route__actions {
     grid-column: 2;
+  }
+
+  /* The stops panel gives back the indent the parent row cannot spare, and
+     a stop's own buttons sit under its fields rather than beside them. */
+  .route__stops {
+    margin-inline-start: 0;
+    padding-inline-start: var(--space-xs);
+  }
+
+  .form .stops__row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .stops__row .route__actions {
+    grid-column: 2;
+    margin-top: 0;
   }
 }

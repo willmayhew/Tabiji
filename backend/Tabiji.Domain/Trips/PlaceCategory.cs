@@ -16,5 +16,6 @@ public enum PlaceCategory
     Stay = 2,
     Shop = 3,
     Transport = 4,
-    Other = 5
+    Other = 5,
+    Entertainment = 6,
 }

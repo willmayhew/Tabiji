@@ -8,77 +8,109 @@ using Tabiji.Domain.Trips;
 namespace Tabiji.Tests;
 
 /// <summary>
-/// The saved-place HTTP surface.
+/// The read-only saved-place compatibility routes.
 ///
-/// Every route names the trip as well as the place, so these tests are about
-/// two things at once: that the wiring is right, and that a place belonging
-/// to another trip is never reachable through it.
+/// Places are rows of the trip's hierarchy now, and the trip API is the only
+/// writer. These tests prove that the old read routes still expose the places
+/// that carry a position, and that the retired write routes are gone.
 /// </summary>
 public sealed class SavedPlaceEndpointTests : IDisposable
 {
+    private static readonly DateOnly StartsOn = new(2027, 4, 10);
+    private static readonly DateOnly EndsOn = new(2027, 4, 14);
+    private static readonly DateTimeOffset CreatedAt = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);
+
     // The API serialises enums as strings, so the test client needs the same options.
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() }
     };
 
-    private readonly SavedPlaceApiFactory _factory = new();
+    private static Trip KyotoWithPlaces() => Trip.Create(
+        "Kyoto",
+        [
+            new TripDestinationDraft(
+                null,
+                "Kyoto",
+                StartsOn,
+                EndsOn,
+                null,
+                null,
+                [
+                    new TripStopDraft(
+                        null,
+                        "Gion",
+                        null,
+                        null,
+                        35.0037,
+                        135.7788,
+                        PlaceCategory.Sight,
+                        "Gion, Kyoto",
+                        "Go early.",
+                        new DateOnly(2027, 4, 11)),
+                    new TripStopDraft(
+                        null,
+                        "Arashiyama",
+                        null,
+                        null,
+                        null,
+                        null,
+                        PlaceCategory.Sight,
+                        null,
+                        null,
+                        new DateOnly(2027, 4, 12)),
+                ]),
+        ],
+        StartsOn,
+        EndsOn,
+        CreatedAt);
+
+    private static Trip Rome() => Trip.Create(
+        "Rome",
+        [new TripDestinationDraft(null, "Rome", StartsOn, EndsOn)],
+        StartsOn,
+        EndsOn,
+        CreatedAt);
+
+    private readonly Trip _kyoto = KyotoWithPlaces();
+    private readonly Trip _rome = Rome();
+    private readonly TripApiFactory _factory;
+
+    public SavedPlaceEndpointTests()
+    {
+        _factory = new TripApiFactory([_kyoto, _rome]);
+    }
 
     public void Dispose() => _factory.Dispose();
 
     private static string Route(Guid tripId) => $"/api/trips/{tripId}/places";
 
-    private static CreateSavedPlaceRequest CreateRequest(
-        string name = "Kinkaku-ji",
-        double? latitude = 35.0394,
-        double? longitude = 135.7292,
-        PlaceCategory? category = PlaceCategory.Sight,
-        string? address = null,
-        string? notes = null,
-        Guid? destinationId = null) =>
-        new(name, latitude, longitude, category, address, notes, destinationId);
+    private Guid GionId() => _kyoto.StopsOf(_kyoto.ParentDestinations[0].Id)[0].Id;
 
-    private static UpdateSavedPlaceRequest UpdateRequest(
-        string name = "Kinkaku-ji",
-        double? latitude = 35.0394,
-        double? longitude = 135.7292,
-        PlaceCategory? category = PlaceCategory.Sight,
-        string? address = null,
-        string? notes = null,
-        Guid? destinationId = null) =>
-        new(name, latitude, longitude, category, address, notes, destinationId);
+    private Guid ArashiyamaId() => _kyoto.StopsOf(_kyoto.ParentDestinations[0].Id)[1].Id;
 
     [Fact]
-    public async Task List_ReturnsThePlacesOfTheTripInTheOrderTheyWereSaved()
+    public async Task List_ReturnsOnlyThePlacesThatCarryAPosition()
     {
         using var client = _factory.CreateClient();
 
         var places = await client.GetFromJsonAsync<SavedPlaceResponse[]>(
-            Route(SavedPlaceApiFactory.Kyoto.Id),
+            Route(_kyoto.Id),
             JsonOptions);
 
         Assert.NotNull(places);
-        Assert.Equal(["Nishiki Market", "Fushimi Inari"], places!.Select(place => place.Name));
-    }
+        var place = Assert.Single(places!);
 
-    [Fact]
-    public async Task List_ReturnsTheFieldsOfAPlace()
-    {
-        using var client = _factory.CreateClient();
-
-        var places = await client.GetFromJsonAsync<SavedPlaceResponse[]>(
-            Route(SavedPlaceApiFactory.Kyoto.Id),
-            JsonOptions);
-
-        Assert.NotNull(places);
-
-        var market = places!.Single(place => place.Name == "Nishiki Market");
-
-        Assert.Equal(35.0050, market.Latitude);
-        Assert.Equal(135.7649, market.Longitude);
-        Assert.Equal(PlaceCategory.Food, market.Category);
-        Assert.NotEqual(Guid.Empty, market.Id);
-        Assert.Null(market.DestinationId);
+        Assert.Equal("Gion", place.Name);
+        Assert.Equal(GionId(), place.Id);
+        Assert.Equal(_kyoto.ParentDestinations[0].Id, place.DestinationId);
+        Assert.Equal(35.0037, place.Latitude);
+        Assert.Equal(135.7788, place.Longitude);
+        Assert.Equal(PlaceCategory.Sight, place.Category);
+        Assert.Equal("Gion, Kyoto", place.Address);
+        Assert.Equal("Go early.", place.Notes);
+        Assert.Equal(new DateOnly(2027, 4, 11), place.PlannedOn);
+        Assert.Equal(CreatedAt, place.CreatedAt);
     }
 
     [Fact]
@@ -87,7 +119,7 @@ public sealed class SavedPlaceEndpointTests : IDisposable
         using var client = _factory.CreateClient();
 
         var places = await client.GetFromJsonAsync<SavedPlaceResponse[]>(
-            Route(SavedPlaceApiFactory.Rome.Id),
+            Route(_rome.Id),
             JsonOptions);
 
         Assert.NotNull(places);
@@ -109,19 +141,24 @@ public sealed class SavedPlaceEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var expected = stored!.First(place => place.Name == "Fushimi Inari");
-
         var place = await client.GetFromJsonAsync<SavedPlaceResponse>(
-            $"{Route(kyoto.Id)}/{expected.Id}",
+            $"{Route(_kyoto.Id)}/{GionId()}",
             JsonOptions);
 
         Assert.NotNull(place);
-        Assert.Equal(expected.Id, place!.Id);
-        Assert.Equal(kyoto.Destinations[0].Id, place.DestinationId);
+        Assert.Equal(GionId(), place!.Id);
+        Assert.Equal("Gion", place.Name);
+        Assert.Equal(_kyoto.ParentDestinations[0].Id, place.DestinationId);
+    }
+
+    [Fact]
+    public async Task GetById_ReturnsNotFoundForAPlaceWithoutAPosition()
+    {
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"{Route(_kyoto.Id)}/{ArashiyamaId()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -129,8 +166,7 @@ public sealed class SavedPlaceEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var response = await client.GetAsync(
-            $"{Route(SavedPlaceApiFactory.Kyoto.Id)}/{Guid.NewGuid()}");
+        var response = await client.GetAsync($"{Route(_kyoto.Id)}/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -140,352 +176,24 @@ public sealed class SavedPlaceEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var placeId = stored![0].Id;
-
-        // The place exists, but not under this trip.
-        var response = await client.GetAsync($"{Route(SavedPlaceApiFactory.Rome.Id)}/{placeId}");
+        var response = await client.GetAsync($"{Route(_rome.Id)}/{GionId()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
-    public async Task Create_ReturnsCreatedAndThePlaceAppearsInTheList()
+    public async Task WriteRoutes_AreRetired()
     {
         using var client = _factory.CreateClient();
 
-        var kyoto = SavedPlaceApiFactory.Kyoto;
+        var post = await client.PostAsJsonAsync(Route(_kyoto.Id), new { name = "Kinkaku-ji" });
+        var put = await client.PutAsJsonAsync(
+            $"{Route(_kyoto.Id)}/{GionId()}",
+            new { name = "Kinkaku-ji" });
+        var delete = await client.DeleteAsync($"{Route(_kyoto.Id)}/{GionId()}");
 
-        var response = await client.PostAsJsonAsync(
-            Route(kyoto.Id),
-            CreateRequest(address: "1 Kinkakujicho, Kyoto", notes: "Weekday mornings are quiet."));
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        var created = await response.Content.ReadFromJsonAsync<SavedPlaceResponse>(JsonOptions);
-        Assert.NotNull(created);
-
-        Assert.Equal($"{Route(kyoto.Id)}/{created!.Id}", response.Headers.Location?.ToString());
-
-        Assert.Equal("Kinkaku-ji", created.Name);
-        Assert.Equal(35.0394, created.Latitude);
-        Assert.Equal(135.7292, created.Longitude);
-        Assert.Equal(PlaceCategory.Sight, created.Category);
-        Assert.Equal("1 Kinkakujicho, Kyoto", created.Address);
-        Assert.Equal("Weekday mornings are quiet.", created.Notes);
-
-        var places = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-
-        Assert.NotNull(places);
-        Assert.Contains(places!, place => place.Id == created.Id);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, post.StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, put.StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, delete.StatusCode);
     }
-
-    [Fact]
-    public async Task Create_FilesThePlaceUnderAStopOfTheSameTrip()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var stop = kyoto.Destinations[1].Id;
-
-        var response = await client.PostAsJsonAsync(Route(kyoto.Id), CreateRequest(destinationId: stop));
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        var created = await response.Content.ReadFromJsonAsync<SavedPlaceResponse>(JsonOptions);
-
-        Assert.NotNull(created);
-        Assert.Equal(stop, created!.DestinationId);
-    }
-
-    [Fact]
-    public async Task Create_ReturnsNotFoundForAnUnknownTrip()
-    {
-        using var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(Route(Guid.NewGuid()), CreateRequest());
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task Create_ReturnsBadRequestForABlankName(string name)
-    {
-        using var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            Route(SavedPlaceApiFactory.Kyoto.Id),
-            CreateRequest(name: name));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
-
-        Assert.NotNull(problem);
-        Assert.Contains("name is required", problem!.Detail, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(91.0, 0.0)]
-    [InlineData(-91.0, 0.0)]
-    [InlineData(0.0, 181.0)]
-    [InlineData(0.0, -181.0)]
-    public async Task Create_ReturnsBadRequestForAPositionOffTheGlobe(double latitude, double longitude)
-    {
-        using var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            Route(SavedPlaceApiFactory.Kyoto.Id),
-            CreateRequest(latitude: latitude, longitude: longitude));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Theory]
-    [InlineData(null, 135.7727)]
-    [InlineData(34.9671, null)]
-    [InlineData(null, null)]
-    public async Task Create_ReturnsBadRequestWhenThePositionIsMissing(double? latitude, double? longitude)
-    {
-        using var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            Route(SavedPlaceApiFactory.Kyoto.Id),
-            CreateRequest(latitude: latitude, longitude: longitude));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
-
-        Assert.NotNull(problem);
-        Assert.Contains("is required", problem!.Detail, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Create_ReturnsBadRequestForAStopOfAnotherTrip()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var stopOfAnotherTrip = SavedPlaceApiFactory.Rome.Destinations[0].Id;
-
-        var response = await client.PostAsJsonAsync(
-            Route(kyoto.Id),
-            CreateRequest(destinationId: stopOfAnotherTrip));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
-
-        Assert.NotNull(problem);
-        Assert.Contains("does not belong to this trip", problem!.Detail, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Create_ReturnsBadRequestForAStopThatDoesNotExist()
-    {
-        using var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            Route(SavedPlaceApiFactory.Kyoto.Id),
-            CreateRequest(destinationId: Guid.NewGuid()));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Update_ChangesThePlaceIncludingItsFiling()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var placeId = stored![0].Id;
-        var stop = kyoto.Destinations[1].Id;
-
-        var response = await client.PutAsJsonAsync(
-            $"{Route(kyoto.Id)}/{placeId}",
-            UpdateRequest(
-                name: "Nishiki Market",
-                latitude: 35.0050,
-                longitude: 135.7649,
-                category: PlaceCategory.Food,
-                address: "Kyoto",
-                notes: "Closed on Wednesdays.",
-                destinationId: stop));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var updated = await response.Content.ReadFromJsonAsync<SavedPlaceResponse>(JsonOptions);
-        Assert.NotNull(updated);
-        Assert.Equal("Nishiki Market", updated!.Name);
-        Assert.Equal(PlaceCategory.Food, updated.Category);
-        Assert.Equal("Kyoto", updated.Address);
-        Assert.Equal("Closed on Wednesdays.", updated.Notes);
-        Assert.Equal(stop, updated.DestinationId);
-        Assert.Equal(placeId, updated.Id);
-
-        var reread = await client.GetFromJsonAsync<SavedPlaceResponse>(
-            $"{Route(kyoto.Id)}/{placeId}",
-            JsonOptions);
-
-        Assert.NotNull(reread);
-        Assert.Equal(stop, reread!.DestinationId);
-    }
-
-    [Fact]
-    public async Task Update_TakesThePlaceOffTheRouteWhenNoStopIsGiven()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var filed = stored!.Single(place => place.DestinationId is not null);
-
-        var response = await client.PutAsJsonAsync(
-            $"{Route(kyoto.Id)}/{filed.Id}",
-            UpdateRequest(name: filed.Name, destinationId: null));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var updated = await response.Content.ReadFromJsonAsync<SavedPlaceResponse>(JsonOptions);
-
-        Assert.NotNull(updated);
-        Assert.Null(updated!.DestinationId);
-    }
-
-    [Fact]
-    public async Task Update_ReturnsBadRequestForAStopOfAnotherTripAndLeavesThePlaceUnchanged()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var before = stored![0];
-
-        var response = await client.PutAsJsonAsync(
-            $"{Route(kyoto.Id)}/{before.Id}",
-            UpdateRequest(
-                name: "Taken over",
-                destinationId: SavedPlaceApiFactory.Rome.Destinations[0].Id));
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var reread = await client.GetFromJsonAsync<SavedPlaceResponse>(
-            $"{Route(kyoto.Id)}/{before.Id}",
-            JsonOptions);
-
-        Assert.NotNull(reread);
-        Assert.Equal(before.Name, reread!.Name);
-        Assert.Equal(before.DestinationId, reread.DestinationId);
-    }
-
-    [Fact]
-    public async Task Update_ReturnsNotFoundForAPlaceOfAnotherTripAndLeavesItUnchanged()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var rome = SavedPlaceApiFactory.Rome;
-
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var place = stored![0];
-
-        var response = await client.PutAsJsonAsync(
-            $"{Route(rome.Id)}/{place.Id}",
-            UpdateRequest(name: "Taken over"));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-
-        var reread = await client.GetFromJsonAsync<SavedPlaceResponse>(
-            $"{Route(kyoto.Id)}/{place.Id}",
-            JsonOptions);
-
-        Assert.NotNull(reread);
-        Assert.Equal(place.Name, reread!.Name);
-    }
-
-    [Fact]
-    public async Task Update_ReturnsNotFoundForAnUnknownPlace()
-    {
-        using var client = _factory.CreateClient();
-
-        var response = await client.PutAsJsonAsync(
-            $"{Route(SavedPlaceApiFactory.Kyoto.Id)}/{Guid.NewGuid()}",
-            UpdateRequest());
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Delete_RemovesThePlace()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var placeId = stored![0].Id;
-
-        var response = await client.DeleteAsync($"{Route(kyoto.Id)}/{placeId}");
-
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-
-        var remaining = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-
-        Assert.NotNull(remaining);
-        Assert.DoesNotContain(remaining!, place => place.Id == placeId);
-    }
-
-    [Fact]
-    public async Task Delete_ReturnsNotFoundForAPlaceOfAnotherTripAndLeavesIt()
-    {
-        using var client = _factory.CreateClient();
-
-        var kyoto = SavedPlaceApiFactory.Kyoto;
-        var rome = SavedPlaceApiFactory.Rome;
-
-        var stored = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-        Assert.NotNull(stored);
-
-        var placeId = stored![0].Id;
-
-        var response = await client.DeleteAsync($"{Route(rome.Id)}/{placeId}");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-
-        // Kyoto's place is still there.
-        var remaining = await client.GetFromJsonAsync<SavedPlaceResponse[]>(Route(kyoto.Id), JsonOptions);
-
-        Assert.NotNull(remaining);
-        Assert.Contains(remaining!, place => place.Id == placeId);
-    }
-
-    [Fact]
-    public async Task Delete_ReturnsNotFoundForAnUnknownPlace()
-    {
-        using var client = _factory.CreateClient();
-
-        var response = await client.DeleteAsync(
-            $"{Route(SavedPlaceApiFactory.Kyoto.Id)}/{Guid.NewGuid()}");
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    private sealed record ProblemDetails(string? Title, string? Detail, int? Status);
 }

@@ -27,7 +27,6 @@ public static class DependencyInjection
 
         services.AddDbContext<TabijiDbContext>(options => options.UseSqlServer(connectionString));
         services.AddScoped<ITripRepository, TripRepository>();
-        services.AddScoped<ISavedPlaceRepository, SavedPlaceRepository>();
 
         return services;
     }

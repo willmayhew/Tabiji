@@ -167,6 +167,28 @@ npm test
 - Do not put a trip's destinations in a comma-separated string or in JSON on the `Trip`
   row. A trip holds an ordered collection of `TripDestination` entities, and the order
   is the sort order.
+- Do not promote a stop to the main route, and do not let a stop hold stops. A stop has a
+  `ParentDestinationId` pointing at a destination; the hierarchy is exactly one level deep.
+  `Trip.ParentDestinations` is the route and `Trip.StopsOf(parentId)` is a destination's
+  stops. A stop's `SortOrder` is its order within its destination and is never a
+  main-route number.
+- Do not let a stop run outside its destination's dates when the destination has dates.
+  A stop is a part of the place, not a leg of the journey; `TripSchedule` checks it, and no
+  date is ever rewritten automatically.
+- A stop is the place. Do not reintroduce a separate `SavedPlace` write path: category,
+  address, notes and planned day are columns on the same `TripDestinations` row, and
+  `TripPlaceKind` distinguishes `Destination`, `Stop` and the legacy `Place`. The old saved
+  place routes are read-only compatibility only. Removing a stop removes its own details;
+  the confirmation says so. A legacy `Place` is filed into a destination by naming it under
+  that destination's `stops` with its existing identity, never by duplicating it.
+- Do not persist the hierarchical label. `1a`, `1b`, `1aa` is presentation computed from
+  the route position and the stop's position within its destination; reordering changes the
+  label and never an ID. Use `shared/format/place-labels.ts` in the list, map, panel and
+  accessible names.
+- Do not draw the stop connection as the main route. The main route is the parent-only
+  dashed line; the stops of the selected, expanded destination have a separate dotted
+  forest line, with at least two located stops, cleared on collapse/deselect and cleaned up
+  with the map.
 - Do not drop the legacy `Trips.Destination` column. It is kept for one release, mapped
   as a shadow property, and is removed by a migration of its own once the backfill in
   `backend/verify-migration.sql` has been verified.
@@ -176,9 +198,11 @@ npm test
   `Tabiji.Domain.Trips.TripSchedule` and is mirrored in
   `frontend/src/app/shared/validate/trip-destinations.ts`.
 - Do not let the change tracker move a stop into a place another stop is holding. The
-  unique index on `(TripId, SortOrder)` makes the tracker read that as a circular
-  dependency, and it refuses to save. `TripRepository.UpdateAsync` moves the positions in
-  the database instead.
+  unique index on `(TripId, Kind, ParentDestinationId, SortOrder)` makes the tracker read
+  that as a circular dependency, and it refuses to save. `TripRepository.UpdateAsync` moves
+  the positions in the database instead.
+- Do not add a new unfiled `Place` from the API or the UI. New locations are stops under a
+  destination; `Place` exists only for legacy saved places that the migration preserved.
 
 ## Before opening a pull request
 

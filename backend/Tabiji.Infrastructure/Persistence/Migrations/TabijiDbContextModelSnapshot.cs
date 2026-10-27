@@ -22,55 +22,6 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Tabiji.Domain.Trips.SavedPlace", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<string>("Category")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid?>("DestinationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<double>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("float");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<Guid>("TripId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DestinationId");
-
-                    b.HasIndex("TripId");
-
-                    b.ToTable("SavedPlaces", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_SavedPlaces_Coordinates", "[Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180");
-                        });
-                });
-
             modelBuilder.Entity("Tabiji.Domain.Trips.Trip", b =>
                 {
                     b.Property<Guid>("Id")
@@ -110,8 +61,24 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset?>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateOnly?>("EndsOn")
                         .HasColumnType("date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<double?>("Latitude")
                         .HasColumnType("float");
@@ -124,6 +91,16 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("ParentDestinationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("PlannedOn")
+                        .HasColumnType("date");
+
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");
 
@@ -135,7 +112,9 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TripId", "SortOrder")
+                    b.HasIndex("ParentDestinationId");
+
+                    b.HasIndex("TripId", "Kind", "ParentDestinationId", "SortOrder")
                         .IsUnique();
 
                     b.ToTable("TripDestinations", null, t =>
@@ -143,25 +122,20 @@ namespace Tabiji.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_TripDestinations_Coordinates", "([Latitude] IS NULL AND [Longitude] IS NULL) OR ([Latitude] IS NOT NULL AND [Longitude] IS NOT NULL AND [Latitude] BETWEEN -90 AND 90 AND [Longitude] BETWEEN -180 AND 180)");
 
                             t.HasCheckConstraint("CK_TripDestinations_Dates", "[StartsOn] IS NULL OR [EndsOn] IS NULL OR [EndsOn] >= [StartsOn]");
+
+                            t.HasCheckConstraint("CK_TripDestinations_Kind", "([Kind] = 'Stop' AND [ParentDestinationId] IS NOT NULL) OR ([Kind] IN ('Destination', 'Place') AND [ParentDestinationId] IS NULL)");
+
+                            t.HasCheckConstraint("CK_TripDestinations_Parent", "[ParentDestinationId] IS NULL OR [ParentDestinationId] <> [Id]");
                         });
-                });
-
-            modelBuilder.Entity("Tabiji.Domain.Trips.SavedPlace", b =>
-                {
-                    b.HasOne("Tabiji.Domain.Trips.TripDestination", null)
-                        .WithMany()
-                        .HasForeignKey("DestinationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Tabiji.Domain.Trips.Trip", null)
-                        .WithMany()
-                        .HasForeignKey("TripId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Tabiji.Domain.Trips.TripDestination", b =>
                 {
+                    b.HasOne("Tabiji.Domain.Trips.TripDestination", null)
+                        .WithMany()
+                        .HasForeignKey("ParentDestinationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Tabiji.Domain.Trips.Trip", null)
                         .WithMany("Destinations")
                         .HasForeignKey("TripId")

@@ -39,6 +39,15 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var deleted = await dbContext.Trips
+            .Where(trip => trip.Id == id)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return deleted == 1;
+    }
+
     /// <summary>
     /// Writes the trip and its route back in one go.
     ///
@@ -81,11 +90,18 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
 
             await ParkPositionsAsync(trip.Id, cancellationToken);
 
+            // A stop may be moved to another destination. The parent is written
+            // in the database before the final positions are, while every
+            // position is still parked: two stops that swap destinations can
+            // then never collide on the unique index on the way.
+            await WriteParentsAsync(kept, cancellationToken);
+
             foreach (var destination in kept)
             {
                 // The position is written in the database, below. The tracker
                 // is told that the position has not changed, so that it never
-                // tries to move a stop into a place another stop is holding.
+                // tries to move a place into a position another place is
+                // holding.
                 dbContext.Entry(destination).Property(d => d.SortOrder).OriginalValue =
                     destination.SortOrder;
             }
@@ -109,23 +125,11 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
                 dbContext.Entry(destination).State = EntityState.Deleted;
             }
 
-            // A stop that goes does not take its saved places with it: they
-            // stay on the trip and simply come off the route. The database
-            // cannot clear the association for us, because a cascading foreign
-            // key from the trip and an unloading one from the stop would be two
-            // paths to the same table, which SQL Server refuses. So the filing
-            // is cleared here, in the same transaction that removes the stop.
-            if (removed.Length > 0)
-            {
-                var removedIds = removed.Select(destination => destination.Id).ToArray();
-
-                await dbContext.SavedPlaces
-                    .Where(place => place.DestinationId.HasValue
-                        && removedIds.Contains(place.DestinationId.Value))
-                    .ExecuteUpdateAsync(
-                        setters => setters.SetProperty(place => place.DestinationId, (Guid?)null),
-                        cancellationToken);
-            }
+            // A removed stop is the place itself: its category, address, notes
+            // and planned day are columns on the same row, so deleting the row
+            // removes them with it. There is no separate saved-place table to
+            // unlink. Unfiled places are not children of a stop and are left
+            // alone.
         }
         finally
         {
@@ -140,21 +144,75 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
     }
 
     /// <summary>
-    /// Moves every stop of the trip out of the way of the positions that are
+    /// Writes the destination each kept stop now belongs to, while every
+    /// position is still parked.
+    ///
+    /// The tracker is told that the parent has not changed, so that it never
+    /// tries to move a stop into a destination whose parked positions would
+    /// collide with another stop on the way.
+    /// </summary>
+    private async Task WriteParentsAsync(
+        IReadOnlyList<TripDestination> destinations,
+        CancellationToken cancellationToken)
+    {
+        foreach (var destination in destinations)
+        {
+            var entry = dbContext.Entry(destination);
+            var parentProperty = entry.Property(candidate => candidate.ParentDestinationId);
+            var kindProperty = entry.Property(candidate => candidate.Kind);
+
+            if (parentProperty.OriginalValue == destination.ParentDestinationId &&
+                kindProperty.OriginalValue == destination.Kind)
+            {
+                continue;
+            }
+
+            // The parent and the kind are written together. A place being
+            // filed becomes a Stop and gains a parent in the same statement,
+            // so the CK_TripDestinations_Kind check is never presented with a
+            // Place that has a parent (or a Stop that has none).
+            await dbContext.TripDestinations
+                .Where(candidate => candidate.Id == destination.Id)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(
+                            candidate => candidate.ParentDestinationId,
+                            destination.ParentDestinationId)
+                        .SetProperty(candidate => candidate.Kind, destination.Kind),
+                    cancellationToken);
+
+            parentProperty.OriginalValue = destination.ParentDestinationId;
+            kindProperty.OriginalValue = destination.Kind;
+        }
+    }
+
+    /// <summary>
+    /// Moves every place of the trip out of the way of the positions that are
     /// about to be written.
+    ///
+    /// Every parked position is unique across the whole trip, not merely
+    /// within its own destination. A stop can move from one destination to
+    /// another, and two stops that swap destinations would otherwise collide
+    /// on the unique index while both are parked at the same offset.
     ///
     /// This is done in the database rather than through the change tracker,
     /// which is left holding the values the domain has already decided.
     /// </summary>
     private async Task ParkPositionsAsync(Guid tripId, CancellationToken cancellationToken)
     {
-        await dbContext.TripDestinations
-            .Where(destination => destination.TripId == tripId)
-            .ExecuteUpdateAsync(
-                setters => setters.SetProperty(
-                    destination => destination.SortOrder,
-                    destination => destination.SortOrder + ParkingOffset),
-                cancellationToken);
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             ;WITH [Parked] AS (
+                 SELECT [Id], ROW_NUMBER() OVER (ORDER BY [Id]) AS [Position]
+                 FROM [TripDestinations]
+                 WHERE [TripId] = {tripId}
+             )
+             UPDATE [destination]
+             SET [SortOrder] = {ParkingOffset} + [parked].[Position]
+             FROM [TripDestinations] AS [destination]
+             JOIN [Parked] AS [parked] ON [parked].[Id] = [destination].[Id];
+             """,
+            cancellationToken);
     }
 
     /// <summary>

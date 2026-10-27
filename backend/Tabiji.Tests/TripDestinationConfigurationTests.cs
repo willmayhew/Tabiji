@@ -72,13 +72,22 @@ public sealed class TripDestinationConfigurationTests
         Assert.False(sortOrder.IsNullable);
     }
 
+    private static readonly string[] ScopeColumns =
+    [
+        nameof(TripDestination.TripId),
+        nameof(TripDestination.Kind),
+        nameof(TripDestination.ParentDestinationId),
+        nameof(TripDestination.SortOrder),
+    ];
+
     [Fact]
     public void TripDestination_BelongsToOneTripAndIsDeletedWithIt()
     {
         using var context = CreateContext();
 
         var entity = context.Model.FindEntityType(typeof(TripDestination));
-        var foreignKey = entity?.GetForeignKeys().SingleOrDefault();
+        var foreignKey = entity?.GetForeignKeys()
+            .SingleOrDefault(key => key.PrincipalEntityType.ClrType == typeof(Trip));
 
         Assert.NotNull(foreignKey);
         Assert.Equal(nameof(TripDestination.TripId), Assert.Single(foreignKey.Properties).Name);
@@ -86,18 +95,59 @@ public sealed class TripDestinationConfigurationTests
     }
 
     [Fact]
-    public void TripDestination_CannotHoldTwoStopsInTheSamePosition()
+    public void TripDestination_MayBelongToOneOfItsOwnDestinations()
     {
         using var context = CreateContext();
 
         var entity = context.Model.FindEntityType(typeof(TripDestination));
-        var index = entity?.GetIndexes().SingleOrDefault();
+        var parent = entity?.FindProperty(nameof(TripDestination.ParentDestinationId));
+
+        Assert.NotNull(parent);
+        Assert.True(parent.IsNullable);
+
+        // The self-key is NO ACTION: a cascading key from Trips and a
+        // cascading self-key would be two cascade paths to the same table,
+        // which SQL Server refuses. The repository removes the stops.
+        var foreignKey = entity?.GetForeignKeys()
+            .SingleOrDefault(key => key.PrincipalEntityType.ClrType == typeof(TripDestination));
+
+        Assert.NotNull(foreignKey);
+        Assert.Equal(nameof(TripDestination.ParentDestinationId), Assert.Single(foreignKey.Properties).Name);
+        Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior);
+    }
+
+    [Fact]
+    public void TripDestination_CannotHoldTwoPlacesInTheSamePositionOfOneScope()
+    {
+        using var context = CreateContext();
+
+        var entity = context.Model.FindEntityType(typeof(TripDestination));
+        var index = entity?.GetIndexes()
+            .SingleOrDefault(candidate =>
+                candidate.IsUnique &&
+                candidate.Properties.Select(property => property.Name).SequenceEqual(ScopeColumns));
 
         Assert.NotNull(index);
-        Assert.True(index.IsUnique);
-        Assert.Equal(
-            [nameof(TripDestination.TripId), nameof(TripDestination.SortOrder)],
-            index.Properties.Select(property => property.Name));
+
+        // The parent scope is not filtered out: SQL Server treats NULLs as
+        // equal, so the main route is covered by the same unique index as
+        // every destination's stops.
+        Assert.Null(index.GetFilter());
+    }
+
+    [Fact]
+    public void TripDestination_IndexesItsParent()
+    {
+        using var context = CreateContext();
+
+        var entity = context.Model.FindEntityType(typeof(TripDestination));
+        var index = entity?.GetIndexes()
+            .SingleOrDefault(candidate =>
+                !candidate.IsUnique &&
+                candidate.Properties.Count == 1 &&
+                candidate.Properties[0].Name == nameof(TripDestination.ParentDestinationId));
+
+        Assert.NotNull(index);
     }
 
     [Theory]
@@ -134,6 +184,23 @@ public sealed class TripDestinationConfigurationTests
         // be written in SQL at all.
         Assert.NotNull(constraint);
         Assert.Contains("[EndsOn] >= [StartsOn]", constraint.Sql);
+    }
+
+    [Fact]
+    public void TripDestination_CannotBeItsOwnParent()
+    {
+        using var context = CreateContext();
+
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var entity = model.FindEntityType(typeof(TripDestination));
+        var constraint = entity?.GetCheckConstraints()
+            .SingleOrDefault(candidate => candidate.Name == "CK_TripDestinations_Parent");
+
+        // The one hierarchy rule a single row can state. One level of nesting
+        // and ownership by the same trip are domain rules.
+        Assert.NotNull(constraint);
+        Assert.Contains("[ParentDestinationId] IS NULL", constraint.Sql);
+        Assert.Contains("[ParentDestinationId] <> [Id]", constraint.Sql);
     }
 
     [Theory]

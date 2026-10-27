@@ -1,0 +1,154 @@
+<dialog
+  #dialog
+  class="destination-editor"
+  aria-labelledby="destination-editor-title"
+  (cancel)="dismiss($event)"
+  (click)="onBackdropClick($event)"
+>
+  <form class="destination-editor__panel" [attr.aria-busy]="saving()" (submit)="submit($event)">
+    <header class="destination-editor__head">
+      <h2 class="destination-editor__title" id="destination-editor-title">{{ title() }}</h2>
+      <button
+        type="button"
+        class="icon-button"
+        (click)="dismiss($event)"
+        aria-label="Close the editor"
+      >
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </header>
+
+    @if (mode() === 'stop' && parent(); as destination) {
+      <p class="destination-editor__note">
+        Part of {{ destination.name }}. A stop never becomes a destination on the main route.
+      </p>
+    }
+
+    <div class="destination-editor__search" (focusout)="onSearchFocusOut($event)">
+      <label class="field-label" for="new-place-search">Find a place</label>
+
+      <div class="destination-editor__search-field">
+        <input
+          #search
+          id="new-place-search"
+          class="destination-editor__search-input"
+          type="search"
+          autocomplete="off"
+          placeholder="Search for a place"
+          [value]="query()"
+          (input)="onQuery($event)"
+          (keydown.enter)="onSearchEnter($event)"
+        />
+
+        @if (results().length > 0) {
+          <ul class="destination-editor__results" aria-live="polite">
+            @for (place of results(); track place.label) {
+              <li>
+                <button
+                  type="button"
+                  class="destination-editor__result"
+                  (click)="choose(place)"
+                >
+                  <span class="destination-editor__result-name">{{ place.name }}</span>
+                  @if (place.label !== place.name) {
+                    <span class="destination-editor__result-context">{{ place.label }}</span>
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      @if (searchError(); as message) {
+        <p class="field-error" role="alert">
+          {{ message }} You can still type the name by hand.
+        </p>
+      } @else if (searching() && results().length === 0) {
+        <p class="field-hint" role="status">Searching&hellip;</p>
+      } @else if (searched() && results().length === 0) {
+        <p class="field-hint" role="status">
+          No places found. Try another search, or type the name by hand.
+        </p>
+      }
+
+      <p class="destination-editor__attribution">{{ attribution }}</p>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="new-place-name">Name</label>
+      <input
+        #nameInput
+        id="new-place-name"
+        type="text"
+        autocomplete="off"
+        [attr.maxlength]="nameMaxLength"
+        [value]="name()"
+        (input)="onName($event)"
+        [attr.aria-invalid]="nameError() ? 'true' : null"
+        [attr.aria-describedby]="nameError() ? 'new-place-name-error' : null"
+      />
+      @if (nameError(); as message) {
+        <p class="field-error" id="new-place-name-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="destination-editor__dates">
+      <div class="field">
+        <label class="field-label" for="new-place-starts-on">Arrive</label>
+        <input
+          id="new-place-starts-on"
+          type="date"
+          [attr.min]="lowerBound() || null"
+          [attr.max]="upperBound() || null"
+          [value]="startsOn()"
+          (input)="onStartsOn($event)"
+        />
+        <p class="field-hint">Optional</p>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="new-place-ends-on">Leave</label>
+        <input
+          id="new-place-ends-on"
+          type="date"
+          [attr.min]="lowerBound() || null"
+          [attr.max]="upperBound() || null"
+          [value]="endsOn()"
+          (input)="onEndsOn($event)"
+        />
+        <p class="field-hint">Optional</p>
+      </div>
+    </div>
+
+    @if (dateError(); as message) {
+      <p class="field-error" role="alert">{{ message }}</p>
+    }
+
+    <p class="destination-editor__hint">
+      Optional. Search for a place to set its location, or type the name by hand.
+    </p>
+
+    @if (error(); as message) {
+      <p class="field-error field-error--api" role="alert">{{ message }}</p>
+    }
+
+    <footer class="destination-editor__actions">
+      <button
+        type="button"
+        class="button button--secondary"
+        (click)="dismiss($event)"
+        [disabled]="saving()"
+      >
+        Cancel
+      </button>
+      <button type="submit" class="button" [disabled]="saving()">
+        @if (saving()) {
+          Saving&hellip;
+        } @else {
+          {{ mode() === 'stop' ? 'Add stop' : 'Add destination' }}
+        }
+      </button>
+    </footer>
+  </form>
+</dialog>

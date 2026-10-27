@@ -26,8 +26,8 @@ export function routeLabel(destinations: readonly TripDestination[], max = 3): s
 }
 
 /**
- * How many stops a route has, in words: "3 stops".
+ * How many destinations a route has, in words: "3 destinations".
  */
 export function routeSummary(destinations: readonly TripDestination[]): string {
-  return destinations.length === 1 ? '1 stop' : `${destinations.length} stops`;
+  return destinations.length === 1 ? '1 destination' : `${destinations.length} destinations`;
 }

@@ -35,16 +35,25 @@ export interface MapHandle {
  * MapLibre expects and nowhere else.
  */
 export interface AtlasPoint extends LocatedPoint {
-  /** The stop's place on the route, counting from one. */
-  index: number;
+  /** The parent's main-route number, such as `1`. */
+  label: string;
+}
+
+/** A stop marker: a place within a destination, labelled `1a`, `1b`, ... */
+export interface AtlasStopPoint extends LocatedPoint {
+  /** The hierarchical label, such as `1a`. */
+  label: string;
 }
 
 /**
- * What the atlas has selected. A stop and a saved place are two different
- * things with their own identities, so which one is meant has to be said.
+ * What the atlas has selected. A destination, a stop within one, and a saved
+ * place are three different things with their own identities, so which one is
+ * meant has to be said.
  */
+export type AtlasSelectionKind = 'destination' | 'stop' | 'place';
+
 export interface AtlasSelection {
-  kind: 'destination' | 'place';
+  kind: AtlasSelectionKind;
   id: string;
 }
 
@@ -59,12 +68,14 @@ export interface AtlasOptions {
  * the list share.
  */
 export interface AtlasHandle {
-  /** Draws the located destinations, numbered, replacing what was there. */
+  /** Draws the located destinations, labelled, replacing what was there. */
   setDestinations(points: readonly AtlasPoint[]): void;
-  /** Draws the trip's saved places, replacing what was there. */
-  setPlaces(points: readonly LocatedPoint[]): void;
+  /** Draws the visible stops of the selected destination, replacing what was there. */
+  setStops(points: readonly AtlasStopPoint[]): void;
   /** Draws the planned connection, in the order the points are given. */
   setRoute(points: readonly AtlasPoint[]): void;
+  /** Draws the connection between the visible stops, in their own order. */
+  setStopRoute(points: readonly LocatedPoint[]): void;
   /** Marks one stop or place as selected, or clears the selection. */
   setSelection(selection: AtlasSelection | null): void;
   /**
@@ -104,6 +115,11 @@ const SINGLE_STOP_ZOOM = 11;
 
 const ROUTE_SOURCE_ID = 'atlas-route';
 const ROUTE_LAYER_ID = 'atlas-route-line';
+
+/** A stop's connection is a dotted forest line, distinct from the main route. */
+const STOP_ROUTE_COLOUR = '#ff0000';
+const STOP_ROUTE_SOURCE_ID = 'atlas-stop-route';
+const STOP_ROUTE_LAYER_ID = 'atlas-stop-route-line';
 
 type MapLibreModule = typeof import('maplibre-gl');
 
@@ -204,15 +220,17 @@ export class MapEngine {
     // identities come from different tables, so they are kept apart here too.
     const destinationMarkers = new Map<string, MapLibreMarker>();
     const destinationElements = new Map<string, HTMLElement>();
-    const placeMarkers = new Map<string, MapLibreMarker>();
-    const placeElements = new Map<string, HTMLElement>();
+    const stopMarkers = new Map<string, MapLibreMarker>();
+    const stopElements = new Map<string, HTMLElement>();
 
     let destinations: readonly AtlasPoint[] = [];
-    let places: readonly LocatedPoint[] = [];
+    let stops: readonly AtlasStopPoint[] = [];
     let route: readonly AtlasPoint[] = [];
+    let stopRoute: readonly LocatedPoint[] = [];
     let selection: AtlasSelection | null = null;
     let loaded = false;
     let routeDirty = false;
+    let stopRouteDirty = false;
     let failed = false;
     let selectHandler: ((selection: AtlasSelection) => void) | null = null;
     let errorHandler: (() => void) | null = null;
@@ -224,6 +242,10 @@ export class MapEngine {
 
       if (routeDirty) {
         applyRoute();
+      }
+
+      if (stopRouteDirty) {
+        applyStopRoute();
       }
     });
 
@@ -279,6 +301,54 @@ export class MapEngine {
       });
     }
 
+    function stopRouteData(
+      points: readonly LocatedPoint[],
+    ): Feature<LineString> | FeatureCollection {
+      if (points.length < 2) {
+        return { type: 'FeatureCollection', features: [] };
+      }
+
+      return {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: points.map((point) => [point.longitude, point.latitude]),
+        },
+      };
+    }
+
+    function applyStopRoute(): void {
+      stopRouteDirty = false;
+
+      const data = stopRouteData(stopRoute);
+      const source = map.getSource(STOP_ROUTE_SOURCE_ID) as GeoJSONSource | undefined;
+
+      if (source !== undefined) {
+        source.setData(data);
+        return;
+      }
+
+      map.addSource(STOP_ROUTE_SOURCE_ID, { type: 'geojson', data });
+
+      // The stop line is drawn beneath the main route, so the route stays the
+      // more prominent line when the two cross.
+      map.addLayer(
+        {
+          id: STOP_ROUTE_LAYER_ID,
+          type: 'line',
+          source: STOP_ROUTE_SOURCE_ID,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': STOP_ROUTE_COLOUR,
+            'line-width': 1.2,
+            'line-opacity': 0.7,
+          },
+        },
+        map.getLayer(ROUTE_LAYER_ID) ? ROUTE_LAYER_ID : undefined,
+      );
+    }
+
     function paintSelection(): void {
       for (const [id, element] of destinationElements) {
         element.classList.toggle(
@@ -287,10 +357,10 @@ export class MapEngine {
         );
       }
 
-      for (const [id, element] of placeElements) {
+      for (const [id, element] of stopElements) {
         element.classList.toggle(
           'atlas-marker--selected',
-          selection?.kind === 'place' && selection.id === id,
+          selection?.kind === 'stop' && selection.id === id,
         );
       }
     }
@@ -306,13 +376,13 @@ export class MapEngine {
      * offset against the whole set, not only its own kind.
      */
     function applyOffsets(): void {
-      const offsets = markerOffsets([...destinations, ...places]);
+      const offsets = markerOffsets([...destinations, ...stops]);
 
       for (const [id, element] of destinationElements) {
         setOffset(element, offsets.get(id));
       }
 
-      for (const [id, element] of placeElements) {
+      for (const [id, element] of stopElements) {
         setOffset(element, offsets.get(id));
       }
     }
@@ -375,9 +445,9 @@ export class MapEngine {
     function setDestinations(points: readonly AtlasPoint[]): void {
       destinations = points;
 
-      // The number is the stop's place on the whole route, not its place among
-      // the stops that happen to have a location.
-      const numbers = new Map(points.map((point) => [point.id, String(point.index)]));
+      // The number is the destination's place on the whole route, not its
+      // place among the destinations that happen to have a location.
+      const labels = new Map(points.map((point) => [point.id, point.label]));
 
       syncMarkers(
         points,
@@ -385,25 +455,47 @@ export class MapEngine {
         destinationElements,
         'destination',
         'atlas-marker__face',
-        (id) => numbers.get(id) ?? '',
+        (id) => labels.get(id) ?? '',
       );
 
       applyOffsets();
       paintSelection();
     }
 
-    function setPlaces(points: readonly LocatedPoint[]): void {
-      places = points;
+    function setStops(points: readonly AtlasStopPoint[]): void {
+      stops = points;
 
-      syncMarkers(points, placeMarkers, placeElements, 'place', 'atlas-marker__dot', () => '');
+      // A stop carries a hierarchical label — 1a, 1b — never a main-route
+      // number of its own.
+      const labels = new Map(points.map((point) => [point.id, point.label]));
+
+      syncMarkers(
+        points,
+        stopMarkers,
+        stopElements,
+        'stop',
+        'atlas-marker__stop',
+        (id) => labels.get(id) ?? '',
+      );
 
       applyOffsets();
       paintSelection();
     }
 
+    function setStopRoute(points: readonly LocatedPoint[]): void {
+      stopRoute = points;
+
+      if (loaded) {
+        applyStopRoute();
+        return;
+      }
+
+      stopRouteDirty = true;
+    }
+
     return {
       setDestinations,
-      setPlaces,
+      setStops,
       setRoute: (points) => {
         route = points;
 
@@ -414,19 +506,20 @@ export class MapEngine {
 
         routeDirty = true;
       },
+      setStopRoute,
       setSelection: (next) => {
         selection = next;
         paintSelection();
       },
       reveal: (next) => {
-        if (next === null) {
+        if (next === null || next.kind === 'place') {
           return;
         }
 
         const point =
           next.kind === 'destination'
             ? destinations.find((candidate) => candidate.id === next.id)
-            : places.find((candidate) => candidate.id === next.id);
+            : stops.find((candidate) => candidate.id === next.id);
 
         if (point === undefined) {
           return;
@@ -443,10 +536,11 @@ export class MapEngine {
         map.easeTo({ center: position });
       },
       fitToTrip: () => {
-        // The stops are the trip; the places are what is worth seeing along the
-        // way, and may be anywhere. The map frames the stops, and falls back to
-        // the places only when no stop has a location.
-        const framing: readonly LocatedPoint[] = destinations.length > 0 ? destinations : places;
+        // The destinations are the trip; the stops are what is worth seeing
+        // along the way. The map frames the destinations, and falls back to
+        // the stops only when no destination has a location.
+        const framing: readonly LocatedPoint[] =
+          destinations.length > 0 ? destinations : stops;
 
         if (framing.length === 0) {
           map.easeTo({ center: [WORLD_VIEW.longitude, WORLD_VIEW.latitude], zoom: WORLD_VIEW.zoom });
@@ -496,14 +590,31 @@ export class MapEngine {
           marker.remove();
         }
 
-        for (const marker of placeMarkers.values()) {
+        for (const marker of stopMarkers.values()) {
           marker.remove();
         }
 
         destinationMarkers.clear();
         destinationElements.clear();
-        placeMarkers.clear();
-        placeElements.clear();
+        stopMarkers.clear();
+        stopElements.clear();
+
+        if (map.getLayer(STOP_ROUTE_LAYER_ID)) {
+          map.removeLayer(STOP_ROUTE_LAYER_ID);
+        }
+
+        if (map.getSource(STOP_ROUTE_SOURCE_ID)) {
+          map.removeSource(STOP_ROUTE_SOURCE_ID);
+        }
+
+        if (map.getLayer(ROUTE_LAYER_ID)) {
+          map.removeLayer(ROUTE_LAYER_ID);
+        }
+
+        if (map.getSource(ROUTE_SOURCE_ID)) {
+          map.removeSource(ROUTE_SOURCE_ID);
+        }
+
         map.remove();
       },
     };

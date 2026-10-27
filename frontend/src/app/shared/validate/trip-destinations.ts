@@ -1,9 +1,14 @@
 import { AbstractControl, ValidationErrors, ValidatorFn } from '@angular/forms';
-import { TRIP_MAX_DESTINATIONS } from '../../core/models/trip';
+import {
+  TRIP_DESTINATION_MAX_LENGTH,
+  TRIP_MAX_DESTINATIONS,
+  TRIP_MAX_STOPS_PER_DESTINATION,
+} from '../../core/models/trip';
 import { isIsoDate } from './iso-date';
 
 /**
- * A stop of a route, as the rules see it.
+ * A place on a route, as the rules see it. A destination and a stop carry the
+ * same three values.
  */
 export interface TripStopValue {
   name: string;
@@ -13,15 +18,26 @@ export interface TripStopValue {
   endsOn: string | null;
 }
 
+/** A destination on the main route, with the stops within it. */
+export interface TripDestinationValue extends TripStopValue {
+  stops?: readonly TripStopValue[];
+}
+
 /**
  * What is wrong with a route, and where.
+ *
+ * `index` is always the destination. `stopIndex` is present when the problem
+ * is a stop within that destination; it is absent when the destination itself
+ * is at fault.
  */
 export interface TripScheduleProblem {
   /** The message shown to the reader. */
   message: string;
-  /** The stop that is at fault. */
+  /** The destination that is at fault, or that holds the stop at fault. */
   index: number;
-  /** The field of that stop that is wrong. */
+  /** The stop within that destination that is at fault, if any. */
+  stopIndex?: number;
+  /** The field of that place that is wrong. */
   field: 'startsOn' | 'endsOn';
 }
 
@@ -49,7 +65,7 @@ function format(isoDate: string): string {
 }
 
 /**
- * Validates the route of a trip as a whole.
+ * Validates the destinations of a trip as a whole.
  *
  * This mirrors the domain rules enforced by the API
  * (Tabiji.Domain.Trips.Trip). The rule itself lives in the domain; the form
@@ -77,14 +93,36 @@ export function validateTripDestinations(names: readonly string[]): string | nul
 }
 
 /**
+ * Validates the stops of one destination.
+ *
+ * A destination may hold no stops at all. What it may not do is hold too many,
+ * or hold one with no name.
+ */
+export function validateTripStops(names: readonly string[]): string | null {
+  if (names.length > TRIP_MAX_STOPS_PER_DESTINATION) {
+    return `A destination cannot have more than ${TRIP_MAX_STOPS_PER_DESTINATION} stops.`;
+  }
+
+  for (const name of names) {
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      return 'The trip stop name is required.';
+    }
+  }
+
+  return null;
+}
+
+/**
  * Validates the schedule of a route against the trip it belongs to.
  *
- * Every date must fall inside the trip's own dates, a stop may not end
- * before it starts, and the stops must be able to be visited in the order
- * they are given. Gaps between stops are fine: the days that belong to no
- * stop are the traveller's own.
+ * Every date must fall inside the trip's own dates, a destination may not end
+ * before it starts, and the destinations must be able to be visited in the
+ * order they are given. A stop must fall inside its destination's dates when
+ * the destination has them, and inside the trip everywhere else. Gaps between
+ * destinations are fine: the days that belong to no destination are the
+ * traveller's own.
  *
- * This mirrors the domain rule (Tabiji.Domain.Trips.TripSchedule) step for
+ * This mirrors the domain rules (Tabiji.Domain.Trips.TripSchedule) step for
  * step, and says the same thing in the same words, so that the message the
  * reader sees here is the message the API would have given.
  *
@@ -93,49 +131,66 @@ export function validateTripDestinations(names: readonly string[]): string | nul
 export function validateTripSchedule(
   tripStartsOn: string,
   tripEndsOn: string,
-  stops: readonly TripStopValue[],
+  destinations: readonly TripDestinationValue[],
 ): TripScheduleProblem | null {
   if (!isIsoDate(tripStartsOn) || !isIsoDate(tripEndsOn)) {
     return null;
   }
 
-  for (let index = 0; index < stops.length; index += 1) {
-    const stop = stops[index];
+  for (let index = 0; index < destinations.length; index += 1) {
+    const destination = destinations[index];
 
-    const outside = outsideTrip(stop, tripStartsOn, tripEndsOn, index);
+    const outside = outsideTrip(destination, tripStartsOn, tripEndsOn, index);
 
     if (outside !== null) {
       return outside;
     }
 
-    const backwards = reversed(stop, index);
+    const backwards = reversed(destination, index);
 
     if (backwards !== null) {
       return backwards;
     }
+
+    const stops = destination.stops ?? [];
+
+    for (let stopIndex = 0; stopIndex < stops.length; stopIndex += 1) {
+      const stopProblem = stopWithinDestination(
+        destination,
+        stops[stopIndex],
+        index,
+        stopIndex,
+        tripStartsOn,
+        tripEndsOn,
+      );
+
+      if (stopProblem !== null) {
+        return stopProblem;
+      }
+    }
   }
 
-  return outOfOrder(stops, tripStartsOn);
+  return outOfOrder(destinations, tripStartsOn);
 }
 
 /**
- * Checks that a stop's dates fall inside the trip's own dates.
+ * Checks that a destination's dates fall inside the trip's own dates.
  */
 function outsideTrip(
-  stop: TripStopValue,
+  destination: TripStopValue,
   tripStartsOn: string,
   tripEndsOn: string,
   index: number,
 ): TripScheduleProblem | null {
-  const startsOn = stop.startsOn;
-  const endsOn = stop.endsOn;
+  const startsOn = destination.startsOn;
+  const endsOn = destination.endsOn;
 
   if (startsOn !== null && isIsoDate(startsOn)) {
     if (startsOn < tripStartsOn) {
       return {
         index,
         field: 'startsOn',
-        message: `"${stop.name}" starts on ${format(startsOn)}, which is before the trip starts on ${format(tripStartsOn)}.`,
+        message: `"${destination.name}" starts on ${format(startsOn)}, which is before the trip starts on ${format(tripStartsOn)}.`,
       };
     }
 
@@ -143,7 +198,7 @@ function outsideTrip(
       return {
         index,
         field: 'startsOn',
-        message: `"${stop.name}" starts on ${format(startsOn)}, which is after the trip ends on ${format(tripEndsOn)}.`,
+        message: `"${destination.name}" starts on ${format(startsOn)}, which is after the trip ends on ${format(tripEndsOn)}.`,
       };
     }
   }
@@ -153,7 +208,7 @@ function outsideTrip(
       return {
         index,
         field: 'endsOn',
-        message: `"${stop.name}" ends on ${format(endsOn)}, which is before the trip starts on ${format(tripStartsOn)}.`,
+        message: `"${destination.name}" ends on ${format(endsOn)}, which is before the trip starts on ${format(tripStartsOn)}.`,
       };
     }
 
@@ -161,7 +216,7 @@ function outsideTrip(
       return {
         index,
         field: 'endsOn',
-        message: `"${stop.name}" ends on ${format(endsOn)}, which is after the trip ends on ${format(tripEndsOn)}.`,
+        message: `"${destination.name}" ends on ${format(endsOn)}, which is after the trip ends on ${format(tripEndsOn)}.`,
       };
     }
   }
@@ -170,9 +225,44 @@ function outsideTrip(
 }
 
 /**
- * Checks that a stop does not end before it starts.
+ * Checks that a destination does not end before it starts.
  */
-function reversed(stop: TripStopValue, index: number): TripScheduleProblem | null {
+function reversed(destination: TripStopValue, index: number): TripScheduleProblem | null {
+  const startsOn = destination.startsOn;
+  const endsOn = destination.endsOn;
+
+  if (
+    startsOn !== null &&
+    endsOn !== null &&
+    isIsoDate(startsOn) &&
+    isIsoDate(endsOn) &&
+    endsOn < startsOn
+  ) {
+    return {
+      index,
+      field: 'endsOn',
+      message: `"${destination.name}" ends on ${format(endsOn)} and starts on ${format(startsOn)}.`,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Checks one stop against the destination it belongs to.
+ *
+ * The bounds are the destination's own dates where it has them, and the trip's
+ * dates everywhere else. A stop is a part of the place, so it can never run
+ * outside the days the traveller is there.
+ */
+function stopWithinDestination(
+  destination: TripDestinationValue,
+  stop: TripStopValue,
+  index: number,
+  stopIndex: number,
+  tripStartsOn: string,
+  tripEndsOn: string,
+): TripScheduleProblem | null {
   const startsOn = stop.startsOn;
   const endsOn = stop.endsOn;
 
@@ -185,44 +275,101 @@ function reversed(stop: TripStopValue, index: number): TripScheduleProblem | nul
   ) {
     return {
       index,
+      stopIndex,
       field: 'endsOn',
-      message: `"${stop.name}" ends on ${format(endsOn)} and starts on ${format(startsOn)}.`,
+      message: `"${stop.name}", a stop at "${destination.name}", ends on ${format(endsOn)} and starts on ${format(startsOn)}.`,
     };
+  }
+
+  const lower = destination.startsOn ?? tripStartsOn;
+  const upper = destination.endsOn ?? tripEndsOn;
+
+  if (startsOn !== null && isIsoDate(startsOn)) {
+    if (startsOn < lower) {
+      return {
+        index,
+        stopIndex,
+        field: 'startsOn',
+        message:
+          destination.startsOn !== null
+            ? `"${stop.name}", a stop at "${destination.name}", starts on ${format(startsOn)}, which is before "${destination.name}" starts on ${format(lower)}.`
+            : `"${stop.name}", a stop at "${destination.name}", starts on ${format(startsOn)}, which is before the trip starts on ${format(lower)}.`,
+      };
+    }
+
+    if (startsOn > upper) {
+      return {
+        index,
+        stopIndex,
+        field: 'startsOn',
+        message:
+          destination.endsOn !== null
+            ? `"${stop.name}", a stop at "${destination.name}", starts on ${format(startsOn)}, which is after "${destination.name}" ends on ${format(upper)}.`
+            : `"${stop.name}", a stop at "${destination.name}", starts on ${format(startsOn)}, which is after the trip ends on ${format(upper)}.`,
+      };
+    }
+  }
+
+  if (endsOn !== null && isIsoDate(endsOn)) {
+    if (endsOn < lower) {
+      return {
+        index,
+        stopIndex,
+        field: 'endsOn',
+        message:
+          destination.startsOn !== null
+            ? `"${stop.name}", a stop at "${destination.name}", ends on ${format(endsOn)}, which is before "${destination.name}" starts on ${format(lower)}.`
+            : `"${stop.name}", a stop at "${destination.name}", ends on ${format(endsOn)}, which is before the trip starts on ${format(lower)}.`,
+      };
+    }
+
+    if (endsOn > upper) {
+      return {
+        index,
+        stopIndex,
+        field: 'endsOn',
+        message:
+          destination.endsOn !== null
+            ? `"${stop.name}", a stop at "${destination.name}", ends on ${format(endsOn)}, which is after "${destination.name}" ends on ${format(upper)}.`
+            : `"${stop.name}", a stop at "${destination.name}", ends on ${format(endsOn)}, which is after the trip ends on ${format(upper)}.`,
+      };
+    }
   }
 
   return null;
 }
 
 /**
- * Walks the route in order and keeps a floor: the earliest day the next
- * stop may begin.
+ * Walks the main route in order and keeps a floor: the earliest day the next
+ * destination may begin.
  *
- * A stop that carries no dates establishes nothing and is stepped over. A
- * stop that carries a start date establishes that day, because its stay may
- * be as short as a single day. A stop that carries only an end date
- * establishes its end, because it must have begun at or before it.
- *
- * The floor only ever moves forward, so a stop is measured against every
- * dated stop before it and not only against its neighbour.
+ * Only destinations take part. A stop is a part of the place, not a leg of the
+ * journey, so it never establishes a floor and never contradicts the order.
  */
 function outOfOrder(
-  stops: readonly TripStopValue[],
+  destinations: readonly TripDestinationValue[],
   tripStartsOn: string,
 ): TripScheduleProblem | null {
   let floor = tripStartsOn;
   let anchor: TripStopValue | null = null;
 
-  for (let index = 0; index < stops.length; index += 1) {
-    const stop = stops[index];
-    const startsOn = stop.startsOn !== null && isIsoDate(stop.startsOn) ? stop.startsOn : null;
-    const endsOn = stop.endsOn !== null && isIsoDate(stop.endsOn) ? stop.endsOn : null;
+  for (let index = 0; index < destinations.length; index += 1) {
+    const destination = destinations[index];
+    const startsOn =
+      destination.startsOn !== null && isIsoDate(destination.startsOn)
+        ? destination.startsOn
+        : null;
+    const endsOn =
+      destination.endsOn !== null && isIsoDate(destination.endsOn)
+        ? destination.endsOn
+        : null;
 
     if (startsOn !== null) {
       if (startsOn < floor) {
         return {
           index,
           field: 'startsOn',
-          message: contradiction(stop, 'starts', startsOn, anchor, floor),
+          message: contradiction(destination, 'starts', startsOn, anchor, floor),
         };
       }
 
@@ -232,30 +379,30 @@ function outOfOrder(
         return {
           index,
           field: 'endsOn',
-          message: contradiction(stop, 'ends', endsOn, anchor, floor),
+          message: contradiction(destination, 'ends', endsOn, anchor, floor),
         };
       }
 
       floor = endsOn;
     } else {
-      // A stop with no dates says nothing about when the journey reaches
-      // it, so it changes nothing.
+      // A destination with no dates says nothing about when the journey
+      // reaches it, so it changes nothing.
       continue;
     }
 
-    anchor = stop;
+    anchor = destination;
   }
 
   return null;
 }
 
 /**
- * The message for a stop that contradicts the route it is on. It names the
- * stop at fault and the stop it conflicts with, so the traveller can put it
- * right without guessing.
+ * The message for a destination that contradicts the route it is on. It names
+ * the destination at fault and the destination it conflicts with, so the
+ * traveller can put it right without guessing.
  */
 function contradiction(
-  stop: TripStopValue,
+  destination: TripStopValue,
   verb: 'starts' | 'ends',
   date: string,
   anchor: TripStopValue | null,
@@ -270,30 +417,30 @@ function contradiction(
           ? `"${anchor.name}", which comes before it, does not begin until ${format(floor)}`
           : `"${anchor.name}", which comes before it, is there until ${format(floor)}`;
 
-  return `"${stop.name}" ${verb} on ${format(date)}, but ${conflict}.`;
+  return `"${destination.name}" ${verb} on ${format(date)}, but ${conflict}.`;
 }
 
 /**
- * Group level validator for the array of stops. The message is exposed as
- * `errors.tripDestinations.message` so the form can show it.
+ * Group level validator for the array of destinations. The message is exposed
+ * as `errors.tripDestinations.message` so the form can show it.
  *
- * The stops in the array are groups, so the names are read out of them.
+ * The destinations in the array are groups, so the names are read out of them.
  */
 export const tripDestinationsValidator: ValidatorFn = (
   control: AbstractControl,
 ): ValidationErrors | null => {
-  const stops = control.value;
+  const destinations = control.value;
 
-  if (!Array.isArray(stops)) {
+  if (!Array.isArray(destinations)) {
     return null;
   }
 
-  const names = stops.map((stop) => {
-    if (typeof stop === 'string') {
-      return stop;
+  const names = destinations.map((destination) => {
+    if (typeof destination === 'string') {
+      return destination;
     }
 
-    const name = (stop as { name?: unknown } | null)?.name;
+    const name = (destination as { name?: unknown } | null)?.name;
 
     return typeof name === 'string' ? name : '';
   });
@@ -304,12 +451,37 @@ export const tripDestinationsValidator: ValidatorFn = (
 };
 
 /**
+ * Group level validator for one destination's stops. The message is exposed
+ * as `errors.tripStops.message`.
+ */
+export const tripStopsValidator: ValidatorFn = (
+  control: AbstractControl,
+): ValidationErrors | null => {
+  const stops = control.value;
+
+  if (!Array.isArray(stops)) {
+    return null;
+  }
+
+  const names = stops.map((stop) => {
+    const name = (stop as { name?: unknown } | null)?.name;
+
+    return typeof name === 'string' ? name : '';
+  });
+
+  const message = validateTripStops(names);
+
+  return message ? { tripStops: { message } } : null;
+};
+
+/**
  * Group level validator for the whole form, checking the schedule of the
  * route against the trip's own dates.
  *
- * It sits on the form rather than on a stop because it needs the trip's dates
+ * It sits on the form rather than on a place because it needs the trip's dates
  * and the whole route. The error is exposed as `errors.tripSchedule` and
- * carries the stop that is at fault, so the message can be shown against it.
+ * carries the destination (and stop, where there is one) that is at fault, so
+ * the message can be shown against it.
  */
 export const tripScheduleValidator: ValidatorFn = (
   control: AbstractControl,
@@ -329,20 +501,27 @@ export const tripScheduleValidator: ValidatorFn = (
   const problem = validateTripSchedule(
     tripStartsOn,
     tripEndsOn,
-    destinations as TripStopValue[],
+    destinations as TripDestinationValue[],
   );
 
   return problem
-    ? { tripSchedule: { message: problem.message, index: problem.index, field: problem.field } }
+    ? {
+        tripSchedule: {
+          message: problem.message,
+          index: problem.index,
+          stopIndex: problem.stopIndex,
+          field: problem.field,
+        },
+      }
     : null;
 };
 
 /**
- * Rejects a stop that is made of nothing but spaces.
+ * Rejects a place that is made of nothing but spaces.
  *
- * The built in required validator only rejects an empty value, so a stop of
- * spaces would pass it and only be caught by the route as a whole. This
- * marks the stop itself as wrong.
+ * The built in required validator only rejects an empty value, so a place of
+ * spaces would pass it and only be caught by the route as a whole. This marks
+ * the place itself as wrong.
  */
 export const nonBlankValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const value = control.value;
@@ -355,10 +534,11 @@ export const nonBlankValidator: ValidatorFn = (control: AbstractControl): Valida
 };
 
 /**
- * Rejects a stop whose end date is before its start date.
+ * Rejects a place whose end date is before its start date.
  *
- * This is the one rule about a stop that the stop can answer on its own.
- * The rest of the schedule is checked against the trip as a whole.
+ * This is the one rule about a place that the place can answer on its own.
+ * The rest of the schedule is checked against the trip and its destination as
+ * a whole.
  */
 export const destinationDatesValidator: ValidatorFn = (
   control: AbstractControl,

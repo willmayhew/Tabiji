@@ -58,7 +58,7 @@ export class TripCard {
       (destination) => destination.startsOn !== null || destination.endsOn !== null,
     ).length;
 
-    return dated === 0 ? null : `Dates are set for ${dated} of ${destinations.length} stops`;
+    return dated === 0 ? null : `Dates are set for ${dated} of ${destinations.length} destinations`;
   });
 
   protected toneFor(status: TripStatus): BadgeTone {

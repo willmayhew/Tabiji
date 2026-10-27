@@ -106,6 +106,121 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     }
 
     [DatabaseFact]
+    public async Task AddAsync_WritesTheDetailsOfAStop()
+    {
+        var trip = Trip.Create(
+            "Japan Adventure",
+            [
+                new TripDestinationDraft(
+                    null,
+                    "Kyoto",
+                    new DateOnly(2027, 5, 16),
+                    new DateOnly(2027, 5, 20),
+                    null,
+                    null,
+                    [
+                        new TripStopDraft(
+                            null,
+                            "Gion",
+                            null,
+                            null,
+                            35.0037,
+                            135.7788,
+                            PlaceCategory.Sight,
+                            "Gion, Kyoto",
+                            "Go early.",
+                            new DateOnly(2027, 5, 17)),
+                    ]),
+            ],
+            StartsOn,
+            EndsOn,
+            CreatedAt);
+
+        await _repository!.AddAsync(trip);
+
+        var reloaded = await ReloadAsync(trip);
+        var stop = Assert.Single(reloaded.StopsOf(reloaded.ParentDestinations[0].Id));
+
+        Assert.Equal(TripPlaceKind.Stop, stop.Kind);
+        Assert.Equal(PlaceCategory.Sight, stop.Category);
+        Assert.Equal("Gion, Kyoto", stop.Address);
+        Assert.Equal("Go early.", stop.Notes);
+        Assert.Equal(new DateOnly(2027, 5, 17), stop.PlannedOn);
+        Assert.Equal(35.0037, stop.Latitude);
+        Assert.Equal(135.7788, stop.Longitude);
+    }
+
+    [DatabaseFact]
+    public async Task UpdateAsync_FilesALegacyPlaceUnderADestination()
+    {
+        var trip = Trip.Create(
+            "Japan Adventure",
+            [new TripDestinationDraft(null, "Kyoto", new DateOnly(2027, 5, 16), new DateOnly(2027, 5, 20))],
+            StartsOn,
+            EndsOn,
+            CreatedAt);
+
+        await _repository!.AddAsync(trip);
+
+        var placeId = Guid.NewGuid();
+        var plannedOn = new DateOnly(2027, 5, 18);
+
+        await _context!.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+             INSERT INTO [TripDestinations]
+                 ([Id], [TripId], [ParentDestinationId], [Kind], [Name], [SortOrder],
+                  [StartsOn], [EndsOn], [Latitude], [Longitude], [Category], [Address],
+                  [Notes], [PlannedOn], [CreatedAt], [MigratedFromSavedPlace])
+             VALUES
+                 ({placeId}, {trip.Id}, NULL, 'Place', 'Someday', 0,
+                  NULL, NULL, 35.0, 135.0, 'Sight', 'Somewhere',
+                  'One day.', {plannedOn}, SYSDATETIMEOFFSET(), 1)
+             """);
+
+        var reloaded = await ReloadAsync(trip);
+        var parent = reloaded.ParentDestinations[0];
+        var place = Assert.Single(reloaded.UnfiledPlaces);
+
+        reloaded.ApplyRoute(
+            reloaded.Name,
+            reloaded.StartsOn,
+            reloaded.EndsOn,
+            [
+                new TripDestinationDraft(
+                    parent.Id,
+                    parent.Name,
+                    parent.StartsOn,
+                    parent.EndsOn,
+                    null,
+                    null,
+                    [
+                        new TripStopDraft(
+                            place.Id,
+                            place.Name,
+                            null,
+                            null,
+                            place.Latitude,
+                            place.Longitude,
+                            place.Category,
+                            place.Address,
+                            place.Notes,
+                            place.PlannedOn),
+                    ]),
+            ],
+            []);
+
+        await _repository.UpdateAsync(reloaded);
+
+        var after = await ReloadAsync(reloaded);
+        var filed = Assert.Single(after.StopsOf(parent.Id));
+
+        Assert.Equal(placeId, filed.Id);
+        Assert.Equal(TripPlaceKind.Stop, filed.Kind);
+        Assert.Equal(parent.Id, filed.ParentDestinationId);
+        Assert.Empty(after.UnfiledPlaces);
+    }
+
+    [DatabaseFact]
     public async Task UpdateAsync_ReversesTheRouteAndKeepsTheIdentityOfTheStops()
     {
         var trip = Japan();
@@ -240,4 +355,216 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
         Assert.Equal("日本", reloaded.Name);
         Assert.Equal("大阪", Assert.Single(reloaded.Destinations).Name);
     }
+
+    private static Trip JapanWithStops() => Trip.Create(
+        "Japan",
+        [
+            new TripDestinationDraft(
+                null,
+                "Osaka",
+                new DateOnly(2027, 5, 16),
+                new DateOnly(2027, 5, 20),
+                null,
+                null,
+                [TripStopDraft.Undated("Namba"), TripStopDraft.Undated("Umeda")]),
+            new TripDestinationDraft(
+                null,
+                "Kyoto",
+                new DateOnly(2027, 5, 20),
+                new DateOnly(2027, 5, 24),
+                null,
+                null,
+                [TripStopDraft.Undated("Gion")]),
+        ],
+        StartsOn,
+        EndsOn,
+        CreatedAt);
+
+    [DatabaseFact]
+    public async Task AddAsync_WritesTheNestedHierarchyInOrder()
+    {
+        var trip = JapanWithStops();
+
+        await _repository!.AddAsync(trip);
+
+        var reloaded = await ReloadAsync(trip);
+
+        Assert.Equal(["Osaka", "Kyoto"], reloaded.ParentDestinations.Select(d => d.Name));
+        Assert.Equal([0, 1], reloaded.ParentDestinations.Select(d => d.SortOrder));
+
+        var osaka = reloaded.ParentDestinations[0];
+        var kyoto = reloaded.ParentDestinations[1];
+
+        Assert.Equal(["Namba", "Umeda"], reloaded.StopsOf(osaka.Id).Select(s => s.Name));
+        Assert.Equal([0, 1], reloaded.StopsOf(osaka.Id).Select(s => s.SortOrder));
+        Assert.Equal(["Gion"], reloaded.StopsOf(kyoto.Id).Select(s => s.Name));
+    }
+
+    [DatabaseFact]
+    public async Task UpdateAsync_AddsAStopUnderAnExistingDestination()
+    {
+        var trip = JapanWithStops();
+
+        await _repository!.AddAsync(trip);
+
+        var reloaded = await ReloadAsync(trip);
+        var osaka = reloaded.ParentDestinations[0];
+        var kyoto = reloaded.ParentDestinations[1];
+
+        reloaded.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [
+                Draft(osaka, [.. Drafts(reloaded.StopsOf(osaka.Id)), NewStop("Tennoji")]),
+                Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id))),
+            ]);
+
+        await _repository.UpdateAsync(reloaded);
+
+        var again = await ReloadAsync(reloaded);
+
+        Assert.Equal(["Namba", "Umeda", "Tennoji"], again.StopsOf(osaka.Id).Select(s => s.Name));
+    }
+
+    [DatabaseFact]
+    public async Task UpdateAsync_ReordersStopsWithinOneDestination()
+    {
+        var trip = JapanWithStops();
+
+        await _repository!.AddAsync(trip);
+
+        var reloaded = await ReloadAsync(trip);
+        var osaka = reloaded.ParentDestinations[0];
+        var kyoto = reloaded.ParentDestinations[1];
+        var osakaStops = reloaded.StopsOf(osaka.Id);
+
+        reloaded.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [
+                Draft(osaka, [Draft(osakaStops[1]), Draft(osakaStops[0])]),
+                Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id))),
+            ]);
+
+        await _repository.UpdateAsync(reloaded);
+
+        var again = await ReloadAsync(reloaded);
+
+        Assert.Equal(["Umeda", "Namba"], again.StopsOf(osaka.Id).Select(s => s.Name));
+        Assert.Equal([0, 1], again.StopsOf(osaka.Id).Select(s => s.SortOrder));
+        Assert.Equal(["Osaka", "Kyoto"], again.ParentDestinations.Select(d => d.Name));
+    }
+
+    [DatabaseFact]
+    public async Task UpdateAsync_DeletesAStopAndKeepsTheRest()
+    {
+        var trip = JapanWithStops();
+
+        await _repository!.AddAsync(trip);
+
+        var reloaded = await ReloadAsync(trip);
+        var osaka = reloaded.ParentDestinations[0];
+        var kyoto = reloaded.ParentDestinations[1];
+        var osakaStops = reloaded.StopsOf(osaka.Id);
+
+        reloaded.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [
+                Draft(osaka, [Draft(osakaStops[1])]),
+                Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id))),
+            ]);
+
+        await _repository.UpdateAsync(reloaded);
+
+        var again = await ReloadAsync(reloaded);
+
+        Assert.Equal(["Umeda"], again.StopsOf(osaka.Id).Select(s => s.Name));
+        Assert.Equal(["Gion"], again.StopsOf(kyoto.Id).Select(s => s.Name));
+    }
+
+    [DatabaseFact]
+    public async Task UpdateAsync_RemovesADestinationAndItsStops()
+    {
+        var trip = JapanWithStops();
+
+        await _repository!.AddAsync(trip);
+
+        var reloaded = await ReloadAsync(trip);
+        var osaka = reloaded.ParentDestinations[0];
+        var kyoto = reloaded.ParentDestinations[1];
+
+        reloaded.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id)))]);
+
+        await _repository.UpdateAsync(reloaded);
+
+        var again = await ReloadAsync(reloaded);
+
+        Assert.Equal(["Kyoto"], again.ParentDestinations.Select(d => d.Name));
+        Assert.Empty(again.StopsOf(osaka.Id));
+        Assert.Equal(["Gion"], again.StopsOf(kyoto.Id).Select(s => s.Name));
+    }
+
+    [DatabaseFact]
+    public async Task UpdateAsync_SwapsStopsBetweenTwoDestinations()
+    {
+        var trip = JapanWithStops();
+
+        await _repository!.AddAsync(trip);
+
+        var reloaded = await ReloadAsync(trip);
+        var osaka = reloaded.ParentDestinations[0];
+        var kyoto = reloaded.ParentDestinations[1];
+        var osakaStops = reloaded.StopsOf(osaka.Id);
+        var kyotoStops = reloaded.StopsOf(kyoto.Id);
+
+        // Osaka receives Gion; Kyoto receives Namba and Umeda. Both stops
+        // change parent in the same transaction, which is the case the
+        // repository's parent-first, position-second write is for.
+        reloaded.ApplyRoute(
+            "Japan",
+            StartsOn,
+            EndsOn,
+            [
+                Draft(osaka, [Draft(kyotoStops[0])]),
+                Draft(kyoto, [Draft(osakaStops[0]), Draft(osakaStops[1])]),
+            ]);
+
+        await _repository.UpdateAsync(reloaded);
+
+        var again = await ReloadAsync(reloaded);
+
+        Assert.Equal(["Gion"], again.StopsOf(osaka.Id).Select(s => s.Name));
+        Assert.Equal(["Namba", "Umeda"], again.StopsOf(kyoto.Id).Select(s => s.Name));
+        Assert.Equal(kyotoStops[0].Id, again.StopsOf(osaka.Id)[0].Id);
+        Assert.Equal(osakaStops[0].Id, again.StopsOf(kyoto.Id)[0].Id);
+    }
+
+    private static TripDestinationDraft Draft(
+        TripDestination parent,
+        IReadOnlyList<TripStopDraft> stops) =>
+        new(
+            parent.Id,
+            parent.Name,
+            parent.StartsOn,
+            parent.EndsOn,
+            parent.Latitude,
+            parent.Longitude,
+            stops);
+
+    private static TripStopDraft[] Drafts(IReadOnlyList<TripDestination> stops) =>
+        stops.Select(Draft).ToArray();
+
+    private static TripStopDraft Draft(TripDestination stop) =>
+        new(stop.Id, stop.Name, stop.StartsOn, stop.EndsOn, stop.Latitude, stop.Longitude);
+
+    private static TripStopDraft NewStop(string name) =>
+        new(null, name, null, null);
 }

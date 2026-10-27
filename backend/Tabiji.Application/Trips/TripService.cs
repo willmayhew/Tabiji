@@ -9,6 +9,8 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         CreateTripRequest request,
         CancellationToken cancellationToken = default)
     {
+        var now = timeProvider.GetUtcNow();
+
         var destinations = (request.Destinations ?? [])
             .Select(destination => new TripDestinationDraft(
                 null,
@@ -16,7 +18,25 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
                 destination.StartsOn,
                 destination.EndsOn,
                 destination.Latitude,
-                destination.Longitude))
+                destination.Longitude,
+                (destination.Stops ?? [])
+                    .Select(stop => new TripStopDraft(
+                        null,
+                        stop.Name,
+                        stop.StartsOn,
+                        stop.EndsOn,
+                        stop.Latitude,
+                        stop.Longitude,
+                        stop.Category,
+                        stop.Address,
+                        stop.Notes,
+                        stop.PlannedOn,
+                        now))
+                    .ToArray(),
+                destination.Category,
+                destination.Address,
+                destination.Notes,
+                destination.PlannedOn))
             .ToArray();
 
         var trip = Trip.Create(
@@ -24,7 +44,7 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
             destinations,
             request.StartsOn,
             request.EndsOn,
-            timeProvider.GetUtcNow());
+            now);
 
         await repository.AddAsync(trip, cancellationToken);
 
@@ -51,6 +71,8 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
             return null;
         }
 
+        var now = timeProvider.GetUtcNow();
+
         var destinations = (request.Destinations ?? [])
             .Select(destination => new TripDestinationDraft(
                 destination.Id,
@@ -58,10 +80,47 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
                 destination.StartsOn,
                 destination.EndsOn,
                 destination.Latitude,
-                destination.Longitude))
+                destination.Longitude,
+                (destination.Stops ?? [])
+                    .Select(stop => new TripStopDraft(
+                        stop.Id,
+                        stop.Name,
+                        stop.StartsOn,
+                        stop.EndsOn,
+                        stop.Latitude,
+                        stop.Longitude,
+                        stop.Category,
+                        stop.Address,
+                        stop.Notes,
+                        stop.PlannedOn,
+                        stop.Id is null ? now : null))
+                    .ToArray(),
+                destination.Category,
+                destination.Address,
+                destination.Notes,
+                destination.PlannedOn))
             .ToArray();
 
-        trip.ApplyRoute(request.Name, request.StartsOn, request.EndsOn, destinations);
+        var places = request.UnfiledPlaces?
+            .Select(place => new TripStopDraft(
+                place.Id,
+                place.Name,
+                place.StartsOn,
+                place.EndsOn,
+                place.Latitude,
+                place.Longitude,
+                place.Category,
+                place.Address,
+                place.Notes,
+                place.PlannedOn))
+            .ToArray();
+
+        trip.ApplyRoute(
+            request.Name,
+            request.StartsOn,
+            request.EndsOn,
+            destinations,
+            places);
 
         await repository.UpdateAsync(trip, cancellationToken);
 
@@ -82,15 +141,21 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         return trips.Select(ToResponse).ToArray();
     }
 
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return repository.DeleteAsync(id, cancellationToken);
+    }
+
     /// <summary>
-    /// The stops are ordered by their sort order here, so the contract holds
-    /// whichever repository produced the trip.
+    /// The destinations, their stops and the legacy unfiled places are ordered
+    /// here, so the contract holds whichever repository produced the trip. A
+    /// stop is never part of the main route: it is nested inside the
+    /// destination it belongs to.
     /// </summary>
     private static TripResponse ToResponse(Trip trip) => new(
         trip.Id,
         trip.Name,
-        trip.Destinations
-            .OrderBy(destination => destination.SortOrder)
+        trip.ParentDestinations
             .Select(destination => new TripDestinationResponse(
                 destination.Id,
                 destination.Name,
@@ -98,9 +163,32 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
                 destination.StartsOn,
                 destination.EndsOn,
                 destination.Latitude,
-                destination.Longitude))
+                destination.Longitude,
+                trip.StopsOf(destination.Id)
+                    .Select(ToStopResponse)
+                    .ToArray(),
+                destination.Category,
+                destination.Address,
+                destination.Notes,
+                destination.PlannedOn,
+                destination.CreatedAt))
             .ToArray(),
         trip.StartsOn,
         trip.EndsOn,
-        trip.Status);
+        trip.Status,
+        trip.UnfiledPlaces.Select(ToStopResponse).ToArray());
+
+    private static TripStopResponse ToStopResponse(TripDestination stop) => new(
+        stop.Id,
+        stop.Name,
+        stop.SortOrder,
+        stop.StartsOn,
+        stop.EndsOn,
+        stop.Latitude,
+        stop.Longitude,
+        stop.Category,
+        stop.Address,
+        stop.Notes,
+        stop.PlannedOn,
+        stop.CreatedAt);
 }

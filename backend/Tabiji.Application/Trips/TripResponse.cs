@@ -8,4 +8,5 @@ public sealed record TripResponse(
     IReadOnlyList<TripDestinationResponse> Destinations,
     DateOnly StartsOn,
     DateOnly EndsOn,
-    TripStatus Status);
+    TripStatus Status,
+    IReadOnlyList<TripStopResponse>? UnfiledPlaces = null);

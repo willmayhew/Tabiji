@@ -100,6 +100,26 @@ public static class TripEndpoints
             .WithName("GetTripById")
             .WithSummary("Returns a single trip by its identifier.");
 
+        group.MapDelete(
+            "/{id:guid}",
+            async (
+                Guid id,
+                TripService tripService,
+                CancellationToken cancellationToken) =>
+            {
+                var deleted = await tripService.DeleteAsync(id, cancellationToken);
+
+                IResult result = deleted
+                    ? Results.NoContent()
+                    : Results.Problem(
+                        title: "Trip not found",
+                        statusCode: StatusCodes.Status404NotFound);
+
+                return result;
+            })
+            .WithName("DeleteTrip")
+            .WithSummary("Deletes a trip and its route.");
+
         return endpoints;
     }
 }

@@ -17,6 +17,8 @@ namespace Tabiji.Application.Trips;
 /// <param name="Category">What kind of place it is, or null when not said.</param>
 /// <param name="Address">A short description of where it is, or null.</param>
 /// <param name="Notes">The reader's own note, or null.</param>
+/// <param name="PlannedOn">The day of the trip the place is planned for, or
+/// null when it has not been planned for one.</param>
 /// <param name="CreatedAt">When the place was saved.</param>
 public sealed record SavedPlaceResponse(
     Guid Id,
@@ -27,4 +29,5 @@ public sealed record SavedPlaceResponse(
     PlaceCategory? Category,
     string? Address,
     string? Notes,
+    DateOnly? PlannedOn,
     DateTimeOffset CreatedAt);

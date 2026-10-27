@@ -189,21 +189,30 @@ curl http://localhost:5080/api/trips
         "name": "Osaka",
         "sortOrder": 0,
         "startsOn": "2027-05-16",
-        "endsOn": "2027-05-20"
+        "endsOn": "2027-05-20",
+        "latitude": null,
+        "longitude": null,
+        "stops": []
       },
       {
         "id": "3c21be5e-0868-4a3e-91c6-64b72892eaa3",
         "name": "Kyoto",
         "sortOrder": 1,
         "startsOn": "2027-05-20",
-        "endsOn": "2027-05-24"
+        "endsOn": "2027-05-24",
+        "latitude": null,
+        "longitude": null,
+        "stops": []
       },
       {
         "id": "6df575e9-6e69-4c8a-b55e-52573a32168f",
         "name": "Ise",
         "sortOrder": 2,
         "startsOn": null,
-        "endsOn": null
+        "endsOn": null,
+        "latitude": null,
+        "longitude": null,
+        "stops": []
       }
     ],
     "startsOn": "2027-05-16",
@@ -213,25 +222,40 @@ curl http://localhost:5080/api/trips
 ]
 ```
 
-Create a trip:
+Create a trip — destinations are the main route, and each may hold stops:
 
 ```bash
 curl -X POST http://localhost:5080/api/trips \
   -H "Content-Type: application/json" \
-  -d '{"name":"Japan Adventure","startsOn":"2027-05-16","endsOn":"2027-06-05","destinations":[{"name":"Osaka","startsOn":"2027-05-16","endsOn":"2027-05-20"},{"name":"Kyoto","startsOn":"2027-05-20","endsOn":"2027-05-24"},{"name":"Ise","startsOn":null,"endsOn":null}]}'
+  -d '{"name":"Japan Adventure","startsOn":"2027-05-08","endsOn":"2027-05-29","destinations":[{"name":"Osaka","startsOn":"2027-05-08","endsOn":"2027-05-12","stops":[{"name":"Namba","category":"Food","address":"Namba, Osaka","notes":"Eat here.","plannedOn":"2027-05-09"},{"name":"Umeda"}]},{"name":"Kyoto","startsOn":"2027-05-13","endsOn":"2027-05-17","stops":[{"name":"Gion"}]}]}'
 ```
 
-Change a trip — the request holds the whole trip, and the order of the array is the route:
+Change a trip — the request holds the whole trip, the order of `destinations` is the main
+route, and the order of each `stops` array is the order within that destination:
 
 ```bash
 curl -X PUT http://localhost:5080/api/trips/c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa \
   -H "Content-Type: application/json" \
-  -d '{"name":"Japan Adventure","startsOn":"2027-05-16","endsOn":"2027-06-05","destinations":[{"id":"6d343873-45bc-42c6-abc2-5c271f99354a","name":"Osaka","startsOn":"2027-05-16","endsOn":"2027-05-20"},{"id":null,"name":"Nagoya","startsOn":null,"endsOn":null}]}'
+  -d '{"name":"Japan Adventure","startsOn":"2027-05-08","endsOn":"2027-05-29","destinations":[{"id":"6d343873-45bc-42c6-abc2-5c271f99354a","name":"Osaka","startsOn":"2027-05-08","endsOn":"2027-05-12","stops":[{"id":"…","name":"Namba"},{"id":null,"name":"Tennoji"}]},{"id":null,"name":"Nagoya","startsOn":null,"endsOn":null,"stops":[]}]}'
 ```
 
-A destination with an `id` is a stop that already exists: it is renamed, rescheduled and
-moved to its new position, and it keeps its identity. A destination with `"id": null` is a
-new stop. A stop the request leaves out is removed. A date sent as `null` is cleared.
+A destination with an `id` is a destination that already exists: it is renamed,
+rescheduled and moved to its new position, and it keeps its identity. A destination with
+`"id": null` is new. A destination the request leaves out is removed with its stops. The
+same rules apply to the entries in `stops`: an `id` keeps a stop, `null` adds one, an
+omitted stop is removed, and the array order is the order within the destination. A stop
+named under a different destination is moved there and keeps its identity and its place
+details (category, address, notes, planned day). A date sent as `null` is cleared.
+
+A stop is the place. It carries its own order inside its parent, optional stay dates and
+coordinates, and an optional category, address, notes and planned day. It is labelled
+hierarchically (`1a`, `1b`, ... `1aa`) in the Atlas and connects to the other stops of its
+destination with a separate line; it is never a numbered main-route pin.
+
+`PUT` also accepts an optional `unfiledPlaces` array for legacy saved places that are not
+yet in a destination. Omitting the array leaves them alone; naming one under a destination
+files it there with the same identity. The old saved-place write routes are retired; the
+read-only `GET /api/trips/{tripId}/places` remains for one release.
 
 A trip holds an **ordered route** of destinations, at least one and at most twenty. Each
 name is free text of up to 200 characters: it is never parsed and never compared against a
@@ -288,8 +312,8 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 117 tests
-cd frontend && npm test           # 197 tests
+dotnet test backend/Tabiji.sln   # 351 tests
+cd frontend && npm test           # 454 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that

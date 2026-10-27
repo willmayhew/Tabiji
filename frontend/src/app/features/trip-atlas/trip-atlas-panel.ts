@@ -1,30 +1,19 @@
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import type { PlaceCategory } from '../../core/models/place';
+import { stopsOf, TripDestination, TripStop } from '../../core/models/trip';
+import { formatDestinationDates, formatPlanDay } from '../../shared/format/trip-dates';
 import {
-  afterNextRender,
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  ElementRef,
-  inject,
-  Injector,
-  input,
-  output,
-  viewChild,
-} from '@angular/core';
-import { SavedPlace } from '../../core/models/place';
-import { TripDestination } from '../../core/models/trip';
-import { formatDestinationDates } from '../../shared/format/trip-dates';
+  placeCategoryLabel,
+  stopLabel as labelStop,
+} from '../../shared/format/place-labels';
 
 /**
- * What the atlas says about whatever is selected: a stop on the route, or a
- * place saved to the trip.
+ * What the atlas says about whatever is selected: a destination on the main
+ * route, a stop within one, or a legacy place not yet in a destination.
  *
- * A stop can only have its location changed here; renaming, reordering and
- * the dates belong to the trip page's editor, so this does not grow into a
- * second one. A saved place is the atlas's own, so it is edited and removed
- * from here.
- *
- * The stop also says what is filed under it. On a phone the list is hidden
- * while the map is showing, so this is the only place a stop's places appear.
+ * The panel reads. A stop is edited and removed from here through the stop
+ * editor; a destination's name, order and dates belong to the trip page; a
+ * legacy place is filed under a destination from the Route list.
  */
 @Component({
   selector: 'app-trip-atlas-panel',
@@ -33,102 +22,107 @@ import { formatDestinationDates } from '../../shared/format/trip-dates';
   styleUrl: './trip-atlas-panel.css',
 })
 export class TripAtlasPanel {
-  /** The selected stop, or null when the selection is a place or nothing. */
+  /** The selected destination, or null when the selection is a stop or place. */
   readonly destination = input<TripDestination | null>(null);
 
-  /** The selected saved place, or null. */
-  readonly place = input<SavedPlace | null>(null);
+  /** The selected stop, or null. */
+  readonly stop = input<TripStop | null>(null);
 
-  /** The stop's place on the route, counting from one. */
+  /** The destination holding the selected stop, when there is one. */
+  readonly parent = input<TripDestination | null>(null);
+
+  /** The selected legacy place not yet in a destination, or null. */
+  readonly place = input<TripStop | null>(null);
+
+  /** The selected destination's place on the main route, counting from one. */
   readonly position = input<number | null>(null);
 
-  /** How many stops the route has. */
+  /** How many destinations the main route has. */
   readonly total = input(0);
 
-  /** The trip's stops, so a place can say which one it is filed under. */
+  /** The trip's destinations, so a destination can list its stops. */
   readonly destinations = input<readonly TripDestination[]>([]);
 
-  /** The trip's saved places, so a stop can say what is filed under it. */
-  readonly places = input<readonly SavedPlace[]>([]);
+  /** The hierarchical label of the selected stop, such as `1a`. */
+  readonly stopLabel = input<string | null>(null);
 
-  readonly changeLocation = output<TripDestination>();
+  readonly editStop = output<TripStop>();
 
-  readonly editPlace = output<SavedPlace>();
+  readonly removeStop = output<TripStop>();
 
-  readonly deletePlace = output<SavedPlace>();
-
-  /** Emits a place filed under the selected stop, so the screen can select it. */
-  readonly selectPlace = output<SavedPlace>();
-
-  private readonly injector = inject(Injector);
-
-  /** The name of the place, once the panel is showing one. */
-  private readonly placeHeading = viewChild<ElementRef<HTMLElement>>('placeHeading');
+  /** Emits a stop of the selected destination, so the screen can select it. */
+  readonly selectStop = output<TripStop>();
 
   protected readonly dates = computed(() => {
-    const stop = this.destination();
+    const place = this.stop() ?? this.destination();
 
-    return stop === null
+    return place === null
       ? null
-      : (formatDestinationDates(stop.startsOn, stop.endsOn) ?? 'Dates not decided');
+      : (formatDestinationDates(place.startsOn, place.endsOn) ?? 'Dates not decided');
   });
 
   protected readonly located = computed(() => {
-    const stop = this.destination();
+    const place = this.stop() ?? this.destination() ?? this.place();
 
-    return stop !== null && stop.latitude !== null && stop.longitude !== null;
-  });
-
-  /**
-   * Where the selected place is filed, in words. A place filed under a stop
-   * that has since gone reads as unassigned, rather than naming a stop the
-   * trip no longer has.
-   */
-  protected readonly filedUnder = computed(() => {
-    const place = this.place();
-
-    if (place === null || place.destinationId === null) {
-      return 'Not on the route';
-    }
-
-    return this.destinations().find((stop) => stop.id === place.destinationId)?.name ?? 'Not on the route';
+    return place !== null && place.latitude !== null && place.longitude !== null;
   });
 
   protected readonly coordinates = computed(() => {
-    const place = this.place();
+    const place = this.stop() ?? this.place();
 
-    return place === null ? null : `${place.latitude.toFixed(4)}, ${place.longitude.toFixed(4)}`;
+    if (place === null || place.latitude === null || place.longitude === null) {
+      return null;
+    }
+
+    return `${place.latitude.toFixed(4)}, ${place.longitude.toFixed(4)}`;
   });
 
-  /**
-   * The places filed under the selected stop — the same rule the plan list
-   * groups by, so the two can never disagree about where a place belongs.
-   */
-  protected readonly placesAtStop = computed(() => {
-    const stop = this.destination();
+  protected readonly plannedDay = computed(() => {
+    const place = this.stop() ?? this.place();
 
-    return stop === null ? [] : this.places().filter((place) => place.destinationId === stop.id);
+    if (place === null || place.plannedOn == null) {
+      return 'No day yet';
+    }
+
+    return formatPlanDay(place.plannedOn) ?? place.plannedOn;
   });
 
-  protected readonly placesAtStopLabel = computed(() => {
-    const count = this.placesAtStop().length;
+  protected readonly stopsAtDestination = computed(() => {
+    const destination = this.destination();
 
-    return count === 1 ? '1 place' : `${count} places`;
+    return destination === null ? [] : stopsOf(destination);
   });
 
-  /**
-   * Selects a place filed under the stop.
-   *
-   * The stop's own content — including the button the reader just pressed —
-   * is replaced by that place, so the focus would be left with nothing. It is
-   * moved to the place's name instead, so a keyboard reader carries on from
-   * where they were rather than from the top of the page.
-   */
-  protected chooseFromStop(place: SavedPlace): void {
-    this.selectPlace.emit(place);
+  protected stopCountLabel(destination: TripDestination): string {
+    const count = stopsOf(destination).length;
 
-    afterNextRender(() => this.placeHeading()?.nativeElement.focus(), {
-      injector: this.injector,
-    });
+    return count === 1 ? '1 stop' : `${count} stops`;
+  }
+
+  protected isStopLocated(stop: TripStop): boolean {
+    return stop.latitude !== null && stop.longitude !== null;
+  }
+
+  /** The hierarchical label of a stop in the selected destination. */
+  protected labelFor(index: number): string {
+    const position = this.position();
+
+    return position === null ? '' : labelStop(position - 1, index);
+  }
+
+  protected categoryOf(place: TripStop | null): PlaceCategory | null {
+    return place?.category ?? null;
+  }
+
+  protected categoryLabel(category: PlaceCategory): string {
+    return placeCategoryLabel(category);
+  }
+
+  protected addressOf(place: TripStop | null): string | null {
+    return place?.address ?? null;
+  }
+
+  protected notesOf(place: TripStop | null): string | null {
+    return place?.notes ?? null;
   }
 }

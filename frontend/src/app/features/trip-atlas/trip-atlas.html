@@ -57,16 +57,15 @@
         </div>
 
         <div class="atlas__bar-actions">
-          <button type="button" class="button" (click)="addPlace()">Add a place</button>
           <a class="button button--secondary" [routerLink]="['/trips', found.id]">Open the trip</a>
         </div>
       </div>
     </header>
 
-    <div class="atlas__toggle" role="group" aria-label="Atlas view">
+    <div class="atlas__toggle segmented" role="group" aria-label="Atlas view">
       <button
         type="button"
-        class="atlas__toggle-button"
+        class="segmented__option"
         [attr.aria-pressed]="mode() === 'map'"
         (click)="setMode('map')"
       >
@@ -74,7 +73,7 @@
       </button>
       <button
         type="button"
-        class="atlas__toggle-button"
+        class="segmented__option"
         [attr.aria-pressed]="mode() === 'list'"
         (click)="setMode('list')"
       >
@@ -82,16 +81,8 @@
       </button>
     </div>
 
-    @if (placesActionError(); as message) {
+    @if (tripActionError(); as message) {
       <p class="callout callout--danger" role="alert">{{ message }}</p>
-    }
-
-    @if (saveError(); as message) {
-      <p class="callout callout--danger" role="alert">
-        {{ message }} The location was not changed.
-      </p>
-    } @else if (saving()) {
-      <p class="atlas__saving" role="status">Saving the location&hellip;</p>
     }
 
     <div
@@ -102,8 +93,9 @@
       <div class="atlas__map-panel">
         @if (showsMap()) {
           <app-trip-atlas-map
-            [destinations]="found.destinations"
-            [places]="places()"
+            [destinations]="ordered()"
+            [stops]="visibleStops()"
+            [parentPosition]="selectedPosition()"
             [selection]="selection()"
             [label]="found.name"
             [active]="mode() === 'map'"
@@ -125,8 +117,8 @@
             </svg>
             <h2 class="empty-state__title">Nothing on the map yet</h2>
             <p class="empty-state__body">
-              No stop has a location yet, and no place has been saved. Choose a place for a stop,
-              or add somewhere worth going.
+              No destination has a location yet, and nothing is selected. Choose a place for a
+              destination, or add a stop with a position.
             </p>
           </div>
         }
@@ -134,49 +126,60 @@
 
       <div class="atlas__side">
         <app-trip-atlas-list
-          [destinations]="found.destinations"
-          [places]="places()"
+          [destinations]="ordered()"
+          [unfiledPlaces]="unfiled()"
+          [startsOn]="startsOn()"
+          [endsOn]="endsOn()"
           [selection]="selection()"
-          [placesLoading]="placesLoading()"
-          [placesError]="placesError()"
+          [expanded]="expanded()"
           (select)="select($event)"
-          (retryPlaces)="retryPlaces()"
+          (addDestination)="addDestination()"
+          (addStop)="addStop($event)"
+          (toggleDestination)="toggleDestination($event)"
+          (filePlace)="filePlace($event)"
         />
       </div>
 
       <div class="atlas__panel-slot">
         <app-trip-atlas-panel
           [destination]="selectedDestination()"
+          [stop]="selectedStop()"
+          [parent]="selectedParent()"
           [place]="selectedPlace()"
           [position]="selectedPosition()"
           [total]="ordered().length"
           [destinations]="ordered()"
-          [places]="places()"
-          (changeLocation)="relocate($event)"
-          (editPlace)="editPlace($event)"
-          (deletePlace)="deletePlace($event)"
-          (selectPlace)="select({ kind: 'place', id: $event.id })"
+          [stopLabel]="selectedStopLabel()"
+          (editStop)="editStop($event)"
+          (removeStop)="removeStop($event)"
+          (selectStop)="select({ kind: 'stop', id: $event.id })"
         />
       </div>
     </div>
   }
 
-  <app-location-picker
-    [open]="pickerFor() !== null"
-    [initialQuery]="pickerQuery()"
-    [initialCoordinates]="pickerCoordinates()"
-    (chosen)="onPlaceChosen($event)"
-    (dismissed)="closePicker()"
+  <app-stop-editor
+    [open]="stopEditorOpen()"
+    [parent]="stopEditorParent()"
+    [stop]="stopEditorStop()"
+    [tripStartsOn]="startsOn()"
+    [tripEndsOn]="endsOn()"
+    [saving]="stopEditorSaving()"
+    [error]="stopEditorError()"
+    (save)="saveStop($event)"
+    (dismissed)="closeStopEditor()"
   />
 
-  <app-place-editor
-    [open]="editorOpen()"
-    [place]="editorPlace()"
-    [destinations]="ordered()"
-    [saving]="editorSaving()"
-    [error]="editorError()"
-    (save)="savePlace($event)"
-    (dismissed)="closeEditor()"
+  <app-destination-editor
+    [open]="destinationEditorOpen()"
+    mode="destination"
+    [parent]="null"
+    [tripStartsOn]="startsOn()"
+    [tripEndsOn]="endsOn()"
+    [saving]="destinationEditorSaving()"
+    [error]="destinationEditorError()"
+    (save)="saveDestination($event)"
+    (dismissed)="closeDestinationEditor()"
   />
 
   <p class="visually-hidden" aria-live="polite">{{ announcement() }}</p>

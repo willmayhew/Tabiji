@@ -13,25 +13,27 @@ import {
   viewChild,
 } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import { SavedPlace } from '../../core/models/place';
-import { TripDestination } from '../../core/models/trip';
+import { TripDestination, TripStop } from '../../core/models/trip';
+import { parentLabel, stopLabel } from '../../shared/format/place-labels';
 import {
   AtlasHandle,
   AtlasPoint,
   AtlasSelection,
-  LocatedPoint,
+  AtlasStopPoint,
   MapEngine,
 } from '../../shared/map/map-engine';
 
 /**
- * The trip drawn on a map: a numbered marker for every located destination, a
- * dot for every saved place, and one dashed line that joins the destinations
- * in the order they are visited.
+ * The trip drawn on a map: a numbered marker for every located destination,
+ * a labelled marker for every visible stop, and two distinct lines — the main
+ * route through the destinations, and the connection between the stops of the
+ * selected destination.
  *
  * The component is presentational. It owns only the map instance; the
- * selection and the trip belong to the screen above it. The map is never the
- * only way to reach a stop or a place — the list beside it carries every one
- * of them as text — so the markers are hidden from assistive technology.
+ * selection, the expansion state and the trip belong to the screen above it.
+ * The map is never the only way to reach a stop — the list beside it carries
+ * every one of them as text — so the markers are hidden from assistive
+ * technology.
  */
 @Component({
   selector: 'app-trip-atlas-map',
@@ -42,13 +44,16 @@ import {
 export class TripAtlasMap implements OnDestroy {
   private readonly mapEngine = inject(MapEngine);
 
-  /** The trip's whole route, in order. Only the located stops are drawn. */
+  /** The trip's destinations, in route order. Only the located ones are drawn. */
   readonly destinations = input<readonly TripDestination[]>([]);
 
-  /** The places saved to the trip. A place always has a position. */
-  readonly places = input<readonly SavedPlace[]>([]);
+  /** The stops of the selected destination, when it is expanded. */
+  readonly stops = input<readonly TripStop[]>([]);
 
-  /** The stop or place the screen has selected, if any. */
+  /** The selected destination's main-route position, counting from one. */
+  readonly parentPosition = input<number | null>(null);
+
+  /** The stop the screen has selected, if any. */
   readonly selection = input<AtlasSelection | null>(null);
 
   /** The trip's name, for the map's accessible name. */
@@ -57,7 +62,7 @@ export class TripAtlasMap implements OnDestroy {
   /** Whether the map is on screen, so a map that returns can be re-measured. */
   readonly active = input(true);
 
-  /** Emits the stop or place whose marker was clicked. */
+  /** Emits the destination or stop whose marker was clicked. */
   readonly select = output<AtlasSelection>();
 
   protected readonly unavailable = signal(false);
@@ -71,9 +76,9 @@ export class TripAtlasMap implements OnDestroy {
   private starting = false;
 
   /**
-   * The stops that can be drawn, numbered by their place on the whole route.
-   * A stop with no location is skipped but still counts towards the numbering,
-   * so a marker's number always matches the stop's position.
+   * The destinations that can be drawn, labelled by their place on the whole
+   * route. A destination with no location is skipped but still counts towards
+   * the numbering, so a marker's label always matches its position.
    */
   protected readonly points = computed<AtlasPoint[]>(() => {
     const ordered = [...this.destinations()].sort(
@@ -88,7 +93,7 @@ export class TripAtlasMap implements OnDestroy {
           id: destination.id,
           latitude: destination.latitude,
           longitude: destination.longitude,
-          index: position + 1,
+          label: parentLabel(position),
         });
       }
     });
@@ -96,14 +101,29 @@ export class TripAtlasMap implements OnDestroy {
     return located;
   });
 
-  /** The saved places, which always carry a position of their own. */
-  protected readonly placePoints = computed<LocatedPoint[]>(() =>
-    this.places().map((place) => ({
-      id: place.id,
-      latitude: place.latitude,
-      longitude: place.longitude,
-    })),
-  );
+  /** The visible stops, with the hierarchical labels of their parent's stops. */
+  protected readonly stopPoints = computed<AtlasStopPoint[]>(() => {
+    const position = this.parentPosition();
+
+    if (position === null) {
+      return [];
+    }
+
+    // The label comes from the stop's place in the whole list, before a stop
+    // without coordinates is skipped: an unlocated stop still takes its
+    // letter, so the map and the list never disagree about `2b`.
+    return this.stops()
+      .map((stop, index) => ({ stop, label: stopLabel(position - 1, index) }))
+      .filter(
+        ({ stop }) => stop.latitude !== null && stop.longitude !== null,
+      )
+      .map(({ stop, label }) => ({
+        id: stop.id,
+        latitude: stop.latitude as number,
+        longitude: stop.longitude as number,
+        label,
+      }));
+  });
 
   constructor() {
     afterNextRender(() => void this.start());
@@ -117,13 +137,18 @@ export class TripAtlasMap implements OnDestroy {
     });
 
     effect(() => {
-      const points = this.placePoints();
-      this.handle?.setPlaces(points);
+      const points = this.stopPoints();
+      this.handle?.setStops(points);
     });
 
     effect(() => {
       const points = this.points();
       this.handle?.setRoute(points);
+    });
+
+    effect(() => {
+      const points = this.stopPoints();
+      this.handle?.setStopRoute(points);
     });
 
     effect(() => {
@@ -180,8 +205,9 @@ export class TripAtlasMap implements OnDestroy {
 
     // The inputs may have arrived while the map was being built.
     handle.setDestinations(this.points());
-    handle.setPlaces(this.placePoints());
+    handle.setStops(this.stopPoints());
     handle.setRoute(this.points());
+    handle.setStopRoute(this.stopPoints());
     handle.setSelection(this.selection());
     handle.fitToTrip();
     handle.reveal(this.selection());

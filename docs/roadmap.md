@@ -198,6 +198,127 @@ database and the API unchanged.
 
 ---
 
+## Phase 0.98 — The trip atlas · **Done**
+
+Read a trip as a map, and everything worth seeing along the way as a plan. The trip page
+says what the trip is; the atlas says what is in it. Nothing here needs an account.
+
+- [x] A sibling screen at `/trips/:id/atlas`: the route on a map, the same route as a
+      list, and one selection the two share — no new navigation entry, no second editor
+      for the trip's own fields
+- [x] Saved places: a place belongs to a trip and carries a required position, an
+      optional category, description and note, and an optional filing under one of the
+      trip's stops
+- [x] Removing a stop unlinks its places inside the same transaction rather than taking
+      them with it, because SQL Server refuses a second referential path from one table
+- [x] Saved places read as a plan, grouped by the stop they are filed under, with the
+      places filed under nothing read last
+- [x] Markers that share a position are fanned out, so two places at one address are both
+      reachable
+- [x] Each place may be **planned for one day of its trip**, and the plan read day by day:
+      the weekday, the stop being stayed at then, the count, and how much of the calendar
+      the plan covers
+- [x] Unplanned places stay readable under "No day yet"; a day stranded by a shortened
+      trip is kept under "Outside the trip's dates" rather than cleared or hidden
+- [x] A place's day must be one of the trip's days, refused by the API and mirrored by the
+      editor, with both ends of the trip inclusive
+- [x] MapLibre GL JS with OpenFreeMap tiles and Photon search, with the attribution shown
+
+**Exit criteria:** a trip can be opened as a map, a place can be saved, filed and planned
+for a day, and every saved place stays reachable from the list whether or not it has a
+position or a day.
+
+---
+
+## Phase 0.99 — A destination and its stops · **Done**
+
+Let a trip say what is *within* a destination without turning every sub-location into
+another place on the main route. The route stays a route; a stop is a part of the place.
+
+- [x] `TripDestination` gains a nullable `ParentDestinationId`: null is a destination on
+      the main route, a destination's id is a stop within it. The hierarchy is one level
+      deep and the domain refuses anything deeper.
+- [x] `Trip.ParentDestinations` is the route and `Trip.StopsOf(parentId)` is a
+      destination's stops; each scope has its own `SortOrder`, and a stop never receives a
+      main-route number.
+- [x] An additive migration that adds the column, replaces the route index with the
+      scope-aware unique index, adds the self-key as NO ACTION and refuses a self-parent.
+      Existing rows keep a null parent and become destinations, so IDs, dates, coordinates,
+      route order and saved-place associations are preserved.
+- [x] `TripSchedule.EnsureStopsWithinDestinations`: a stop's dates fall inside its
+      destination when the destination has dates, and inside the trip everywhere else. No
+      automatic rewriting and no chronological ordering among stops.
+- [x] The API takes and returns `stops` nested inside each destination, on both create and
+      update, and `PUT /api/trips/{id}` remains the one operation that writes the whole
+      hierarchy. Flat requests remain valid.
+- [x] The shared trip editor builds destinations and their stops, with a disclosure panel,
+      nested add/remove/move controls, a focus policy and a live region. Collapsing a
+      destination never removes the stops the reader entered.
+- [x] The fixed date-field width (`--route-date-width`) keeps Arrive and Leave equal and
+      unclipped, and the pair wraps on a narrow screen rather than shrinking.
+- [x] The Atlas overview draws destinations only; selecting a destination reveals its stops
+      and directly-filed places, selecting a stop reveals its own places, and choosing
+      the selected destination or stop again restores the main route. Add destination,
+      Add stop and Add saved place are three distinct actions.
+- [x] Saved places keep their `DestinationId`, which may now name a destination or a stop;
+      deleting a destination or stop unlinks its places rather than deleting them. The
+      `By day` reading names the stop that covers the day before falling back to its
+      destination.
+- [x] Repository positions are parked at a globally unique value so two stops can swap
+      destinations in one transaction without colliding, and parent rows are written before
+      final positions.
+
+**Exit criteria:** a trip can be created and edited with destinations and nested stops, the
+main-route numbering and route line never count a stop, existing trips open unchanged, and
+saved places and their planned days survive every hierarchy edit.
+
+---
+
+## Phase 0.100 — One kind of place, and stops you can edit · **Done**
+
+Make a stop the place. A destination, a stop and a legacy unfiled saved place become rows
+of one table, so the reader never has to choose between "Add stop" and "Add saved place".
+
+- [x] `TripDestination` gains `Kind` (`Destination` / `Stop` / `Place`), `Category`,
+      `Address`, `Notes`, `PlannedOn` and `CreatedAt`. A stop carries the whole place, and
+      a `Place` is a legacy saved place that is not yet in a destination.
+- [x] `Trip.ParentDestinations`, `Trip.StopsOf` and `Trip.UnfiledPlaces` read the three
+      scopes. The hierarchy stays one level and the domain refuses a stop as a parent.
+- [x] A migration copies every saved place into `TripDestinations` in one transaction,
+      preserving its ID, name, coordinates, category, address, notes, planned day and
+      creation time. A filed place becomes a stop; an unfiled place becomes `Place`; a
+      place filed under a nested stop is flattened to that stop's parent. The old table is
+      kept as `SavedPlaces_Legacy` with its foreign keys dropped, and the rollback marker
+      `MigratedFromSavedPlace` lets the Down restore exactly the copied rows.
+- [x] The unique index becomes `(TripId, Kind, ParentDestinationId, SortOrder)`, and
+      `CK_TripDestinations_Kind` states the single-row shape.
+- [x] `PUT /api/trips/{id}` carries each stop's details and an optional `unfiledPlaces`
+      array. Omitting the array leaves the legacy places alone; filing one turns it into a
+      stop with the same identity. The saved-place routes are read-only for one release.
+- [x] The Atlas Route heading has a plus for a new destination; each destination's
+      stop-count heading has a plus for a stop in that destination and a separate chevron
+      for opening its stops. The expansion state is shared by the list and the map.
+- [x] A selected stop can be edited (name, location, category, address, notes, planned day,
+      Arrive/Leave) or removed, with confirmation. The stop editor reuses the geocoding
+      search and keeps the fixed date-field width.
+- [x] Stops are labelled hierarchically (`1a`, `1b`, ... `1z`, `1aa`), computed by the
+      shared `place-labels` helper and used in the Route panel, map markers, stop panel and
+      accessible names. Nothing is persisted.
+- [x] The map draws a separate dotted forest line through the located stops of the
+      selected destination. It needs two located stops, ignores missing coordinates, clears
+      on collapse/deselect and is cleaned up with the map.
+- [x] The separate saved-place list is gone. The Route list shows the stops; `Plan by day`
+      is a second reading of the same stops; the legacy `Place` rows sit in a transitional
+      `Not yet in a destination` section with a file action.
+- [x] The trip form round-trips the new details without showing them, so editing a trip on
+      the trip page never clears a stop's category, address, notes or planned day.
+
+**Exit criteria:** a stop is the only user-facing place within a destination; adding,
+editing, removing and filing places all use the trip API; labels and the stop line match
+the route; and every existing saved place remains readable with its planned day.
+
+---
+
 ## Phase 1 — Accounts, trips and membership
 
 *Planned.* Everything downstream needs to know who the participants are.

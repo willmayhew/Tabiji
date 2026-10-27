@@ -137,7 +137,7 @@ describe('TripDetail', () => {
   it('should say how much of the schedule has been decided', () => {
     showTrip();
 
-    expect(element().textContent).toContain('Dates are set for 2 of 3 stops');
+    expect(element().textContent).toContain('Dates are set for 2 of 3 destinations');
   });
 
   it('should say so when a trip has no stops', () => {
@@ -261,9 +261,9 @@ describe('TripDetail', () => {
       startsOn: '2027-04-01',
       endsOn: '2027-04-08',
       destinations: [
-        { id: 'a1', name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-04', latitude: null, longitude: null },
-        { id: 'b2', name: 'Amalfi', startsOn: '2027-04-04', endsOn: '2027-04-06', latitude: null, longitude: null },
-        { id: 'c3', name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null },
+        { id: 'a1', name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-04', latitude: null, longitude: null, stops: [] },
+        { id: 'b2', name: 'Amalfi', startsOn: '2027-04-04', endsOn: '2027-04-06', latitude: null, longitude: null, stops: [] },
+        { id: 'c3', name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null, stops: [] },
       ],
     });
 
