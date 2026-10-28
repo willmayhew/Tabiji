@@ -1291,3 +1291,64 @@ label.route__node:hover {
     0 0 0 2px var(--color-surface),
     0 0 0 4px var(--color-forest);
 }
+
+/* Accounts ------------------------------------------------------------
+   Signing in and creating an account are the same small card in the middle
+   of the page. The two screens share it, so it cannot live in either
+   component's stylesheet. */
+
+.auth {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-lg);
+}
+
+.auth__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 26rem;
+  padding: var(--space-xl);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.auth__card h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-display);
+}
+
+.auth__lede {
+  margin: calc(-1 * var(--space-2xs)) 0 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.auth__aside,
+.auth__note {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+}
+
+.auth__aside a {
+  color: var(--color-forest);
+  font-weight: 600;
+}
+
+.auth__aside a:hover {
+  color: var(--color-forest-deep);
+}
+

@@ -18,6 +18,14 @@ export function describeHttpError(failure: HttpErrorResponse): string {
     return 'The Tabiji API could not be reached. Is the backend running on http://localhost:5080?';
   }
 
+  if (failure.status === 401) {
+    return 'Your session has expired. Sign in again.';
+  }
+
+  if (failure.status === 429) {
+    return 'Too many attempts. Wait a minute and try again.';
+  }
+
   const problem = failure.error as ProblemDetails | undefined;
   const detail = problem?.detail;
 

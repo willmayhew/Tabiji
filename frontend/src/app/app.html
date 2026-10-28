@@ -20,6 +20,15 @@
 
     <div class="app-header__actions">
       <a class="button button--secondary" routerLink="/trips/new">New trip</a>
+
+      @if (isReady()) {
+        @if (user(); as account) {
+          <span class="app-header__account" [title]="account.email">{{ account.email }}</span>
+          <button type="button" class="button button--ghost" (click)="signOut()">Sign out</button>
+        } @else {
+          <a class="button button--ghost" routerLink="/login">Sign in</a>
+        }
+      }
     </div>
   </div>
 </header>

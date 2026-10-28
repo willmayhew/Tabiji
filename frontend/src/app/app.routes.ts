@@ -29,5 +29,15 @@ export const routes: Routes = [
     loadComponent: () => import('./features/trip-detail/trip-detail').then((m) => m.TripDetail),
     title: 'Tabiji — Trip',
   },
+  {
+    path: 'login',
+    loadComponent: () => import('./features/login/login').then((m) => m.Login),
+    title: 'Tabiji — Sign in',
+  },
+  {
+    path: 'register',
+    loadComponent: () => import('./features/register/register').then((m) => m.Register),
+    title: 'Tabiji — Create an account',
+  },
   { path: '**', redirectTo: '' },
 ];

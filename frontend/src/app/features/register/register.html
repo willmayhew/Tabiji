@@ -1,0 +1,73 @@
+<section class="auth">
+  <div class="auth__card">
+    <p class="eyebrow">Account</p>
+    <h1>Create an account</h1>
+    <p class="auth__lede">
+      Your trips, kept together. An address and a password are all it takes.
+    </p>
+
+    <form class="auth__form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <div class="field">
+        <label class="field-label" for="register-email">Email</label>
+        <input
+          id="register-email"
+          type="email"
+          formControlName="email"
+          autocomplete="email"
+          [attr.aria-invalid]="errorFor('email') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('email') ? 'register-email-error' : null"
+        />
+        @if (errorFor('email'); as message) {
+          <p class="field-error" id="register-email-error">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="register-password">Password</label>
+        <input
+          id="register-password"
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+          [attr.aria-invalid]="errorFor('password') ? 'true' : null"
+          [attr.aria-describedby]="
+            errorFor('password') ? 'register-password-error' : 'register-password-hint'
+          "
+        />
+        @if (errorFor('password'); as message) {
+          <p class="field-error" id="register-password-error">{{ message }}</p>
+        } @else {
+          <p class="field-hint" id="register-password-hint">
+            At least {{ passwordMinLength }} characters, with an upper-case letter, a lower-case
+            letter and a digit.
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="register-confirmation">Repeat the password</label>
+        <input
+          id="register-confirmation"
+          type="password"
+          formControlName="confirmPassword"
+          autocomplete="new-password"
+          [attr.aria-invalid]="matchError() ? 'true' : null"
+          [attr.aria-describedby]="matchError() ? 'register-confirmation-error' : null"
+        />
+        @if (matchError(); as message) {
+          <p class="field-error" id="register-confirmation-error">{{ message }}</p>
+        }
+      </div>
+
+      @if (error(); as message) {
+        <p class="field-error field-error--api" role="alert">{{ message }}</p>
+      }
+
+      <button type="submit" class="button button--block" [disabled]="submitting()">
+        {{ submitting() ? 'Creating…' : 'Create account' }}
+      </button>
+    </form>
+
+    <p class="auth__aside">Already have an account? <a routerLink="/login">Sign in</a>.</p>
+  </div>
+</section>
