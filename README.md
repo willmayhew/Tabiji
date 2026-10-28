@@ -170,7 +170,20 @@ Base URL in development: `http://localhost:5080`.
 | `POST` | `/api/trips` | Creates a trip. |
 | `GET` | `/api/trips/{id}` | Returns a single trip. |
 | `PUT` | `/api/trips/{id}` | Replaces a trip and its route. |
+| `POST` | `/api/auth/register` | Creates an account. It does not sign the reader in. |
+| `POST` | `/api/auth/login?useCookies=true` | Signs in and sets the `.Tabiji.Auth` cookie. |
+| `GET` | `/api/auth/session` | Reports who the browser is. `200` either way. |
+| `POST` | `/api/auth/logout` | Clears the cookie. Requires `X-XSRF-TOKEN`. |
+| `GET` | `/api/auth/csrf` | Issues the antiforgery token and its cookie. |
 | `GET` | `/openapi/v1.json` | The OpenAPI document. |
+
+The account routes are mounted under `/api/auth` by ASP.NET Core Identity; the four that
+need an email transport (`confirmEmail`, `resendConfirmationEmail`, `forgotPassword`,
+`resetPassword`) answer `503` until one exists. `IdentityApi` also maps `refresh` and
+`manage/*`, which the SPA does not use.
+
+The trip and place routes are **anonymous**. Accounts exist, but nothing is protected by
+them yet: trip ownership and membership are the next milestone.
 
 List the trips:
 
@@ -312,8 +325,8 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 351 tests
-cd frontend && npm test           # 454 tests
+dotnet test backend/Tabiji.sln   # 267 tests
+cd frontend && npm test           # 343 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that
@@ -339,6 +352,7 @@ motif, the destination plate, the shared editor and every screen.
 |---|---|---|
 | `ConnectionStrings:Tabiji` | `appsettings.json` (empty), `appsettings.Development.json` (LocalDB) | Use user secrets or `ConnectionStrings__Tabiji` for other servers. |
 | `Cors:AllowedOrigins` | `appsettings.json` | The Angular dev origin, `http://localhost:4200`. |
+| `Email:DeliveryEnabled` | `appsettings.json` (`false`) | Off until a mail transport exists; the four email-dependent account routes answer `503` while it is. |
 | `ASPNETCORE_ENVIRONMENT` | `launchSettings.json` | `Development` for the local profiles. |
 
 No credential is committed to this repository.
@@ -356,6 +370,10 @@ No credential is committed to this repository.
   proxies to it over plain HTTP. Terminate TLS at the reverse proxy in any real
   deployment. The `https` launch profile expects a trusted development certificate:
   `dotnet dev-certs https --trust`.
+- **Accounts.** Signing in sets an `HttpOnly`, `SameSite=Lax` cookie named `.Tabiji.Auth`.
+  In development it is not marked `Secure`, because the dev server is plain HTTP; outside
+  development it always is. The cookie is encrypted with Data Protection keys, so a
+  deployment that does not persist its key ring will sign everybody out on restart.
 
 ---
 

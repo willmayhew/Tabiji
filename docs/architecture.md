@@ -25,7 +25,8 @@ today, not the finished product.
 **Non-goals (explicitly out of scope for now)**
 
 - Microservices. Tabiji is a modular monolith.
-- Authentication and authorisation. Not implemented yet; see the roadmap.
+- Authorisation policies for trips. Accounts exist (Phase 1a); ownership and membership
+  are Phase 1b. Every trip endpoint is still anonymous.
 - Infrastructure as code, CI/CD pipelines, containerisation, cloud deployment.
 - Real-time collaboration, notifications, offline support.
 
@@ -1157,14 +1158,96 @@ No credential is committed to the repository.
 User secrets live outside the repository, in the user profile, so nothing sensitive can
 be committed by accident.
 
-## 10. Where this goes next
+## 10. Accounts and authentication
+
+Phase 1a gives the application accounts. They are ASP.NET Core Identity with a cookie,
+and they protect nothing yet: the trip API stays anonymous until ownership arrives.
+
+**The stack**
+
+- `Microsoft.AspNetCore.Identity.EntityFrameworkCore`, registered in `Program.cs` through
+  `AddTabijiIdentity` (`backend/Tabiji.Api/Identity/IdentitySetup.cs`).
+- `AddIdentityApiEndpoints<AppUser>()` with `MapIdentityApi<AppUser>()` under
+  `/api/auth`, so the framework provides registration and sign-in and the existing `/api`
+  development proxy covers them with no change.
+- Cookies, not bearer tokens. `POST /api/auth/login?useCookies=true` issues an `HttpOnly`,
+  `SameSite=Lax` cookie named `.Tabiji.Auth`, which is `Secure` outside development.
+  Identity also registers its bearer scheme; the SPA never uses it.
+- Only three routes are written by hand: `GET /api/auth/session`,
+  `POST /api/auth/logout` and `GET /api/auth/csrf`.
+
+**Where the accounts live**
+
+`TabijiDbContext` derives from `IdentityUserContext<AppUser, Guid>`, not
+`IdentityDbContext`. `AddIdentityApiEndpoints` registers no role manager, so the three
+role tables would be tables nothing can read. `AppUser` carries no profile fields yet:
+Identity's own columns hold the credential, the hash, the security stamp and the lockout
+counter.
+
+The domain and `Application` are untouched. Identity belongs to `Infrastructure` and
+`Api`, as Phase 1 said, and no identity type reaches either inward project.
+
+The key is a `Guid`, matching every other key in the database, so the membership row in
+Phase 1b is a `uniqueidentifier` rather than a four-hundred-and-fifty character string.
+
+**Session**
+
+`GET /api/auth/session` answers `200` whether or not anybody is signed in, with
+`{ authenticated, user }`. It is a probe, not a protected resource, so asking on every
+page load does not put a failed request in the console. The id and the address come from
+the cookie's claims, with no database read.
+
+**Antiforgery**
+
+`SameSite=Lax` is the first line: a browser does not attach the cookie to a cross-site
+`POST`. On top of that, `GET /api/auth/csrf` issues a token and `POST /api/auth/logout`
+refuses a request without it, through an endpoint filter that calls
+`IAntiforgery.ValidateRequestAsync` (`Identity/AntiforgeryEndpointExtensions.cs`).
+
+The .NET 10 antiforgery middleware is deliberately passive: it records a verdict on the
+request, and only a component that consumes a submitted form is obliged to enforce it. A
+JSON endpoint is not one, so it asks the question directly. The token embeds the account
+and is rejected against a different one, which is why the client discards it whenever the
+session changes.
+
+The framework's own `manage/2fa` and `manage/info` routes are cookie-authenticated and
+carry no token requirement, so they rest on `SameSite=Lax` alone. The app does not link to
+them; Phase 1b either narrows that surface or puts it behind the same filter. Everything
+else that changes state without a cookie — registration, sign-in, the email routes — has
+no ambient credential to forge in the first place.
+
+**Rate limiting and lockout**
+
+Identity locks an account for five minutes after five failed attempts. On top of that, a
+per-address, per-route fixed window allows ten attempts a minute at `login`, `register`,
+`forgotPassword` and `resetPassword`, and a hundred and twenty elsewhere, so ordinary
+navigation never throttles the session probe.
+
+**Email is not configured**
+
+There is no mail transport in the repository. `RequireConfirmedEmail` is therefore false,
+so a new account is usable immediately, and the four routes that would deliver a link —
+`confirmEmail`, `resendConfirmationEmail`, `forgotPassword`, `resetPassword` — answer
+`503 ProblemDetails` titled "Email delivery is not configured". Answering `200` and
+dropping the message would be a lie. `Email:DeliveryEnabled` turns the guard off in the
+change that adds a provider.
+
+**What is still anonymous**
+
+Every trip and place endpoint. There is no fallback authorization policy, so an endpoint
+is protected only when it says so, and nothing is protected yet except the account routes
+themselves.
+
+## 11. Where this goes next
 
 The layering is designed so that the roadmap features land without rework:
 
 - **Invitations, proposals, votes, comments and itinerary items** each become an aggregate
   in `Domain`, a service and a port in `Application`, and a repository in `Infrastructure`.
-- **Authentication** is a cross-cutting concern that the API project will own, most likely
-  as a JWT bearer setup with ASP.NET Core Identity for the user store.
+- **Trip membership** adds a `TripMembers` table beside the accounts, enforces itself in
+  `Application` against a `UserId` value object, and turns on `RequireAuthorization` for
+  the trip endpoints. The scheme is already registered, so that is a policy change rather
+  than new plumbing.
 - **Real-time updates** would be added at the API layer over SignalR, with the domain
   unchanged.
 

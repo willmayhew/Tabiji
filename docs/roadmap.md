@@ -321,21 +321,41 @@ the route; and every existing saved place remains readable with its planned day.
 
 ## Phase 1 — Accounts, trips and membership
 
+### Phase 1a — Accounts
+
+*Done.* The identity provider is chosen and the accounts exist.
+
+- [x] ASP.NET Core Identity with cookie authentication, under `/api/auth`. Chosen over a
+      JWT bearer setup: the browser stores an `HttpOnly` cookie that no script can read,
+      so there is no token to defend in JavaScript.
+- [x] `AppUser` in `Infrastructure`, keyed on a `Guid`; no identity type reaches `Domain`
+      or `Application`.
+- [x] Registration, sign-in, sign-out, session restoration, lockout, rate limiting and
+      antiforgery.
+- [ ] Email delivery, and with it account confirmation and password recovery. The four
+      routes that need it answer `503` until it exists.
+
+### Phase 1b — Trips and membership
+
 *Planned.* Everything downstream needs to know who the participants are.
 
-- [ ] User accounts. Decide the identity provider and the token strategy first.
-- [ ] `User` entity in the domain, with a persistence representation that does not leak
-      identity-provider details.
+- [ ] `UserId` value object in the domain.
 - [ ] `TripMember` aggregate: a user, a trip, and a role (`Owner`, `Organiser`, `Member`).
+- [ ] Backfill: every trip that exists before membership is granted to one configured owner.
 - [ ] Invitations: create an invite for a trip, accept it, expire it.
 - [ ] Full trip CRUD, including editing, cancelling and archiving.
 - [ ] Authorisation policies: who may view, edit or delete a trip.
-- [ ] Frontend: sign-in, trip list, trip detail, invitation flow.
+- [ ] Frontend: the trip list and detail filtered by membership, and the invitation flow.
+- [ ] A route guard on the screens that need a session.
 
 **Design notes**
 
 - Identity belongs in `Infrastructure` and `Api`; the domain only sees a `UserId` value
   object.
+- Membership is a table, not an owner column on `Trips`: collaboration is the point of the
+  product, and a single owner column would have to be migrated away immediately.
+- The membership foreign keys stay `Restrict`. A cascade from `Trips` and a cascade from
+  `AspNetUsers` would be two cascade paths to the same table, which SQL Server refuses.
 - Invitations are their own aggregate with their own lifecycle
   (`Pending` → `Accepted` / `Revoked` / `Expired`).
 - Expiry and acceptance must be safe under concurrent requests, so the accept operation
@@ -431,8 +451,9 @@ at this stage of the project.
 
 ## Deferred by design
 
-- **Authentication** is deliberately not implemented in Phase 0. It is the first item in
-  Phase 1, and choosing an identity provider is a product decision.
+- **Authentication** is no longer deferred. Phase 1a implements it with ASP.NET Core
+  Identity and cookies; see `docs/architecture.md` §10. Email delivery remains deferred
+  until a provider is chosen.
 - **Deployment** is deliberately not implemented. The application is built to be
   deployable — configuration comes from environment variables and secrets, and the API
   runs behind a reverse proxy with TLS terminated upstream — but no infrastructure is

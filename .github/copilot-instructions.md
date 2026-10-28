@@ -154,7 +154,12 @@ npm test
   is deliberately small.
 - Do not reference EF Core or ASP.NET Core from `Tabiji.Domain` or `Tabiji.Application`.
 - Do not introduce microservices, a message broker, or a second database.
-- Do not implement authentication until the identity provider has been chosen.
+- Do not hand-roll a password store, and do not keep an authentication token in browser
+  storage. Accounts are ASP.NET Core Identity with an `HttpOnly`, `SameSite=Lax` cookie,
+  registered in `backend/Tabiji.Api/Identity`. `AppUser` lives in `Infrastructure`; no
+  identity type may reach `Domain` or `Application`, which see a `UserId` value object.
+- Do not add `RequireAuthorization` to an endpoint that is not ready for it. There is no
+  fallback policy, so the trip API is anonymous on purpose until membership arrives.
 - Do not hardcode secrets, and do not disable the NuGet audit to make a warning go away.
   Pin the package to a patched version instead.
 - Do not build out the roadmap features ahead of their phase. See `docs/roadmap.md`.
