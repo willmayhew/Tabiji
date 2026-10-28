@@ -26,3 +26,42 @@ Accept: application/json
 ### OpenAPI document
 GET {{Tabiji.Api_HostAddress}}/openapi/v1.json
 Accept: application/json
+
+### Register an account (200, empty body; does not sign in)
+POST {{Tabiji.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "traveller@example.com",
+  "password": "CorrectHorse42"
+}
+
+### Sign in and receive the authentication cookie (200, empty body)
+# useSessionCookies=true gives a cookie that ends with the browser session.
+POST {{Tabiji.Api_HostAddress}}/api/auth/login?useCookies=true
+Content-Type: application/json
+
+{
+  "email": "traveller@example.com",
+  "password": "CorrectHorse42"
+}
+
+### Who am I? (200 either way)
+GET {{Tabiji.Api_HostAddress}}/api/auth/session
+Accept: application/json
+
+### Collect the antiforgery token
+GET {{Tabiji.Api_HostAddress}}/api/auth/csrf
+Accept: application/json
+
+### Sign out (204; send X-XSRF-TOKEN with the token above)
+POST {{Tabiji.Api_HostAddress}}/api/auth/logout
+X-XSRF-TOKEN: {{csrfToken}}
+
+### Password recovery is unavailable until email delivery is configured (503)
+POST {{Tabiji.Api_HostAddress}}/api/auth/forgotPassword
+Content-Type: application/json
+
+{
+  "email": "traveller@example.com"
+}
