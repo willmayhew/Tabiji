@@ -25,8 +25,8 @@ today, not the finished product.
 **Non-goals (explicitly out of scope for now)**
 
 - Microservices. Tabiji is a modular monolith.
-- Authorisation policies for trips. Accounts exist (Phase 1a); ownership and membership
-  are Phase 1b. Every trip endpoint is still anonymous.
+- Invitations, shared trips and roles other than the owner. Ownership and the
+  authorisation that follows from it are Phase 1b and are described in §10.
 - Infrastructure as code, CI/CD pipelines, containerisation, cloud deployment.
 - Real-time collaboration, notifications, offline support.
 
@@ -1116,7 +1116,9 @@ developer and every build uses the same compiler.
 | The chronological rule | `backend/Tabiji.Tests/TripScheduleTests.cs` | The rule on its own, case by case, and a stop inside its destination | No |
 | Health endpoint tests | `backend/Tabiji.Tests/HealthEndpointTests.cs` | The health probes, via `WebApplicationFactory` | No |
 | Trip endpoint tests | `backend/Tabiji.Tests/TripEndpointTests.cs` | The trip HTTP surface, via `WebApplicationFactory` | No |
-| Migration tests | `backend/Tabiji.Tests/*MigrationTests.cs` | The operations of a migration, inspected by reflection | No |
+| Authorisation tests | `backend/Tabiji.Tests/TripAuthorisationEndpointTests.cs`, `AntiforgeryOnTripEndpointsTests.cs`, `AuthorizationCoverageTests.cs` | Who may reach a trip, the token a write needs, and the promise that no endpoint is anonymous by accident | No |
+| Ownership, end to end | `backend/Tabiji.Tests/TripOwnershipIntegrationTests.cs` | Two real accounts, the real cookie and a real store | **Yes** |
+| Migration tests | `backend/Tabiji.Tests/*MigrationTests.cs` | The operations of a migration, inspected by reflection; the ones that move data run against a disposable database | Mostly no |
 | Repository tests | `backend/Tabiji.Tests/TripRepositoryTests.cs` | The route written to a real database | **Yes** |
 | Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the rules, the route motif, the destination plate, the map picker and the geocoder | No |
 
@@ -1160,8 +1162,9 @@ be committed by accident.
 
 ## 10. Accounts and authentication
 
-Phase 1a gives the application accounts. They are ASP.NET Core Identity with a cookie,
-and they protect nothing yet: the trip API stays anonymous until ownership arrives.
+Phase 1a gives the application accounts, and Phase 1b makes every trip private to the
+account that owns it. They are ASP.NET Core Identity with a cookie, and the trip API is
+protected by the membership row behind that cookie.
 
 **The stack**
 
@@ -1210,11 +1213,80 @@ JSON endpoint is not one, so it asks the question directly. The token embeds the
 and is rejected against a different one, which is why the client discards it whenever the
 session changes.
 
-The framework's own `manage/2fa` and `manage/info` routes are cookie-authenticated and
-carry no token requirement, so they rest on `SameSite=Lax` alone. The app does not link to
-them; Phase 1b either narrows that surface or puts it behind the same filter. Everything
-else that changes state without a cookie — registration, sign-in, the email routes — has
-no ambient credential to forge in the first place.
+The framework's own `manage/2fa`, `manage/info` and `refresh` routes are not used by the
+app, and a cookie-authenticated, state-changing route nobody links to is only attack
+surface. They answer `404`, from a path check that runs before authentication
+(`Identity/UnusedIdentityEndpoints.cs`), so no caller needs a credential to learn that the
+route does not exist. Everything else that changes state without a cookie — registration,
+sign-in, the email routes — has no ambient credential to forge in the first place.
+
+**Trip ownership**
+
+A trip is private to the account that created it. Ownership is a row, not a column: a trip
+has one or more `TripMembers`, and today exactly one, the account that created it, with
+`Role = Owner`.
+
+| | |
+|---|---|
+| `TripMembers` | `(TripId, UserId)` primary key, `Role`, `GrantedAt`, an index on `UserId` |
+| `TripId` | foreign key to `Trips`, cascade — deleting a trip deletes its membership |
+| `UserId` | foreign key to `AspNetUsers`, **no action** — deleting an account must not quietly strip a trip of its owner |
+| Domain | `UserId`, `TripMemberRole`, `TripMember`, in `Tabiji.Domain/Membership`; no identity type crosses inwards |
+
+Ownership is written in the same save as the trip (`TripRepository.AddAsync` takes the trip
+and its owner), so a trip is never left with nobody able to reach it. The owner comes from
+the cookie's `NameIdentifier` claim (`Identity/CurrentUser.cs`); no request body can name
+an owner.
+
+**The three layers of authorisation**
+
+1. **Deny by default.** `AddAuthorization` installs a fallback policy that requires an
+   authenticated user, so an endpoint added without saying anything is protected. The
+   anonymous surface is small and named: the account routes, `/health`, `/health/ready`
+   and the OpenAPI document. `AuthorizationCoverageTests` enumerates the routing table and
+   fails, naming the endpoint, if anything is neither public on purpose nor protected.
+
+2. **The port decides which trips.** `ITripRepository` has no method that reads, writes or
+   deletes a trip without naming the caller. `GetForMemberAsync` and `ListForMemberAsync`
+   put a `WHERE EXISTS (SELECT 1 FROM TripMembers …)` into the statement itself, so a trip
+   the caller is not a member of is never loaded; `UpdateAsync` and `DeleteForMemberAsync`
+   check or require the same membership. `GetByIdAsync`, `ListAsync` and `DeleteAsync` were
+   **deleted** rather than kept alongside, so every call site had to be reconsidered and a
+   forgotten check is a compile error rather than a hole. The read-only
+   `/api/trips/{tripId}/places` routes are scoped by the same port.
+
+3. **The token proves the request.** `POST`, `PUT` and `DELETE` on a trip carry
+   `RequireValidAntiforgeryToken`, the same filter `logout` uses. `SameSite=Lax` remains
+   the first line; this closes the gap for a same-site form post. The Angular client
+   already stamps `X-XSRF-TOKEN` on every unsafe request, so no screen changed for it.
+
+**What a caller is told**
+
+Never `403` for a trip. A trip that does not exist and a trip the caller cannot reach are
+the same `404 ProblemDetails { title: "Trip not found" }`, so an id cannot be used to learn
+that somebody else's trip exists. An unauthenticated request is `401`, from the cookie
+handler that already avoids a redirect. The list is filtered rather than refused: an
+account with no trips gets `200 []`.
+
+**Trips and the development database**
+
+The migration that creates `TripMembers` is additive. Trips that predate accounts are
+assigned to the one account that already exists, and only when that account is
+unambiguous: `IF (SELECT COUNT(*) FROM [AspNetUsers]) = 1`. With no account, or more than
+one, the migration still applies and leaves those trips unowned rather than guessing;
+`verify-migration.sql` reports every trip without an owner. An unowned trip is unreachable —
+the API answers `404`, exactly as for a trip that does not exist — until somebody makes the
+decision: query 20 in the same file is an idempotent insert that gives every still-unowned
+trip a chosen owner, and queries 17 and 18 confirm the result. Refusing to migrate would
+block an upgrade over a database whose only sin is that nobody has signed up yet. The
+legacy `Trips.Destination` column and the `SavedPlaces_Legacy` archive are untouched.
+
+**Where membership goes next**
+
+The role is already stored, so collaboration needs no schema change: accepting an
+invitation is an insert into `TripMembers`, and a read that a role restricts narrows the
+`EXISTS` predicate rather than replacing the design. Invitations themselves are a separate
+aggregate with their own lifecycle, and they are not part of this milestone.
 
 **Rate limiting and lockout**
 
@@ -1232,11 +1304,12 @@ so a new account is usable immediately, and the four routes that would deliver a
 dropping the message would be a lie. `Email:DeliveryEnabled` turns the guard off in the
 change that adds a provider.
 
-**What is still anonymous**
+**What is no longer anonymous**
 
-Every trip and place endpoint. There is no fallback authorization policy, so an endpoint
-is protected only when it says so, and nothing is protected yet except the account routes
-themselves.
+Every trip and place endpoint. There is a fallback authorization policy, so an endpoint is
+protected unless it says otherwise, and the only public surfaces are the account routes,
+the two probes and the OpenAPI document. What the caller may then reach is decided by the
+membership row, in the repository, not in the endpoint.
 
 ## 11. Where this goes next
 
@@ -1244,10 +1317,11 @@ The layering is designed so that the roadmap features land without rework:
 
 - **Invitations, proposals, votes, comments and itinerary items** each become an aggregate
   in `Domain`, a service and a port in `Application`, and a repository in `Infrastructure`.
-- **Trip membership** adds a `TripMembers` table beside the accounts, enforces itself in
-  `Application` against a `UserId` value object, and turns on `RequireAuthorization` for
-  the trip endpoints. The scheme is already registered, so that is a policy change rather
-  than new plumbing.
+- **Trip membership** — the table and the role already exist. Inviting somebody is an
+  insert into `TripMembers`, and a role-restricted operation narrows the `EXISTS`
+  predicate in `TripRepository` rather than introducing a second authorisation mechanism.
+  An endpoint that needs a coarse rule ("only an organiser may archive") can use
+  `IAuthorizationService` on top, while the port stays the place that decides which trip.
 - **Real-time updates** would be added at the API layer over SignalR, with the domain
   unchanged.
 

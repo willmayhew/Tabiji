@@ -337,16 +337,29 @@ the route; and every existing saved place remains readable with its planned day.
 
 ### Phase 1b — Trips and membership
 
-*Planned.* Everything downstream needs to know who the participants are.
+*In progress.* Ownership is in place; invitations and further collaboration are not.
 
-- [ ] `UserId` value object in the domain.
-- [ ] `TripMember` aggregate: a user, a trip, and a role (`Owner`, `Organiser`, `Member`).
-- [ ] Backfill: every trip that exists before membership is granted to one configured owner.
+- [x] `UserId` value object in the domain.
+- [x] `TripMember` record: a user, a trip, and a role (`Owner`, `Organiser`, `Member`).
+      Only `Owner` is granted today; the other roles are there so that collaboration is an
+      insert rather than a schema change.
+- [x] Backfill: every trip that existed before accounts was assigned to the one account
+      that was already there, inside a guarded, additive migration. A database with no
+      account, or more than one, is left unowned rather than guessed at;
+      `verify-migration.sql` reports it and carries the idempotent recovery insert that
+      gives those trips a chosen owner.
+- [x] Authorisation: deny by default, and the trip repository decides which trips an
+      account may reach, so a nested route cannot become a hole.
+- [x] Frontend: the trips list, the trip page, the atlas and the create page handle a
+      signed-out reader and an expired session.
 - [ ] Invitations: create an invite for a trip, accept it, expire it.
-- [ ] Full trip CRUD, including editing, cancelling and archiving.
-- [ ] Authorisation policies: who may view, edit or delete a trip.
-- [ ] Frontend: the trip list and detail filtered by membership, and the invitation flow.
-- [ ] A route guard on the screens that need a session.
+- [ ] Cancelling and archiving a trip. `TripStatus` already names the states; nothing
+      transitions them yet.
+- [ ] Frontend: the invitation flow.
+- [ ] A route guard on the screens that need a session. Deliberately deferred: the session
+      probe is asynchronous, so a guard on a page reload would race it and bounce a
+      signed-in reader to `/login`. The screens show the right state without one, and the
+      API is the boundary either way.
 
 **Design notes**
 
@@ -354,8 +367,9 @@ the route; and every existing saved place remains readable with its planned day.
   object.
 - Membership is a table, not an owner column on `Trips`: collaboration is the point of the
   product, and a single owner column would have to be migrated away immediately.
-- The membership foreign keys stay `Restrict`. A cascade from `Trips` and a cascade from
-  `AspNetUsers` would be two cascade paths to the same table, which SQL Server refuses.
+- The membership foreign keys stay `Restrict` on the account and cascade from the trip. A
+  deleted trip takes its membership with it; a deleted account does not silently strip a
+  trip of its owner.
 - Invitations are their own aggregate with their own lifecycle
   (`Pending` → `Accepted` / `Revoked` / `Expired`).
 - Expiry and acceptance must be safe under concurrent requests, so the accept operation

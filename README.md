@@ -8,10 +8,11 @@ editorial — warm paper, forest green, a Fraunces display serif and the 旅 mon
 and it is drawn entirely in type and line, with no photography anywhere in the product.
 
 This repository contains a .NET 10 modular monolith, an Angular 22 standalone SPA and a
-SQL Server database. The `Trip` slice is complete end to end: a trip can be created from the
-browser, listed, and opened, with an editorial interface built around it.
+SQL Server database. The `Trip` slice is complete end to end: a trip can be created from
+the browser, listed, and opened, with an editorial interface built around it. Trips are
+private to the account that created them.
 
-> **Status:** Phase 0.8 of the roadmap. See [`docs/roadmap.md`](docs/roadmap.md) for what
+> **Status:** Phase 1b of the roadmap. See [`docs/roadmap.md`](docs/roadmap.md) for what
 > comes next and [`docs/architecture.md`](docs/architecture.md) for how the code is put
 > together.
 
@@ -164,31 +165,47 @@ Base URL in development: `http://localhost:5080`.
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/health` | Liveness probe. Does not touch the database. |
-| `GET` | `/health/ready` | Readiness probe. Verifies the database is reachable. |
-| `GET` | `/api/trips` | Lists every trip, ordered by start date and then by name. |
-| `POST` | `/api/trips` | Creates a trip. |
+| `GET` | `/health` | Liveness probe. Does not touch the database. Anonymous. |
+| `GET` | `/health/ready` | Readiness probe. Verifies the database is reachable. Anonymous. |
+| `GET` | `/api/trips` | Lists the trips the signed-in account is a member of, ordered by start date and then by name. |
+| `POST` | `/api/trips` | Creates a trip owned by the signed-in account. Requires `X-XSRF-TOKEN`. |
 | `GET` | `/api/trips/{id}` | Returns a single trip. |
-| `PUT` | `/api/trips/{id}` | Replaces a trip and its route. |
+| `PUT` | `/api/trips/{id}` | Replaces a trip and its route. Requires `X-XSRF-TOKEN`. |
+| `DELETE` | `/api/trips/{id}` | Deletes a trip. Requires `X-XSRF-TOKEN`. |
+| `GET` | `/api/trips/{tripId}/places` | Read-only view of the places that carry a position. |
 | `POST` | `/api/auth/register` | Creates an account. It does not sign the reader in. |
 | `POST` | `/api/auth/login?useCookies=true` | Signs in and sets the `.Tabiji.Auth` cookie. |
 | `GET` | `/api/auth/session` | Reports who the browser is. `200` either way. |
 | `POST` | `/api/auth/logout` | Clears the cookie. Requires `X-XSRF-TOKEN`. |
 | `GET` | `/api/auth/csrf` | Issues the antiforgery token and its cookie. |
-| `GET` | `/openapi/v1.json` | The OpenAPI document. |
+| `GET` | `/openapi/v1.json` | The OpenAPI document. Anonymous. |
 
 The account routes are mounted under `/api/auth` by ASP.NET Core Identity; the four that
 need an email transport (`confirmEmail`, `resendConfirmationEmail`, `forgotPassword`,
-`resetPassword`) answer `503` until one exists. `IdentityApi` also maps `refresh` and
-`manage/*`, which the SPA does not use.
+`resetPassword`) answer `503` until one exists. The framework also maps `refresh` and
+`manage/*`; Tabiji does not use them, so they answer `404`.
 
-The trip and place routes are **anonymous**. Accounts exist, but nothing is protected by
-them yet: trip ownership and membership are the next milestone.
+**Every trip route requires an account.** A trip is private to the account that created
+it, and a trip the caller cannot reach is answered `404` exactly as a trip that does not
+exist. The API is the boundary: the Angular screens only decide what to show.
 
-List the trips:
+A trust boundary is one thing; a session is another. The examples below sign in first and
+keep the cookie in a jar. A write also needs the antiforgery token from `GET
+/api/auth/csrf`, echoed in `X-XSRF-TOKEN` — which is what the Angular client does for
+you.
 
 ```bash
-curl http://localhost:5080/api/trips
+# 1. Sign in and keep the cookie
+curl -c cookies.txt -X POST "http://localhost:5080/api/auth/login?useCookies=true" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"CorrectHorse42"}'
+
+# 2. Ask for the antiforgery token (it also sets its own cookie)
+curl -b cookies.txt -c cookies.txt http://localhost:5080/api/auth/csrf
+# {"token":"CfDJ8..."}
+
+# 3. List the trips on this account
+curl -b cookies.txt http://localhost:5080/api/trips
 ```
 
 ```json
@@ -238,8 +255,9 @@ curl http://localhost:5080/api/trips
 Create a trip — destinations are the main route, and each may hold stops:
 
 ```bash
-curl -X POST http://localhost:5080/api/trips \
+curl -b cookies.txt -X POST http://localhost:5080/api/trips \
   -H "Content-Type: application/json" \
+  -H "X-XSRF-TOKEN: CfDJ8..." \
   -d '{"name":"Japan Adventure","startsOn":"2027-05-08","endsOn":"2027-05-29","destinations":[{"name":"Osaka","startsOn":"2027-05-08","endsOn":"2027-05-12","stops":[{"name":"Namba","category":"Food","address":"Namba, Osaka","notes":"Eat here.","plannedOn":"2027-05-09"},{"name":"Umeda"}]},{"name":"Kyoto","startsOn":"2027-05-13","endsOn":"2027-05-17","stops":[{"name":"Gion"}]}]}'
 ```
 
@@ -247,8 +265,9 @@ Change a trip — the request holds the whole trip, the order of `destinations` 
 route, and the order of each `stops` array is the order within that destination:
 
 ```bash
-curl -X PUT http://localhost:5080/api/trips/c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa \
+curl -b cookies.txt -X PUT http://localhost:5080/api/trips/c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa \
   -H "Content-Type: application/json" \
+  -H "X-XSRF-TOKEN: CfDJ8..." \
   -d '{"name":"Japan Adventure","startsOn":"2027-05-08","endsOn":"2027-05-29","destinations":[{"id":"6d343873-45bc-42c6-abc2-5c271f99354a","name":"Osaka","startsOn":"2027-05-08","endsOn":"2027-05-12","stops":[{"id":"…","name":"Namba"},{"id":null,"name":"Tennoji"}]},{"id":null,"name":"Nagoya","startsOn":null,"endsOn":null,"stops":[]}]}'
 ```
 
@@ -325,8 +344,8 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 267 tests
-cd frontend && npm test           # 343 tests
+dotnet test backend/Tabiji.sln   # 327 tests
+cd frontend && npm test           # 358 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that

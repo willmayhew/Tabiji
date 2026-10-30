@@ -158,8 +158,18 @@ npm test
   storage. Accounts are ASP.NET Core Identity with an `HttpOnly`, `SameSite=Lax` cookie,
   registered in `backend/Tabiji.Api/Identity`. `AppUser` lives in `Infrastructure`; no
   identity type may reach `Domain` or `Application`, which see a `UserId` value object.
-- Do not add `RequireAuthorization` to an endpoint that is not ready for it. There is no
-  fallback policy, so the trip API is anonymous on purpose until membership arrives.
+- Do not add an anonymous trip route. Every endpoint demands an account through the
+  fallback policy unless it says `.AllowAnonymous()`, and `AuthorizationCoverageTests`
+  fails on anything that is neither public on purpose nor protected.
+- Do not read an owner, a member or a role from a request body. The account is the one the
+  request was authenticated as (`backend/Tabiji.Api/Identity/CurrentUser.cs`).
+- Do not add a repository method that reads, writes or deletes a trip without naming the
+  caller. The membership check belongs in the statement (`ITripRepository`), not in the
+  endpoint, so a forgotten call cannot become a way in.
+- Do not answer `403` for a trip the caller cannot reach. It is `404`, identical to a trip
+  that does not exist, so an id cannot be used to discover someone else's data.
+- Do not put an `HttpOnly`, `SameSite` cookie behind a state-changing trip request without
+  `.RequireValidAntiforgeryToken()`. The Angular client already sends `X-XSRF-TOKEN`.
 - Do not hardcode secrets, and do not disable the NuGet audit to make a warning go away.
   Pin the package to a patched version instead.
 - Do not build out the roadmap features ahead of their phase. See `docs/roadmap.md`.
