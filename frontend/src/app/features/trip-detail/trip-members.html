@@ -1,0 +1,137 @@
+<section class="detail__section members">
+  <div class="section-head">
+    <h2>Travellers</h2>
+    <p class="section-head__meta">
+      {{ members().length }} {{ members().length === 1 ? 'person' : 'people' }}
+    </p>
+  </div>
+
+  @if (loading()) {
+    <p class="muted">Loading travellers&hellip;</p>
+  } @else if (error(); as message) {
+    <div class="callout callout--danger">
+      <p>{{ message }}</p>
+      <button type="button" class="button" (click)="load()">Try again</button>
+    </div>
+  } @else {
+    <ul class="member-list">
+      @for (member of members(); track member.userId) {
+        <li class="member-row">
+          <div class="member-row__identity">
+            <span class="member-row__email">{{ member.email }}</span>
+            @if (isSelf(member)) {
+              <span class="member-row__you">You</span>
+            }
+          </div>
+
+          <app-status-badge [label]="member.role" [tone]="roleTone(member.role)" />
+
+          @if (viewerRole() === 'Owner') {
+            <div class="member-row__actions">
+              <label class="visually-hidden" [for]="roleId(member)">
+                Role for {{ member.email }}
+              </label>
+              <select
+                class="member-row__role"
+                [id]="roleId(member)"
+                [value]="member.role"
+                [disabled]="isLastOwner(member)"
+                (change)="changeRole(member, $event)"
+              >
+                <option value="Editor">Editor</option>
+                <option value="Owner">Owner</option>
+              </select>
+
+              <button
+                type="button"
+                class="icon-button icon-button--danger"
+                [disabled]="isLastOwner(member)"
+                (click)="remove(member)"
+                [attr.aria-label]="'Remove ' + member.email"
+              >
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+          }
+        </li>
+      }
+    </ul>
+
+    @if (hasSingleOwner()) {
+      <p class="field-hint">A trip must keep at least one owner.</p>
+    }
+  }
+
+  @if (viewerRole() === 'Owner') {
+    <div class="members__invite">
+      <h3 class="detail__heading">Invite a traveller</h3>
+
+      <form class="members__form" [formGroup]="inviteForm" (ngSubmit)="invite()" novalidate>
+        <div class="field">
+          <label class="field-label" for="invite-email">Email address</label>
+          <input
+            id="invite-email"
+            type="email"
+            formControlName="email"
+            autocomplete="off"
+            [attr.aria-invalid]="inviteEmailError() ? 'true' : null"
+            [attr.aria-describedby]="inviteEmailError() ? 'invite-email-error' : null"
+          />
+          @if (inviteEmailError(); as message) {
+            <p class="field-error" id="invite-email-error">{{ message }}</p>
+          }
+        </div>
+
+        <button type="submit" class="button" [disabled]="inviting()">
+          {{ inviting() ? 'Sending…' : 'Send invitation' }}
+        </button>
+      </form>
+
+      @if (inviteError(); as message) {
+        <p class="field-error field-error--api" role="alert">{{ message }}</p>
+      }
+
+      @if (inviteSuccess(); as message) {
+        <p class="field-success" role="status">{{ message }}</p>
+      }
+
+      @if (createdInvitation()?.invitationUrl; as url) {
+        <p class="field-hint">No email provider is configured, so share this link yourself:</p>
+        <a class="link-arrow" [href]="url" target="_blank" rel="noopener">
+          Open the invitation link
+        </a>
+      }
+    </div>
+
+    <div class="members__invitations">
+      <h3 class="detail__heading">Pending invitations</h3>
+
+      @if (invitations().length === 0) {
+        <p class="muted">No pending invitations.</p>
+      } @else {
+        <ul class="invitation-list">
+          @for (invitation of invitations(); track invitation.id) {
+            <li class="invitation-row">
+              <span class="invitation-row__email">{{ invitation.email }}</span>
+              <app-status-badge [label]="invitation.status" [tone]="toneFor(invitation.status)" />
+              <span class="invitation-row__expiry">
+                Expires {{ invitation.expiresAt | date: 'mediumDate' }}
+              </span>
+              @if (invitation.status === 'Pending') {
+                <button type="button" class="button button--ghost" (click)="revoke(invitation)">
+                  Revoke
+                </button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  @if (actionError(); as message) {
+    <p class="field-error field-error--api" role="alert">{{ message }}</p>
+  }
+
+  <p class="visually-hidden" aria-live="polite">{{ announcement() }}</p>
+</section>

@@ -1,3 +1,4 @@
+import type { MemberRole } from './member';
 import type { PlaceCategory } from './place';
 
 export type TripStatus = 'Planning' | 'Confirmed' | 'Completed' | 'Cancelled';
@@ -143,6 +144,13 @@ export interface Trip {
   startsOn: string;
   endsOn: string;
   status: TripStatus;
+  /**
+   * The caller's part in this trip. The API always sends it; it is optional
+   * here so a response written before collaboration, or a hand-written
+   * fixture, is still readable. When it is absent the screen offers no
+   * membership controls.
+   */
+  viewerRole?: MemberRole;
   /**
    * Legacy saved places that have not been filed under a destination. They
    * are kept readable, but new locations are always added as stops.

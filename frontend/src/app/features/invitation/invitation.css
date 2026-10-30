@@ -1,0 +1,56 @@
+.back-link {
+  align-self: flex-start;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.back-link:hover {
+  color: var(--color-forest);
+}
+
+.invitation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-width: var(--measure-editorial);
+  padding: var(--space-xl);
+  background: var(--color-surface);
+  border: var(--rule-hairline) solid var(--color-rule);
+  border-radius: var(--radius-md);
+}
+
+.invitation__title {
+  margin: 0;
+  font-size: var(--text-3xl);
+  text-wrap: balance;
+}
+
+.invitation__lede {
+  margin: 0;
+  color: var(--color-ink-soft);
+  line-height: var(--leading-relaxed);
+}
+
+.invitation__facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.invitation__expiry {
+  color: var(--color-ink-faint);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.invitation__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}

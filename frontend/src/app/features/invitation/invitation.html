@@ -1,0 +1,82 @@
+<section class="panel">
+  <a class="back-link" routerLink="/trips">&larr; All trips</a>
+
+  @if (invalid()) {
+    <div class="empty-state">
+      <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+        <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+        <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+        <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+        <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+      </svg>
+      <h1 class="empty-state__title">This invitation is not for this account</h1>
+      <p class="empty-state__body">
+        It may have expired, been revoked, or been sent to a different email address.
+      </p>
+      <a class="button" routerLink="/trips">Back to your trips</a>
+    </div>
+  } @else if (signedOut()) {
+    <app-sign-in-prompt
+      [level]="1"
+      [returnUrl]="returnUrl()"
+      message="Sign in to accept this invitation. It is addressed to your email address."
+    />
+  } @else if (loading()) {
+    <p class="muted">Opening the invitation&hellip;</p>
+  } @else if (error(); as message) {
+    <div class="empty-state empty-state--danger">
+      <h1 class="empty-state__title">Something went wrong</h1>
+      <p class="empty-state__body">{{ message }}</p>
+      <button type="button" class="button" (click)="retry()" [disabled]="saving()">
+        Try again
+      </button>
+    </div>
+  } @else if (declined()) {
+    <div class="empty-state">
+      <h1 class="empty-state__title">Invitation declined</h1>
+      <p class="empty-state__body">You will not be added to the trip.</p>
+      <a class="button" routerLink="/trips">Back to your trips</a>
+    </div>
+  } @else if (preview(); as invitation) {
+    <article class="invitation">
+      <p class="eyebrow">An invitation</p>
+      <h1 class="invitation__title">{{ invitation.tripName }}</h1>
+      <p class="invitation__lede">
+        {{ invitation.invitedByEmail }} invited you to join as
+        {{ invitation.role === 'Owner' ? 'an owner' : 'an editor' }}.
+      </p>
+
+      <div class="invitation__facts">
+        <app-status-badge [label]="invitation.status" [tone]="toneFor(invitation.status)" />
+        <span class="invitation__expiry">
+          Expires {{ invitation.expiresAt | date: 'mediumDate' }}
+        </span>
+      </div>
+
+      @if (invitation.status === 'Pending' && invitation.canAccept) {
+        <div class="invitation__actions">
+          <button type="button" class="button" (click)="accept()" [disabled]="saving()">
+            {{ saving() ? 'Joining…' : 'Accept invitation' }}
+          </button>
+          <button
+            type="button"
+            class="button button--secondary"
+            (click)="decline()"
+            [disabled]="saving()"
+          >
+            Decline
+          </button>
+        </div>
+      } @else if (invitation.status === 'Accepted') {
+        <a class="button" [routerLink]="['/trips', invitation.tripId]">Open the trip</a>
+      } @else {
+        <p class="muted">This invitation {{ statusMessage(invitation.status) }}.</p>
+        <a class="link-arrow" routerLink="/trips">Back to your trips</a>
+      }
+
+      @if (actionError(); as message) {
+        <p class="field-error field-error--api" role="alert">{{ message }}</p>
+      }
+    </article>
+  }
+</section>

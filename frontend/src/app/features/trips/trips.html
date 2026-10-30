@@ -33,6 +33,55 @@
       </div>
     }
 
+    @if (invitations().length > 0) {
+      <section class="invitations-waiting">
+        <div class="section-head">
+          <h2>Invitations waiting for you</h2>
+          <p class="section-head__meta">
+            {{ invitations().length }} {{ invitations().length === 1 ? 'invitation' : 'invitations' }}
+          </p>
+        </div>
+
+        <ul class="invitation-list">
+          @for (invitation of invitations(); track invitation.id) {
+            <li class="invitation-row">
+              <span class="invitation-row__email">{{ invitation.tripName }}</span>
+              <span class="muted">from {{ invitation.invitedByEmail }}</span>
+              <app-status-badge label="Pending" tone="warning" />
+              <span class="invitation-row__expiry">
+                Expires {{ invitation.expiresAt | date: 'mediumDate' }}
+              </span>
+              <span class="invitations-waiting__actions">
+                <button
+                  type="button"
+                  class="button button--secondary"
+                  (click)="acceptInvitation(invitation)"
+                  [disabled]="workingInvitation() !== null"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  class="button button--ghost"
+                  (click)="declineInvitation(invitation)"
+                  [disabled]="workingInvitation() !== null"
+                >
+                  Decline
+                </button>
+              </span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    @if (invitationError(); as message) {
+      <div class="callout callout--danger">
+        <p>{{ message }}</p>
+        <button type="button" class="button" (click)="load()">Try again</button>
+      </div>
+    }
+
     @if (loading()) {
       <p class="visually-hidden">Loading trips</p>
       <ul class="trip-grid" aria-busy="true">

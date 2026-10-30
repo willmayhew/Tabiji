@@ -437,14 +437,16 @@
           Cancel
         </button>
         
-        <button
-          type="button"
-          class="button button--danger form__actions-side"
-          (click)="delete()"
-          [disabled]="deleting()"
-        >
-          {{ deleting() ? 'Deleting…' : 'Delete this trip' }}
-        </button>
+        @if (canDelete()) {
+          <button
+            type="button"
+            class="button button--danger form__actions-side"
+            (click)="delete()"
+            [disabled]="deleting()"
+          >
+            {{ deleting() ? 'Deleting…' : 'Delete this trip' }}
+          </button>
+        }
       </div>   
     }
 

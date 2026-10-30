@@ -3,7 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { Router } from '@angular/router';
 import { SessionService } from '../../core/auth/session.service';
+import { RecipientInvitation } from '../../core/models/member';
 import { Trip } from '../../core/models/trip';
 import { Trips } from './trips';
 
@@ -40,6 +42,16 @@ const kyoto: Trip = {
   status: 'Confirmed',
 };
 
+const pending: RecipientInvitation = {
+  id: 'inv-1',
+  tripId: kyoto.id,
+  tripName: 'Kyoto in spring',
+  invitedByEmail: 'owner@example.com',
+  role: 'Editor',
+  status: 'Pending',
+  expiresAt: '2027-04-20T09:00:00Z',
+};
+
 describe('Trips', () => {
   let fixture: ComponentFixture<Trips>;
   let http: HttpTestingController;
@@ -67,20 +79,25 @@ describe('Trips', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
+  /** The trips and the invitations arrive from two requests. */
+  function answerTrips(trips: Trip[], invitations: RecipientInvitation[] = []): void {
+    http.expectOne('/api/trips').flush(trips);
+    http.expectOne('/api/invitations').flush(invitations);
+    fixture.detectChanges();
+  }
+
   it('should show a loading state while the trips are fetched', () => {
     fixture.detectChanges();
 
     expect(element().textContent).toContain('Loading trips');
 
-    http.expectOne('/api/trips').flush([tokyo, kyoto]);
-    fixture.detectChanges();
+    answerTrips([tokyo, kyoto]);
   });
 
   it('should list the trips returned by the API', () => {
     fixture.detectChanges();
 
-    http.expectOne('/api/trips').flush([tokyo, kyoto]);
-    fixture.detectChanges();
+    answerTrips([tokyo, kyoto]);
 
     expect(element().textContent).toContain('Rome & Amalfi');
     expect(element().textContent).toContain('Kyoto in spring');
@@ -90,8 +107,7 @@ describe('Trips', () => {
   it('should link every trip to its detail page', () => {
     fixture.detectChanges();
 
-    http.expectOne('/api/trips').flush([tokyo]);
-    fixture.detectChanges();
+    answerTrips([tokyo]);
 
     const link = element().querySelector('.trip-link') as HTMLAnchorElement;
 
@@ -101,8 +117,7 @@ describe('Trips', () => {
   it('should show an empty state when there are no trips', () => {
     fixture.detectChanges();
 
-    http.expectOne('/api/trips').flush([]);
-    fixture.detectChanges();
+    answerTrips([]);
 
     expect(element().textContent).toContain('No trips yet');
     expect(element().querySelectorAll('.trip-link')).toHaveLength(0);
@@ -121,8 +136,7 @@ describe('Trips', () => {
   it('should reload the trips when the refresh button is clicked', () => {
     fixture.detectChanges();
 
-    http.expectOne('/api/trips').flush([tokyo]);
-    fixture.detectChanges();
+    answerTrips([tokyo]);
 
     const refresh = element().querySelector('.button--secondary') as HTMLButtonElement;
     refresh.click();
@@ -130,8 +144,7 @@ describe('Trips', () => {
 
     expect(element().textContent).toContain('Loading trips');
 
-    http.expectOne('/api/trips').flush([tokyo, kyoto]);
-    fixture.detectChanges();
+    answerTrips([tokyo, kyoto]);
 
     expect(element().querySelectorAll('.trip-link')).toHaveLength(2);
   });
@@ -139,8 +152,7 @@ describe('Trips', () => {
   it('should promote the first trip to a feature band', () => {
     fixture.detectChanges();
 
-    http.expectOne('/api/trips').flush([tokyo, kyoto]);
-    fixture.detectChanges();
+    answerTrips([tokyo, kyoto]);
 
     const items = element().querySelectorAll('.trip-grid > li');
 
@@ -152,8 +164,7 @@ describe('Trips', () => {
   it('should number the trips from one', () => {
     fixture.detectChanges();
 
-    http.expectOne('/api/trips').flush([tokyo, kyoto]);
-    fixture.detectChanges();
+    answerTrips([tokyo, kyoto]);
 
     const indexes = element().querySelectorAll('.plate__index');
 
@@ -165,10 +176,51 @@ describe('Trips', () => {
   it('should not render an image in the grid', () => {
     fixture.detectChanges();
 
-    http.expectOne('/api/trips').flush([tokyo, kyoto]);
-    fixture.detectChanges();
+    answerTrips([tokyo, kyoto]);
 
     expect(element().querySelector('img')).toBeNull();
+  });
+
+  it('should show invitations waiting for the account and accept one', () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+
+    fixture.detectChanges();
+    answerTrips([tokyo], [pending]);
+
+    expect(element().textContent).toContain('Invitations waiting for you');
+    expect(element().textContent).toContain('Kyoto in spring');
+    expect(element().textContent).toContain('from owner@example.com');
+
+    const accept = element().querySelector(
+      '.invitations-waiting .button--secondary',
+    ) as HTMLButtonElement;
+
+    accept.click();
+
+    const request = http.expectOne(`/api/invitations/${pending.id}/accept`);
+    expect(request.request.method).toBe('POST');
+    request.flush({ tripId: kyoto.id, role: 'Editor' });
+    fixture.detectChanges();
+
+    expect(navigate).toHaveBeenCalledWith(['/trips', kyoto.id]);
+  });
+
+  it('should decline an invitation without leaving the trips page', () => {
+    fixture.detectChanges();
+    answerTrips([tokyo], [pending]);
+
+    const decline = element().querySelector(
+      '.invitations-waiting .button--ghost',
+    ) as HTMLButtonElement;
+
+    decline.click();
+
+    const request = http.expectOne(`/api/invitations/${pending.id}/decline`);
+    expect(request.request.method).toBe('POST');
+    request.flush(null);
+    fixture.detectChanges();
+
+    expect(element().textContent).not.toContain('Invitations waiting for you');
   });
 });
 

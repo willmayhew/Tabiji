@@ -14,12 +14,14 @@ import { catchError, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
 import { SessionService } from '../../core/auth/session.service';
+import { MemberRole } from '../../core/models/member';
 import { Trip, TripDestination, TripStatus } from '../../core/models/trip';
 import { formatDestinationDates, formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
 import { routeSummary } from '../../shared/format/trip-destinations';
 import { TripForm } from '../../shared/form/trip-form';
 import { SignInPrompt } from '../../shared/ui/sign-in-prompt';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
+import { TripMembers } from './trip-members';
 
 interface TripDetailResult {
   trip: Trip | null;
@@ -30,7 +32,7 @@ interface TripDetailResult {
 
 @Component({
   selector: 'app-trip-detail',
-  imports: [RouterLink, StatusBadge, TripForm, SignInPrompt],
+  imports: [RouterLink, StatusBadge, TripForm, SignInPrompt, TripMembers],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-detail.html',
   styleUrl: './trip-detail.css',
@@ -58,6 +60,15 @@ export class TripDetail {
 
   /** Where signing in comes back to. */
   protected readonly returnUrl = computed(() => `/trips/${this.routeId()}`);
+
+  /** The caller's part in the trip, when the API has told us. */
+  protected readonly viewerRole = computed(() => this.trip()?.viewerRole ?? null);
+
+  /**
+   * Only an owner may destroy a trip. When the role is not known — an older
+   * response or a fixture — the existing behaviour is kept.
+   */
+  protected readonly canDelete = computed(() => this.viewerRole() !== 'Editor');
 
   /** Whether the trip is being changed. */
   readonly editing = signal(false);
@@ -149,6 +160,21 @@ export class TripDetail {
   protected onDeleted(): void {
     this.deleted.set(true);
     this.editing.set(false);
+    void this.router.navigate(['/trips']);
+  }
+
+  /** Takes a role the members panel changed, so the page's controls follow. */
+  protected onViewerRoleChanged(role: MemberRole): void {
+    const trip = this.trip();
+
+    if (trip !== null) {
+      this.trip.set({ ...trip, viewerRole: role });
+    }
+  }
+
+  /** The caller removed themselves from the trip. */
+  protected onLeftTrip(): void {
+    this.deleted.set(true);
     void this.router.navigate(['/trips']);
   }
 

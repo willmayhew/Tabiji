@@ -14,8 +14,8 @@ describe('describeHttpError', () => {
     expect(describeHttpError(failure(401))).toBe('Your session has expired. Sign in again.');
   });
 
-  it('should say when the trip is not the reader’s', () => {
-    expect(describeHttpError(failure(403))).toBe('You do not have access to this trip.');
+  it('should say when the action needs a role the reader does not have', () => {
+    expect(describeHttpError(failure(403))).toBe('You do not have permission to do that.');
   });
 
   it('should keep the API’s own reason', () => {

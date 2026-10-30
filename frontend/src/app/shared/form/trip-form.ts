@@ -117,6 +117,12 @@ export class TripForm {
    */
   readonly trip = input<Trip | null>(null);
 
+  /**
+   * Whether the reader may delete the trip. Only an owner may; an editor is
+   * still allowed to change the journey.
+   */
+  readonly canDelete = input(true);
+
   /** Emits the trip that was saved, whether it was made or changed. */
   readonly saved = output<Trip>();
 

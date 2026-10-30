@@ -39,5 +39,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/register/register').then((m) => m.Register),
     title: 'Tabiji — Create an account',
   },
+  {
+    path: 'invite',
+    loadComponent: () => import('./features/invitation/invitation').then((m) => m.Invitation),
+    title: 'Tabiji — Invitation',
+  },
   { path: '**', redirectTo: '' },
 ];

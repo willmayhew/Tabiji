@@ -329,6 +329,44 @@ describe('TripDetail', () => {
 
     expect(element().textContent).toContain('The trip name is required.');
   });
+
+  it('should show the travellers and hide Delete from an editor', () => {
+    createComponent(trip.id);
+
+    http.expectOne(`/api/trips/${trip.id}`).flush({ ...trip, viewerRole: 'Editor' });
+    fixture.detectChanges();
+
+    http.expectOne(`/api/trips/${trip.id}/members`).flush({
+      viewerRole: 'Editor',
+      members: [
+        {
+          userId: 'owner-1',
+          email: 'owner@example.com',
+          role: 'Owner',
+          grantedAt: '2026-10-30T09:00:00Z',
+        },
+        {
+          userId: 'editor-1',
+          email: 'editor@example.com',
+          role: 'Editor',
+          grantedAt: '2026-10-30T09:00:00Z',
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Travellers');
+    expect(element().textContent).toContain('editor@example.com');
+    expect(element().querySelector('app-trip-members')).not.toBeNull();
+
+    const edit = element().querySelector('.detail__edit-button') as HTMLButtonElement;
+
+    edit.click();
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Save changes');
+    expect(element().textContent).not.toContain('Delete this trip');
+  });
 });
 
 describe('unsavedChangesGuard', () => {

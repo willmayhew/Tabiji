@@ -40,6 +40,7 @@
           <h1 class="detail__name">Edit trip</h1>
           <app-trip-form
             [trip]="found"
+            [canDelete]="canDelete()"
             (saved)="onSaved($event)"
             (cancelled)="cancelEditing()"
             (deleted)="onDeleted()"
@@ -150,6 +151,15 @@
               </dl>
               <p class="detail__id">Id: <code>{{ found.id }}</code></p>
             </section>
+
+            @if (viewerRole(); as role) {
+              <app-trip-members
+                [tripId]="found.id"
+                [viewerRole]="role"
+                (viewerRoleChanged)="onViewerRoleChanged($event)"
+                (leftTrip)="onLeftTrip()"
+              />
+            }
           </div>
 
           <aside class="detail__aside">
@@ -161,14 +171,10 @@
             <ol class="detail__roadmap">
               <li>
                 <span class="detail__roadmap-index">01</span>
-                <span>Invitations, so everyone joins the same trip</span>
-              </li>
-              <li>
-                <span class="detail__roadmap-index">02</span>
                 <span>Activity proposals and voting</span>
               </li>
               <li>
-                <span class="detail__roadmap-index">03</span>
+                <span class="detail__roadmap-index">02</span>
                 <span>A shared itinerary</span>
               </li>
             </ol>

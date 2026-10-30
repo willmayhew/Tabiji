@@ -23,7 +23,7 @@ export function describeHttpError(failure: HttpErrorResponse): string {
   }
 
   if (failure.status === 403) {
-    return 'You do not have access to this trip.';
+    return 'You do not have permission to do that.';
   }
 
   if (failure.status === 429) {
