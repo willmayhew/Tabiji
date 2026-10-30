@@ -64,4 +64,101 @@ public sealed class MembershipTests
 
         Assert.Equal("owner", exception.ParamName);
     }
+
+    [Fact]
+    public void Grant_AddsAnEditor()
+    {
+        var member = TripMember.Grant(
+            TripId,
+            UserId.Create(OwnerId),
+            TripMemberRole.Editor,
+            GrantedAt);
+
+        Assert.Equal(TripId, member.TripId);
+        Assert.Equal(OwnerId, member.UserId);
+        Assert.Equal(TripMemberRole.Editor, member.Role);
+        Assert.Equal(GrantedAt, member.GrantedAt);
+        Assert.False(member.IsOwner);
+    }
+
+    [Fact]
+    public void Grant_CanAddACoOwner()
+    {
+        var member = TripMember.Grant(
+            TripId,
+            UserId.Create(OwnerId),
+            TripMemberRole.Owner,
+            GrantedAt);
+
+        Assert.True(member.IsOwner);
+    }
+
+    [Fact]
+    public void Grant_RefusesATripThatIsNotNamed()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => TripMember.Grant(
+                Guid.Empty,
+                UserId.Create(OwnerId),
+                TripMemberRole.Editor,
+                GrantedAt));
+
+        Assert.Equal("tripId", exception.ParamName);
+    }
+
+    [Fact]
+    public void Grant_RefusesAnAccountThatIsNotNamed()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => TripMember.Grant(
+                TripId,
+                default,
+                TripMemberRole.Editor,
+                GrantedAt));
+
+        Assert.Equal("member", exception.ParamName);
+    }
+
+    [Fact]
+    public void Grant_RefusesARoleThatDoesNotExist()
+    {
+        var exception = Assert.Throws<ArgumentException>(
+            () => TripMember.Grant(
+                TripId,
+                UserId.Create(OwnerId),
+                (TripMemberRole)99,
+                GrantedAt));
+
+        Assert.Equal("role", exception.ParamName);
+    }
+
+    [Fact]
+    public void ChangeRole_MovesAPersonBetweenTheRoles()
+    {
+        var member = TripMember.Grant(
+            TripId,
+            UserId.Create(OwnerId),
+            TripMemberRole.Editor,
+            GrantedAt);
+
+        member.ChangeRole(TripMemberRole.Owner);
+
+        Assert.True(member.IsOwner);
+
+        member.ChangeRole(TripMemberRole.Editor);
+
+        Assert.False(member.IsOwner);
+    }
+
+    [Fact]
+    public void ChangeRole_RefusesARoleThatDoesNotExist()
+    {
+        var member = TripMember.Own(TripId, UserId.Create(OwnerId), GrantedAt);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => member.ChangeRole((TripMemberRole)99));
+
+        Assert.Equal("role", exception.ParamName);
+        Assert.True(member.IsOwner);
+    }
 }

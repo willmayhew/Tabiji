@@ -3,13 +3,12 @@ namespace Tabiji.Domain.Membership;
 /// <summary>
 /// What a person may do on a trip.
 ///
-/// Only <see cref="Owner"/> is granted today: a trip is private to the person
-/// who created it. The other roles exist so that the membership row can grow
-/// into collaboration without the table being rebuilt.
+/// An owner controls the trip itself: its membership, its invitations and
+/// whether it exists at all. An editor changes the journey — the route, the
+/// stops and the places — but cannot manage who else is on it.
 /// </summary>
 public enum TripMemberRole
 {
     Owner = 0,
-    Organiser = 1,
-    Member = 2
+    Editor = 1
 }

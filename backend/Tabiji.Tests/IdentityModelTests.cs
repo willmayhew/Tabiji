@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Tabiji.Domain.Invitations;
 using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 using Tabiji.Infrastructure.Persistence;
@@ -22,6 +24,7 @@ public sealed class IdentityModelTests
         "AspNetUserLogins",
         "AspNetUserTokens",
         "AspNetUsers",
+        "Invitations",
         "TripDestinations",
         "TripMembers",
         "Trips"
@@ -240,5 +243,169 @@ public sealed class IdentityModelTests
 
         Assert.NotNull(index);
         Assert.False(index.IsUnique);
+    }
+
+    [Fact]
+    public void Invitation_IsKeyedOnItsOwnIdAndKeepsOnlyTheTokenHash()
+    {
+        using var context = CreateContext();
+
+        var invitation = context.Model.FindEntityType(typeof(Invitation));
+
+        Assert.NotNull(invitation);
+        Assert.Equal("Invitations", invitation.GetTableName());
+
+        var key = invitation.FindPrimaryKey();
+
+        Assert.NotNull(key);
+        Assert.Equal(nameof(Invitation.Id), Assert.Single(key.Properties).Name);
+
+        var hash = invitation.FindProperty(nameof(Invitation.TokenHash));
+
+        Assert.NotNull(hash);
+        Assert.Equal(typeof(byte[]), hash.ClrType);
+        Assert.Equal("varbinary(32)", hash.GetColumnType());
+        Assert.False(hash.IsNullable);
+
+        // The token is a bearer credential; only its hash belongs in the
+        // database.
+        Assert.Null(invitation.FindProperty("Token"));
+    }
+
+    [Fact]
+    public void Invitation_KeepsTheAddressRoleAndStatusAsReadableValues()
+    {
+        using var context = CreateContext();
+
+        var invitation = context.Model.FindEntityType(typeof(Invitation));
+
+        Assert.NotNull(invitation);
+
+        var email = invitation.FindProperty(nameof(Invitation.Email));
+        var normalized = invitation.FindProperty(nameof(Invitation.NormalizedEmail));
+        var role = invitation.FindProperty(nameof(Invitation.Role));
+        var status = invitation.FindProperty(nameof(Invitation.Status));
+
+        Assert.NotNull(email);
+        Assert.NotNull(normalized);
+        Assert.NotNull(role);
+        Assert.NotNull(status);
+
+        Assert.Equal(EmailAddress.MaxLength, email.GetMaxLength());
+        Assert.Equal(EmailAddress.MaxLength, normalized.GetMaxLength());
+        Assert.False(email.IsNullable);
+        Assert.False(normalized.IsNullable);
+
+        Assert.Equal(typeof(TripMemberRole), role.ClrType);
+        Assert.Equal("nvarchar(20)", role.GetColumnType());
+        Assert.False(role.IsNullable);
+
+        Assert.Equal(typeof(InvitationStatus), status.ClrType);
+        Assert.Equal("nvarchar(20)", status.GetColumnType());
+        Assert.False(status.IsNullable);
+    }
+
+    [Fact]
+    public void Invitation_BelongsToItsTripAndItsAccounts()
+    {
+        using var context = CreateContext();
+
+        var invitation = context.Model.FindEntityType(typeof(Invitation));
+
+        Assert.NotNull(invitation);
+
+        var foreignKeys = invitation.GetForeignKeys();
+
+        Assert.Equal(4, foreignKeys.Count());
+
+        var toTrip = foreignKeys.Single(
+            key => key.PrincipalEntityType.ClrType == typeof(Trip));
+
+        // A deleted trip takes its invitations with it.
+        Assert.Equal(DeleteBehavior.Cascade, toTrip.DeleteBehavior);
+
+        var toAccounts = foreignKeys
+            .Where(key => key.PrincipalEntityType.ClrType == typeof(AppUser))
+            .ToArray();
+
+        // The sender, the acceptor and the decider. None may cascade: deleting
+        // an account must not quietly erase the record of an invitation.
+        Assert.Equal(3, toAccounts.Length);
+        Assert.All(toAccounts, key => Assert.Equal(DeleteBehavior.NoAction, key.DeleteBehavior));
+        Assert.Equal(
+            [
+                nameof(Invitation.AcceptedByUserId),
+                nameof(Invitation.DecidedByUserId),
+                nameof(Invitation.InvitedByUserId),
+            ],
+            toAccounts.SelectMany(key => key.Properties.Select(property => property.Name)).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Invitation_AllowsOnePendingOfferPerAddressAndTrip()
+    {
+        using var context = CreateContext();
+
+        var invitation = context.Model.FindEntityType(typeof(Invitation));
+
+        Assert.NotNull(invitation);
+
+        var index = invitation.GetIndexes()
+            .SingleOrDefault(candidate => candidate.IsUnique && candidate.GetFilter() is not null);
+
+        Assert.NotNull(index);
+        Assert.Equal("IX_Invitations_TripId_NormalizedEmail_Pending", index.GetDatabaseName());
+        Assert.Equal(
+            [nameof(Invitation.TripId), nameof(Invitation.NormalizedEmail)],
+            index.Properties.Select(property => property.Name));
+
+        // The filter is what lets a fresh invitation follow a decline, a
+        // revocation or an expiry.
+        Assert.Equal("[Status] = 'Pending'", index.GetFilter());
+    }
+
+    [Fact]
+    public void Invitation_ResolvesATokenOnce()
+    {
+        using var context = CreateContext();
+
+        var invitation = context.Model.FindEntityType(typeof(Invitation));
+
+        Assert.NotNull(invitation);
+
+        var index = invitation.GetIndexes()
+            .SingleOrDefault(candidate =>
+                candidate.IsUnique &&
+                candidate.Properties.Count == 1 &&
+                candidate.Properties[0].Name == nameof(Invitation.TokenHash));
+
+        Assert.NotNull(index);
+    }
+
+    [Fact]
+    public void Invitation_StatesTheLifecycleInTheDatabase()
+    {
+        using var context = CreateContext();
+
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var invitation = model.FindEntityType(typeof(Invitation));
+
+        Assert.NotNull(invitation);
+
+        var constraints = invitation.GetCheckConstraints()
+            .ToDictionary(
+                constraint => constraint.Name!,
+                constraint => constraint.Sql ?? string.Empty);
+
+        Assert.Contains("CK_Invitations_Expiry", constraints.Keys);
+        Assert.Contains("[ExpiresAt] > [CreatedAt]", constraints["CK_Invitations_Expiry"]);
+
+        Assert.Contains("CK_Invitations_Status", constraints.Keys);
+        Assert.Contains("'Pending'", constraints["CK_Invitations_Status"]);
+        Assert.Contains("'Expired'", constraints["CK_Invitations_Status"]);
+
+        Assert.Contains("CK_Invitations_Role", constraints.Keys);
+        Assert.Contains("'Owner'", constraints["CK_Invitations_Role"]);
+        Assert.Contains("'Editor'", constraints["CK_Invitations_Role"]);
     }
 }

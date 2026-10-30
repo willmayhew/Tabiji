@@ -133,17 +133,18 @@ SELECT [Id], [Name], [ParentDestinationId]
 FROM [TripDestinations]
 WHERE [Kind] = 'Destination' AND [ParentDestinationId] IS NOT NULL;
 
-PRINT '--- 17. Every trip has an owner (expected: 0 rows) ---';
+PRINT '--- 17. Every trip has at least one owner (expected: 0 rows) ---';
 SELECT t.[Id], t.[Name]
 FROM [Trips] t
-WHERE NOT EXISTS (SELECT 1 FROM [TripMembers] m WHERE m.[TripId] = t.[Id]);
+WHERE NOT EXISTS (
+    SELECT 1 FROM [TripMembers] m
+    WHERE m.[TripId] = t.[Id] AND m.[Role] = 'Owner');
 
-PRINT '--- 18. Every trip has exactly one owner (expected: 0 rows) ---';
-SELECT [TripId], COUNT(*) AS Owners
+PRINT '--- 18. Membership counts by role (for the record) ---';
+SELECT [Role], COUNT(*) AS n
 FROM [TripMembers]
-WHERE [Role] = 'Owner'
-GROUP BY [TripId]
-HAVING COUNT(*) <> 1;
+GROUP BY [Role]
+ORDER BY [Role];
 
 PRINT '--- 19. Membership inventory (for the record) ---';
 SELECT (SELECT COUNT(*) FROM [Trips])                              AS Trips,
@@ -171,4 +172,39 @@ PRINT '--- 20. Recovery procedure for unowned trips (not run) ---';
 --   FROM [Trips] t
 --   WHERE NOT EXISTS (SELECT 1 FROM [TripMembers] m WHERE m.[TripId] = t.[Id]);
 --
--- Then run queries 17 and 18 again. Both must report 0 rows.
+-- Then run query 17 again: it must report 0 rows. Query 18 shows the roles
+-- that were granted.
+
+PRINT '--- 21. No duplicate pending invitations (expected: 0 rows) ---';
+SELECT [TripId], [NormalizedEmail], COUNT(*) AS Pending
+FROM [Invitations]
+WHERE [Status] = 'Pending'
+GROUP BY [TripId], [NormalizedEmail]
+HAVING COUNT(*) > 1;
+
+PRINT '--- 22. No pending invitation addressed to an existing member (expected: 0 rows) ---';
+SELECT i.[Id], i.[TripId], i.[Email], m.[Role] AS MemberRole
+FROM [Invitations] i
+JOIN [TripMembers] m ON m.[TripId] = i.[TripId]
+JOIN [AspNetUsers] u ON u.[Id] = m.[UserId]
+WHERE i.[Status] = 'Pending'
+  AND u.[NormalizedEmail] = i.[NormalizedEmail];
+
+PRINT '--- 23. Every accepted invitation has a matching membership (expected: 0 rows) ---';
+SELECT i.[Id], i.[TripId], i.[Email], i.[AcceptedByUserId]
+FROM [Invitations] i
+WHERE i.[Status] = 'Accepted'
+  AND NOT EXISTS (
+      SELECT 1 FROM [TripMembers] m
+      WHERE m.[TripId] = i.[TripId] AND m.[UserId] = i.[AcceptedByUserId]);
+
+PRINT '--- 24. Invitation inventory by status (for the record) ---';
+SELECT [Status], COUNT(*) AS n
+FROM [Invitations]
+GROUP BY [Status]
+ORDER BY [Status];
+
+PRINT '--- 25. No membership names a role outside the vocabulary (expected: 0 rows) ---';
+SELECT [TripId], [UserId], [Role]
+FROM [TripMembers]
+WHERE [Role] NOT IN ('Owner', 'Editor');

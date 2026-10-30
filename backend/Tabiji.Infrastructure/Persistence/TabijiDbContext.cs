@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Tabiji.Domain.Invitations;
 using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 using Tabiji.Infrastructure.Persistence.Identity;
@@ -23,6 +24,8 @@ public sealed class TabijiDbContext(DbContextOptions<TabijiDbContext> options)
     public DbSet<TripDestination> TripDestinations => Set<TripDestination>();
 
     public DbSet<TripMember> TripMembers => Set<TripMember>();
+
+    public DbSet<Invitation> Invitations => Set<Invitation>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
