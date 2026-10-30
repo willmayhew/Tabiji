@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tabiji.Application.Abstractions;
+using Tabiji.Application.Trips;
 using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 
@@ -31,44 +32,86 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<Trip?> GetForMemberAsync(
+    public async Task<TripAccess?> GetForMemberAsync(
         Guid tripId,
         UserId member,
         CancellationToken cancellationToken = default)
     {
         var userId = member.Value;
 
-        return dbContext.Trips
-            .Where(trip =>
-                trip.Id == tripId &&
-                dbContext.TripMembers.Any(
-                    membership => membership.TripId == trip.Id && membership.UserId == userId))
-            .Include(trip => trip.Destinations.OrderBy(destination => destination.SortOrder))
-            .SingleOrDefaultAsync(cancellationToken);
+        // The role is read first: it is the answer to "may this account reach
+        // the trip at all", and it is what the caller will be allowed to do.
+        var role = await dbContext.TripMembers
+            .Where(membership => membership.TripId == tripId && membership.UserId == userId)
+            .Select(membership => (TripMemberRole?)membership.Role)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (role is null)
+        {
+            return null;
+        }
+
+        var trip = await dbContext.Trips
+            .Include(candidate => candidate.Destinations.OrderBy(destination => destination.SortOrder))
+            .SingleOrDefaultAsync(candidate => candidate.Id == tripId, cancellationToken);
+
+        // A trip deleted between the two statements is simply not there.
+        return trip is null ? null : new TripAccess(trip, role.Value);
     }
 
-    public async Task<IReadOnlyList<Trip>> ListForMemberAsync(
+    public async Task<IReadOnlyList<TripAccess>> ListForMemberAsync(
         UserId member,
         CancellationToken cancellationToken = default)
     {
         var userId = member.Value;
 
-        return await dbContext.Trips
-            .Where(trip =>
-                dbContext.TripMembers.Any(
-                    membership => membership.TripId == trip.Id && membership.UserId == userId))
+        var memberships = await dbContext.TripMembers
+            .Where(candidate => candidate.UserId == userId)
+            .Select(candidate => new { candidate.TripId, candidate.Role })
+            .ToListAsync(cancellationToken);
+
+        if (memberships.Count == 0)
+        {
+            return [];
+        }
+
+        var tripIds = memberships.Select(candidate => candidate.TripId).ToArray();
+
+        var trips = await dbContext.Trips
+            .Where(trip => tripIds.Contains(trip.Id))
             .Include(trip => trip.Destinations.OrderBy(destination => destination.SortOrder))
+            .ToListAsync(cancellationToken);
+
+        var roles = memberships.ToDictionary(candidate => candidate.TripId, candidate => candidate.Role);
+
+        return trips
             .OrderBy(trip => trip.StartsOn)
             .ThenBy(trip => trip.Name)
-            .ToListAsync(cancellationToken);
+            .Select(trip => new TripAccess(trip, roles[trip.Id]))
+            .ToArray();
     }
 
-    public async Task<bool> DeleteForMemberAsync(
+    public async Task<TripDeleteOutcome> DeleteForMemberAsync(
         Guid tripId,
         UserId actor,
         CancellationToken cancellationToken = default)
     {
         var userId = actor.Value;
+
+        var role = await dbContext.TripMembers
+            .Where(membership => membership.TripId == tripId && membership.UserId == userId)
+            .Select(membership => (TripMemberRole?)membership.Role)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (role is null)
+        {
+            return TripDeleteOutcome.NotFound;
+        }
+
+        if (role != TripMemberRole.Owner)
+        {
+            return TripDeleteOutcome.Forbidden;
+        }
 
         // The membership is part of the predicate, not a check before it, so
         // there is no window between deciding and deleting.
@@ -76,19 +119,24 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
             .Where(trip =>
                 trip.Id == tripId &&
                 dbContext.TripMembers.Any(
-                    membership => membership.TripId == trip.Id && membership.UserId == userId))
+                    membership =>
+                        membership.TripId == trip.Id &&
+                        membership.UserId == userId &&
+                        membership.Role == TripMemberRole.Owner))
             .ExecuteDeleteAsync(cancellationToken);
 
-        return deleted == 1;
+        return deleted == 1 ? TripDeleteOutcome.Deleted : TripDeleteOutcome.NotFound;
     }
 
     /// <summary>
     /// Writes the trip and its route back in one go.
     ///
-    /// Returns false, writing nothing, when the account is not a member of the
-    /// trip. A trip is normally loaded through
-    /// <see cref="GetForMemberAsync"/> first, so this is defence in depth
-    /// against a trip object that arrived some other way.
+    /// An owner or an editor may write. Anyone else is refused without writing
+    /// anything: a non-member is <see cref="TripWriteOutcome.NotFound"/>, a
+    /// member with another role is <see cref="TripWriteOutcome.Forbidden"/>.
+    /// A trip is normally loaded through <see cref="GetForMemberAsync"/> first,
+    /// so this is defence in depth against a trip object that arrived some
+    /// other way.
     ///
     /// The positions are moved in the database rather than through the change
     /// tracker. The tracker is asked to move a stop into a place another stop
@@ -102,21 +150,26 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
     /// The stops are updated in place rather than written afresh, so that a
     /// stop keeps its identity across an edit.
     /// </summary>
-    public async Task<bool> UpdateAsync(
+    public async Task<TripWriteOutcome> UpdateAsync(
         Trip trip,
         UserId actor,
         CancellationToken cancellationToken = default)
     {
         var userId = actor.Value;
 
-        var isMember = await dbContext.TripMembers
-            .AnyAsync(
-                member => member.TripId == trip.Id && member.UserId == userId,
-                cancellationToken);
+        var role = await dbContext.TripMembers
+            .Where(member => member.TripId == trip.Id && member.UserId == userId)
+            .Select(member => (TripMemberRole?)member.Role)
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (!isMember)
+        if (role is null)
         {
-            return false;
+            return TripWriteOutcome.NotFound;
+        }
+
+        if (role is not (TripMemberRole.Owner or TripMemberRole.Editor))
+        {
+            return TripWriteOutcome.Forbidden;
         }
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -196,7 +249,7 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
 
         await transaction.CommitAsync(cancellationToken);
 
-        return true;
+        return TripWriteOutcome.Written;
     }
 
     /// <summary>

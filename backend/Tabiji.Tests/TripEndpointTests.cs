@@ -84,7 +84,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
 
         var trip = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
 
@@ -98,7 +98,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
 
         var trip = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
 
@@ -124,7 +124,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var tripId = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var tripId = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
 
         var response = await client.DeleteAsync($"/api/trips/{tripId}");
 
@@ -401,7 +401,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
         Assert.NotNull(stored);
 
@@ -441,7 +441,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
         Assert.NotNull(stored);
 
@@ -481,7 +481,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
         Assert.NotNull(stored);
 
@@ -514,7 +514,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
         Assert.NotNull(stored);
 
@@ -556,7 +556,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
         Assert.NotNull(stored);
 
@@ -582,7 +582,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
         Assert.NotNull(stored);
 
@@ -624,7 +624,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var stored = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
         Assert.NotNull(stored);
 
@@ -654,8 +654,8 @@ public sealed class TripEndpointTests : IDisposable
         using var client = _factory.CreateClient();
 
         var trips = await _factory.Repository.ListForMemberAsync(TestUsers.Owner);
-        var rome = trips.First(trip => trip.Name == "Rome");
-        var kyoto = trips.First(trip => trip.Name == "Kyoto");
+        var rome = trips.First(access => access.Trip.Name == "Rome").Trip;
+        var kyoto = trips.First(access => access.Trip.Name == "Kyoto").Trip;
 
         var request = new UpdateTripRequest(
             "Kyoto",
@@ -773,7 +773,7 @@ public sealed class TripEndpointTests : IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(trip => trip.Name == "Rome").Id;
+        var id = (await _factory.Repository.ListForMemberAsync(TestUsers.Owner)).First(access => access.Trip.Name == "Rome").Trip.Id;
         var trip = await client.GetFromJsonAsync<TripResponse>($"/api/trips/{id}", JsonOptions);
 
         Assert.NotNull(trip);

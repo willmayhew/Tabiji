@@ -1,4 +1,5 @@
 using Tabiji.Application.Abstractions;
+using Tabiji.Application.Trips;
 using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 
@@ -7,13 +8,13 @@ namespace Tabiji.Tests.Fakes;
 /// <summary>
 /// The trip repository, in memory.
 ///
-/// It scopes exactly as the real one does, so a test cannot accidentally pass
-/// against a fake that is more permissive than SQL.
+/// It scopes and checks roles exactly as the real one does, so a test cannot
+/// accidentally pass against a fake that is more permissive than SQL.
 /// </summary>
 internal sealed class FakeTripRepository : ITripRepository
 {
     private readonly Dictionary<Guid, Trip> _trips = [];
-    private readonly Dictionary<Guid, HashSet<Guid>> _members = [];
+    private readonly Dictionary<Guid, Dictionary<Guid, TripMemberRole>> _members = [];
 
     public FakeTripRepository()
     {
@@ -24,7 +25,7 @@ internal sealed class FakeTripRepository : ITripRepository
         foreach (var trip in seed)
         {
             _trips[trip.Id] = trip;
-            MembersOf(trip.Id).Add(owner.Value);
+            MembersOf(trip.Id)[owner.Value] = TripMemberRole.Owner;
         }
     }
 
@@ -33,11 +34,14 @@ internal sealed class FakeTripRepository : ITripRepository
     public int UpdateCallCount { get; private set; }
 
     /// <summary>
-    /// Makes an account a member without going through the API. The milestone
-    /// only ever grants ownership at creation, so this exists for a test that
-    /// needs a second participant.
+    /// Makes an account a member without going through the API, for a test
+    /// that needs a second participant.
     /// </summary>
-    public void Grant(Guid tripId, UserId member) => MembersOf(tripId).Add(member.Value);
+    public void Grant(Guid tripId, UserId member, TripMemberRole role = TripMemberRole.Editor) =>
+        MembersOf(tripId)[member.Value] = role;
+
+    public TripMemberRole? RoleOf(Guid tripId, UserId member) =>
+        MembersOf(tripId).TryGetValue(member.Value, out var role) ? role : null;
 
     public Task AddAsync(
         Trip trip,
@@ -45,69 +49,85 @@ internal sealed class FakeTripRepository : ITripRepository
         CancellationToken cancellationToken = default)
     {
         _trips[trip.Id] = trip;
-        MembersOf(trip.Id).Add(owner.UserId);
+        MembersOf(trip.Id)[owner.UserId] = owner.Role;
         AddCallCount++;
 
         return Task.CompletedTask;
     }
 
-    public Task<Trip?> GetForMemberAsync(
+    public Task<TripAccess?> GetForMemberAsync(
         Guid tripId,
         UserId member,
         CancellationToken cancellationToken = default)
     {
-        var isVisible =
-            _trips.TryGetValue(tripId, out var trip) &&
-            MembersOf(tripId).Contains(member.Value);
+        if (!_trips.TryGetValue(tripId, out var trip) ||
+            !MembersOf(tripId).TryGetValue(member.Value, out var role))
+        {
+            return Task.FromResult<TripAccess?>(null);
+        }
 
-        return Task.FromResult(isVisible ? trip : null);
+        return Task.FromResult<TripAccess?>(new TripAccess(trip, role));
     }
 
-    public Task<IReadOnlyList<Trip>> ListForMemberAsync(
+    public Task<IReadOnlyList<TripAccess>> ListForMemberAsync(
         UserId member,
         CancellationToken cancellationToken = default)
     {
         var ordered = _trips.Values
-            .Where(trip => MembersOf(trip.Id).Contains(member.Value))
+            .Where(trip => MembersOf(trip.Id).ContainsKey(member.Value))
             .OrderBy(trip => trip.StartsOn)
             .ThenBy(trip => trip.Name)
+            .Select(trip => new TripAccess(trip, MembersOf(trip.Id)[member.Value]))
             .ToArray();
 
-        return Task.FromResult<IReadOnlyList<Trip>>(ordered);
+        return Task.FromResult<IReadOnlyList<TripAccess>>(ordered);
     }
 
-    public Task<bool> UpdateAsync(
+    public Task<TripWriteOutcome> UpdateAsync(
         Trip trip,
         UserId actor,
         CancellationToken cancellationToken = default)
     {
-        if (!_trips.ContainsKey(trip.Id) || !MembersOf(trip.Id).Contains(actor.Value))
+        if (!_trips.ContainsKey(trip.Id) ||
+            !MembersOf(trip.Id).TryGetValue(actor.Value, out var role))
         {
-            return Task.FromResult(false);
+            return Task.FromResult(TripWriteOutcome.NotFound);
+        }
+
+        if (role is not (TripMemberRole.Owner or TripMemberRole.Editor))
+        {
+            return Task.FromResult(TripWriteOutcome.Forbidden);
         }
 
         _trips[trip.Id] = trip;
         UpdateCallCount++;
 
-        return Task.FromResult(true);
+        return Task.FromResult(TripWriteOutcome.Written);
     }
 
-    public Task<bool> DeleteForMemberAsync(
+    public Task<TripDeleteOutcome> DeleteForMemberAsync(
         Guid tripId,
         UserId actor,
         CancellationToken cancellationToken = default)
     {
-        if (!_trips.ContainsKey(tripId) || !MembersOf(tripId).Contains(actor.Value))
+        if (!_trips.ContainsKey(tripId) ||
+            !MembersOf(tripId).TryGetValue(actor.Value, out var role))
         {
-            return Task.FromResult(false);
+            return Task.FromResult(TripDeleteOutcome.NotFound);
+        }
+
+        if (role != TripMemberRole.Owner)
+        {
+            return Task.FromResult(TripDeleteOutcome.Forbidden);
         }
 
         _members.Remove(tripId);
 
-        return Task.FromResult(_trips.Remove(tripId));
+        return Task.FromResult(
+            _trips.Remove(tripId) ? TripDeleteOutcome.Deleted : TripDeleteOutcome.NotFound);
     }
 
-    private HashSet<Guid> MembersOf(Guid tripId)
+    private Dictionary<Guid, TripMemberRole> MembersOf(Guid tripId)
     {
         if (!_members.TryGetValue(tripId, out var members))
         {

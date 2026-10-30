@@ -116,7 +116,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
 
         Assert.NotNull(reloaded);
 
-        return reloaded!;
+        return reloaded!.Trip;
     }
 
     [DatabaseFact]

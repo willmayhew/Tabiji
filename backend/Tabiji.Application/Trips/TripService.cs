@@ -55,7 +55,7 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
 
         await repository.AddAsync(trip, TripMember.Own(trip.Id, owner, now), cancellationToken);
 
-        return ToResponse(trip);
+        return ToResponse(trip, TripMemberRole.Owner);
     }
 
     /// <summary>
@@ -65,7 +65,9 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
     /// the domain refuses leaves the trip exactly as it was.
     ///
     /// Returns null when there is no such trip, or when the caller is not one
-    /// of its members. The two are deliberately the same answer.
+    /// of its members. The two are deliberately the same answer. A member
+    /// whose role may not edit is also null here; the repository is what drew
+    /// the line, and the endpoint keeps the answer opaque.
     /// </summary>
     public async Task<TripResponse?> UpdateAsync(
         Guid id,
@@ -73,9 +75,9 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         UserId actor,
         CancellationToken cancellationToken = default)
     {
-        var trip = await repository.GetForMemberAsync(id, actor, cancellationToken);
+        var access = await repository.GetForMemberAsync(id, actor, cancellationToken);
 
-        if (trip is null)
+        if (access is null)
         {
             return null;
         }
@@ -124,16 +126,18 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
                 place.PlannedOn))
             .ToArray();
 
-        trip.ApplyRoute(
+        access.Trip.ApplyRoute(
             request.Name,
             request.StartsOn,
             request.EndsOn,
             destinations,
             places);
 
-        var written = await repository.UpdateAsync(trip, actor, cancellationToken);
+        var written = await repository.UpdateAsync(access.Trip, actor, cancellationToken);
 
-        return written ? ToResponse(trip) : null;
+        return written == TripWriteOutcome.Written
+            ? ToResponse(access.Trip, access.Role)
+            : null;
     }
 
     public async Task<TripResponse?> GetAsync(
@@ -141,9 +145,9 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         UserId viewer,
         CancellationToken cancellationToken = default)
     {
-        var trip = await repository.GetForMemberAsync(id, viewer, cancellationToken);
+        var access = await repository.GetForMemberAsync(id, viewer, cancellationToken);
 
-        return trip is null ? null : ToResponse(trip);
+        return access is null ? null : ToResponse(access.Trip, access.Role);
     }
 
     public async Task<IReadOnlyList<TripResponse>> ListAsync(
@@ -152,10 +156,10 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
     {
         var trips = await repository.ListForMemberAsync(viewer, cancellationToken);
 
-        return trips.Select(ToResponse).ToArray();
+        return trips.Select(access => ToResponse(access.Trip, access.Role)).ToArray();
     }
 
-    public Task<bool> DeleteAsync(
+    public Task<TripDeleteOutcome> DeleteAsync(
         Guid id,
         UserId actor,
         CancellationToken cancellationToken = default)
@@ -169,7 +173,7 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
     /// stop is never part of the main route: it is nested inside the
     /// destination it belongs to.
     /// </summary>
-    private static TripResponse ToResponse(Trip trip) => new(
+    private static TripResponse ToResponse(Trip trip, TripMemberRole viewerRole) => new(
         trip.Id,
         trip.Name,
         trip.ParentDestinations
@@ -193,6 +197,7 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
         trip.StartsOn,
         trip.EndsOn,
         trip.Status,
+        viewerRole,
         trip.UnfiledPlaces.Select(ToStopResponse).ToArray());
 
     private static TripStopResponse ToStopResponse(TripDestination stop) => new(

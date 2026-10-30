@@ -1,3 +1,4 @@
+using Tabiji.Application.Trips;
 using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 
@@ -10,6 +11,9 @@ namespace Tabiji.Application.Abstractions;
 /// method that reads, writes or deletes a trip without one: a trip the caller
 /// is not a member of is answered exactly as a trip that does not exist, so a
 /// forgotten check cannot become a way in.
+///
+/// A read returns the caller's role with the trip. A write says whether the
+/// role was enough, so the endpoint can tell "not yours" from "not allowed".
 /// </summary>
 public interface ITripRepository
 {
@@ -23,37 +27,39 @@ public interface ITripRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns the trip with its route loaded, ordered by sort order, when the
-    /// account is one of its members; null when the trip does not exist or the
-    /// account is not a member.
+    /// Returns the trip with its route loaded, ordered by sort order, and the
+    /// account's role, when the account is one of its members; null when the
+    /// trip does not exist or the account is not a member.
     /// </summary>
-    Task<Trip?> GetForMemberAsync(
+    Task<TripAccess?> GetForMemberAsync(
         Guid tripId,
         UserId member,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the trips the account is a member of, with their routes loaded,
-    /// ordered by start date and then by name.
+    /// ordered by start date and then by name, each with the account's role.
     /// </summary>
-    Task<IReadOnlyList<Trip>> ListForMemberAsync(
+    Task<IReadOnlyList<TripAccess>> ListForMemberAsync(
         UserId member,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Writes the trip and its route back, in one go, so that a trip is never
-    /// left half changed. Returns false, writing nothing, when the account is
-    /// not a member.
+    /// left half changed. An owner or an editor may write; any other role is
+    /// refused without writing anything.
     /// </summary>
-    Task<bool> UpdateAsync(
+    Task<TripWriteOutcome> UpdateAsync(
         Trip trip,
         UserId actor,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Deletes the trip and its route when the account is a member of it.
+    /// Deletes the trip, its route and its membership when the account is one
+    /// of its owners. An editor may read and change the journey but not
+    /// destroy it.
     /// </summary>
-    Task<bool> DeleteForMemberAsync(
+    Task<TripDeleteOutcome> DeleteForMemberAsync(
         Guid tripId,
         UserId actor,
         CancellationToken cancellationToken = default);

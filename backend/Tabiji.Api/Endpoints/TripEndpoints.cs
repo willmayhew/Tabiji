@@ -154,18 +154,26 @@ public static class TripEndpoints
                     return Results.Unauthorized();
                 }
 
-                var deleted = await tripService.DeleteAsync(id, actor, cancellationToken);
+                var outcome = await tripService.DeleteAsync(id, actor, cancellationToken);
 
-                IResult result = deleted
-                    ? Results.NoContent()
-                    : Results.Problem(
+                IResult result = outcome switch
+                {
+                    TripDeleteOutcome.Deleted => Results.NoContent(),
+
+                    // The caller can see the trip, so the role is the reason.
+                    TripDeleteOutcome.Forbidden => Results.Problem(
+                        title: "Only an owner can delete this trip",
+                        statusCode: StatusCodes.Status403Forbidden),
+
+                    _ => Results.Problem(
                         title: "Trip not found",
-                        statusCode: StatusCodes.Status404NotFound);
+                        statusCode: StatusCodes.Status404NotFound),
+                };
 
                 return result;
             })
             .WithName("DeleteTrip")
-            .WithSummary("Deletes a trip and its route.")
+            .WithSummary("Deletes a trip and its route. Only an owner may do this.")
             .RequireValidAntiforgeryToken();
 
         return endpoints;

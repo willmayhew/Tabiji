@@ -29,14 +29,16 @@ public sealed class SavedPlaceService(ITripRepository trips)
         UserId viewer,
         CancellationToken cancellationToken = default)
     {
-        var trip = await trips.GetForMemberAsync(tripId, viewer, cancellationToken);
+        var access = await trips.GetForMemberAsync(tripId, viewer, cancellationToken);
 
-        if (trip is null)
+        if (access is null)
         {
             return null;
         }
 
-        return PlacesOf(trip).Select(place => ToResponse(trip, place)).ToArray();
+        return PlacesOf(access.Trip)
+            .Select(place => ToResponse(access.Trip, place))
+            .ToArray();
     }
 
     /// <summary>
@@ -50,16 +52,16 @@ public sealed class SavedPlaceService(ITripRepository trips)
         UserId viewer,
         CancellationToken cancellationToken = default)
     {
-        var trip = await trips.GetForMemberAsync(tripId, viewer, cancellationToken);
+        var access = await trips.GetForMemberAsync(tripId, viewer, cancellationToken);
 
-        if (trip is null)
+        if (access is null)
         {
             return null;
         }
 
-        var place = PlacesOf(trip).FirstOrDefault(candidate => candidate.Id == placeId);
+        var place = PlacesOf(access.Trip).FirstOrDefault(candidate => candidate.Id == placeId);
 
-        return place is null ? null : ToResponse(trip, place);
+        return place is null ? null : ToResponse(access.Trip, place);
     }
 
     private static IEnumerable<TripDestination> PlacesOf(Trip trip) =>

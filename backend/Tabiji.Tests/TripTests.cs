@@ -686,8 +686,8 @@ public sealed class TripTests
         var stored = await repository.GetForMemberAsync(created.Id, TestUsers.Owner);
 
         Assert.NotNull(stored);
-        Assert.Equal("Rome & Amalfi", stored!.Name);
-        Assert.Equal(["Rome", "Amalfi", "Naples"], stored.Destinations.Select(d => d.Name));
+        Assert.Equal("Rome & Amalfi", stored!.Trip.Name);
+        Assert.Equal(["Rome", "Amalfi", "Naples"], stored.Trip.Destinations.Select(d => d.Name));
         Assert.Equal(0, repository.UpdateCallCount);
     }
 
@@ -745,7 +745,7 @@ public sealed class TripTests
         var stored = await repository.GetForMemberAsync(created.Id, TestUsers.Owner);
 
         Assert.NotNull(stored);
-        Assert.Equal("Rome & Amalfi", stored!.Name);
+        Assert.Equal("Rome & Amalfi", stored!.Trip.Name);
     }
 
     [Fact]
@@ -757,10 +757,10 @@ public sealed class TripTests
         var created = await service.CreateAsync(
             new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
 
-        Assert.False(await service.DeleteAsync(created.Id, TestUsers.Other));
+        Assert.Equal(TripDeleteOutcome.NotFound, await service.DeleteAsync(created.Id, TestUsers.Other));
         Assert.NotNull(await service.GetAsync(created.Id, TestUsers.Owner));
 
-        Assert.True(await service.DeleteAsync(created.Id, TestUsers.Owner));
+        Assert.Equal(TripDeleteOutcome.Deleted, await service.DeleteAsync(created.Id, TestUsers.Owner));
         Assert.Null(await service.GetAsync(created.Id, TestUsers.Owner));
     }
 }

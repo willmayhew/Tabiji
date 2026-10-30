@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Tabiji.Application.Membership;
 using Tabiji.Application.Trips;
 
 namespace Tabiji.Application;
@@ -10,6 +11,8 @@ public static class DependencyInjection
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<TripService>();
         services.AddScoped<SavedPlaceService>();
+        services.AddScoped<TripMembershipService>();
+        services.AddScoped<InvitationService>();
 
         return services;
     }

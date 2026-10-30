@@ -29,6 +29,8 @@ public static class DependencyInjection
 
         services.AddDbContext<TabijiDbContext>(options => options.UseSqlServer(connectionString));
         services.AddScoped<ITripRepository, TripRepository>();
+        services.AddScoped<ITripMembershipRepository, TripMembershipRepository>();
+        services.AddScoped<IInvitationRepository, InvitationRepository>();
 
         // An invitation that lasts a day is a nuisance; one that lasts a year
         // is a second password. The window is small and explicit.
