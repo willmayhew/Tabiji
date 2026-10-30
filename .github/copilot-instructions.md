@@ -173,10 +173,10 @@ npm test
 - Do not let an invitation grant ownership. An invitation makes an editor; an owner promotes
   an existing member. Never allow the last owner to be removed or demoted — the check and
   the write run in one serializable transaction that locks the trip's memberships.
-- Do not store, log or return a raw invitation token. Keep only its SHA-256, put the
-  development link's token in the URL fragment, send the token in the request body, and
-  never include it in a production response. `Email:DeliveryEnabled=false` means invitation
-  creation outside Development is `503`.
+- Do not store or log a raw invitation token. Keep only its SHA-256, send the token in the
+  request body, and put it in the URL fragment of the Development `invitationUrl` — the one
+  response that may carry it. Never include it in a production response.
+  `Email:DeliveryEnabled=false` means invitation creation outside Development is `503`.
 - Do not let invitation creation reveal whether an address has an account. The response is
   the same whether or not the invitee is registered.
 - Do not put an `HttpOnly`, `SameSite` cookie behind a state-changing trip or invitation
