@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Tabiji.Infrastructure.Persistence;
@@ -49,7 +50,14 @@ public static class IdentitySetup
             })
             .AddEntityFrameworkStores<TabijiDbContext>();
 
-        services.AddAuthorization();
+        // Every endpoint demands an account unless it deliberately says
+        // otherwise, so a route added next year is protected before anybody
+        // remembers to protect it. The anonymous surface is small and named:
+        // the account routes, the two probes and the OpenAPI document.
+        services.AddAuthorization(options =>
+            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build());
 
         services.ConfigureApplicationCookie(options =>
         {

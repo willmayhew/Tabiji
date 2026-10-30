@@ -334,7 +334,7 @@ public sealed class TripTests
         var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
 
         var response = await service.CreateAsync(
-            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn));
+            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
 
         Assert.Equal(1, repository.AddCallCount);
         Assert.Equal("Rome & Amalfi", response.Name);
@@ -352,7 +352,7 @@ public sealed class TripTests
         var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => service.CreateAsync(new CreateTripRequest("Rome & Amalfi", [], StartsOn, EndsOn)));
+            () => service.CreateAsync(new CreateTripRequest("Rome & Amalfi", [], StartsOn, EndsOn), TestUsers.Owner));
     }
 
     [Fact]
@@ -362,9 +362,9 @@ public sealed class TripTests
         var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
 
         var created = await service.CreateAsync(
-            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn));
+            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
 
-        var fetched = await service.GetAsync(created.Id);
+        var fetched = await service.GetAsync(created.Id, TestUsers.Owner);
 
         Assert.NotNull(fetched);
         Assert.Equal(created.Id, fetched.Id);
@@ -377,7 +377,7 @@ public sealed class TripTests
     {
         var service = new TripService(new FakeTripRepository(), TimeProvider.System);
 
-        var response = await service.GetAsync(Guid.NewGuid());
+        var response = await service.GetAsync(Guid.NewGuid(), TestUsers.Owner);
 
         Assert.Null(response);
     }
@@ -390,11 +390,11 @@ public sealed class TripTests
             Trip.Create("Kyoto", Stops("Kyoto", "Nara", "Osaka"), new DateOnly(2027, 4, 10), new DateOnly(2027, 4, 14), CreatedAt),
             Trip.Create("Rome", Stops("Rome", "Amalfi", "Naples"), new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 8), CreatedAt),
             Trip.Create("Reykjavík", Stops("Reykjavík", "Vík"), new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 3), CreatedAt)
-        ]);
+        ], TestUsers.Owner);
 
         var service = new TripService(repository, TimeProvider.System);
 
-        var trips = await service.ListAsync();
+        var trips = await service.ListAsync(TestUsers.Owner);
 
         Assert.Equal(ExpectedListOrder, trips.Select(trip => trip.Name));
     }
@@ -404,7 +404,7 @@ public sealed class TripTests
     {
         var service = new TripService(new FakeTripRepository(), TimeProvider.System);
 
-        var trips = await service.ListAsync();
+        var trips = await service.ListAsync(TestUsers.Owner);
 
         Assert.Empty(trips);
     }
@@ -415,11 +415,11 @@ public sealed class TripTests
         var repository = new FakeTripRepository(
         [
             Trip.Create("Rome & Amalfi", Route, StartsOn, EndsOn, CreatedAt)
-        ]);
+        ], TestUsers.Owner);
 
         var service = new TripService(repository, TimeProvider.System);
 
-        var trips = await service.ListAsync();
+        var trips = await service.ListAsync(TestUsers.Owner);
 
         var trip = Assert.Single(trips);
         Assert.Equal("Rome & Amalfi", trip.Name);
@@ -631,7 +631,7 @@ public sealed class TripTests
         var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
 
         var created = await service.CreateAsync(
-            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn));
+            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
 
         var response = await service.UpdateAsync(
             created.Id,
@@ -642,7 +642,8 @@ public sealed class TripTests
                     new(null, "Pompeii", null, null)
                 ],
                 StartsOn,
-                EndsOn));
+                EndsOn),
+            TestUsers.Owner);
 
         Assert.NotNull(response);
         Assert.Equal("Italy", response!.Name);
@@ -658,7 +659,8 @@ public sealed class TripTests
 
         var response = await service.UpdateAsync(
             Guid.NewGuid(),
-            new UpdateTripRequest("Rome & Amalfi", RouteUpdateRequest, StartsOn, EndsOn));
+            new UpdateTripRequest("Rome & Amalfi", RouteUpdateRequest, StartsOn, EndsOn),
+            TestUsers.Owner);
 
         Assert.Null(response);
     }
@@ -670,7 +672,7 @@ public sealed class TripTests
         var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
 
         var created = await service.CreateAsync(
-            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn));
+            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateAsync(
             created.Id,
@@ -678,13 +680,87 @@ public sealed class TripTests
                 "Changed",
                 [new(created.Destinations[0].Id, "Roma", StartsOn.AddDays(-1), null)],
                 StartsOn,
-                EndsOn)));
+                EndsOn),
+            TestUsers.Owner));
 
-        var stored = await repository.GetByIdAsync(created.Id);
+        var stored = await repository.GetForMemberAsync(created.Id, TestUsers.Owner);
 
         Assert.NotNull(stored);
         Assert.Equal("Rome & Amalfi", stored!.Name);
         Assert.Equal(["Rome", "Amalfi", "Naples"], stored.Destinations.Select(d => d.Name));
         Assert.Equal(0, repository.UpdateCallCount);
+    }
+
+    [Fact]
+    public async Task CreateAsync_MakesTheCallerTheOwner()
+    {
+        var repository = new FakeTripRepository();
+        var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
+
+        var created = await service.CreateAsync(
+            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
+
+        Assert.NotNull(await repository.GetForMemberAsync(created.Id, TestUsers.Owner));
+
+        // The owner comes from the caller, so no other account can reach it.
+        Assert.Null(await repository.GetForMemberAsync(created.Id, TestUsers.Other));
+        Assert.Null(await service.GetAsync(created.Id, TestUsers.Other));
+    }
+
+    [Fact]
+    public async Task ListAsync_ReturnsOnlyTheTripsTheAccountIsAMemberOf()
+    {
+        var repository = new FakeTripRepository(
+        [
+            Trip.Create("Kyoto", Stops("Kyoto"), new DateOnly(2027, 4, 10), new DateOnly(2027, 4, 14), CreatedAt),
+            Trip.Create("Rome", Stops("Rome"), new DateOnly(2027, 4, 1), new DateOnly(2027, 4, 8), CreatedAt)
+        ], TestUsers.Owner);
+
+        var service = new TripService(repository, TimeProvider.System);
+
+        Assert.Equal(
+            ["Rome", "Kyoto"],
+            (await service.ListAsync(TestUsers.Owner)).Select(trip => trip.Name));
+
+        Assert.Empty(await service.ListAsync(TestUsers.Other));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ReturnsNullAndWritesNothingForAnotherAccount()
+    {
+        var repository = new FakeTripRepository();
+        var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
+
+        var created = await service.CreateAsync(
+            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
+
+        var response = await service.UpdateAsync(
+            created.Id,
+            new UpdateTripRequest("Stolen", RouteUpdateRequest, StartsOn, EndsOn),
+            TestUsers.Other);
+
+        Assert.Null(response);
+        Assert.Equal(0, repository.UpdateCallCount);
+
+        var stored = await repository.GetForMemberAsync(created.Id, TestUsers.Owner);
+
+        Assert.NotNull(stored);
+        Assert.Equal("Rome & Amalfi", stored!.Name);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RemovesOnlyATripTheAccountIsAMemberOf()
+    {
+        var repository = new FakeTripRepository();
+        var service = new TripService(repository, new FixedTimeProvider(CreatedAt));
+
+        var created = await service.CreateAsync(
+            new CreateTripRequest("Rome & Amalfi", RouteRequest, StartsOn, EndsOn), TestUsers.Owner);
+
+        Assert.False(await service.DeleteAsync(created.Id, TestUsers.Other));
+        Assert.NotNull(await service.GetAsync(created.Id, TestUsers.Owner));
+
+        Assert.True(await service.DeleteAsync(created.Id, TestUsers.Owner));
+        Assert.Null(await service.GetAsync(created.Id, TestUsers.Owner));
     }
 }

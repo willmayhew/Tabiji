@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -131,5 +133,21 @@ public sealed class IdentitySetupTests
         Assert.Equal(".Tabiji.Antiforgery", options.Cookie.Name);
         Assert.True(options.Cookie.HttpOnly);
         Assert.Equal(SameSiteMode.Lax, options.Cookie.SameSite);
+    }
+
+    [Fact]
+    public void Authorization_DeniesByDefault()
+    {
+        using var factory = new EnvironmentApiFactory(Environments.Production);
+
+        var options = factory.Services.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+
+        Assert.NotNull(options.FallbackPolicy);
+
+        // An endpoint that says nothing demands an account. That is what makes
+        // a route added later protected before anybody remembers to protect it.
+        Assert.Contains(
+            options.FallbackPolicy!.Requirements,
+            requirement => requirement is DenyAnonymousAuthorizationRequirement);
     }
 }

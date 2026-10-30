@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Tabiji.Api.Identity;
 using Tabiji.Application.Trips;
 
 namespace Tabiji.Api.Endpoints;
@@ -11,20 +13,31 @@ public static class SavedPlaceEndpoints
     /// one surface that creates, changes or removes them. These routes are
     /// kept for one release so an older client can still read the places that
     /// carry a position; they never write.
+    ///
+    /// They are scoped to a member of the trip exactly as the trip routes are:
+    /// the trip id alone is not enough to read a place.
     /// </summary>
     public static IEndpointRouteBuilder MapSavedPlaceEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/trips/{tripId:guid}/places")
-            .WithTags("Saved places");
+        var group = endpoints
+            .MapGroup("/api/trips/{tripId:guid}/places")
+            .WithTags("Saved places")
+            .RequireAuthorization();
 
         group.MapGet(
             "/",
             async (
                 Guid tripId,
+                ClaimsPrincipal user,
                 SavedPlaceService placeService,
                 CancellationToken cancellationToken) =>
             {
-                var places = await placeService.ListAsync(tripId, cancellationToken);
+                if (!CurrentUser.TryGetId(user, out var viewer))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var places = await placeService.ListAsync(tripId, viewer, cancellationToken);
 
                 IResult result = places is null
                     ? Results.Problem(
@@ -42,10 +55,16 @@ public static class SavedPlaceEndpoints
             async (
                 Guid tripId,
                 Guid placeId,
+                ClaimsPrincipal user,
                 SavedPlaceService placeService,
                 CancellationToken cancellationToken) =>
             {
-                var place = await placeService.GetAsync(tripId, placeId, cancellationToken);
+                if (!CurrentUser.TryGetId(user, out var viewer))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var place = await placeService.GetAsync(tripId, placeId, viewer, cancellationToken);
 
                 IResult result = place is null
                     ? Results.Problem(

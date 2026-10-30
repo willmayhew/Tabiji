@@ -1,4 +1,6 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 using Tabiji.Infrastructure.Persistence;
 using Tabiji.Infrastructure.Persistence.Repositories;
@@ -28,6 +30,8 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     private static readonly DateOnly EndsOn = new(2027, 6, 5);
     private static readonly DateTimeOffset CreatedAt = new(2026, 10, 19, 9, 0, 0, TimeSpan.Zero);
 
+    private static readonly UserId Owner = TestUsers.Owner;
+
     private TabijiDbContext? _context;
     private TripRepository? _repository;
 
@@ -42,6 +46,31 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
         // The real migrations, so that the schema under test is the schema
         // that ships.
         await _context.Database.MigrateAsync();
+
+        // A membership names an account, and the database enforces it. The
+        // tests write trips as one account, so it has to exist first.
+        await using (var connection = new SqlConnection(ConnectionString))
+        {
+            await connection.OpenAsync();
+
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                INSERT INTO [AspNetUsers]
+                    ([Id], [UserName], [NormalizedUserName], [Email], [NormalizedEmail],
+                     [EmailConfirmed], [PasswordHash], [SecurityStamp], [ConcurrencyStamp],
+                     [PhoneNumber], [PhoneNumberConfirmed], [TwoFactorEnabled],
+                     [LockoutEnd], [LockoutEnabled], [AccessFailedCount])
+                VALUES
+                    (@id, 'owner@example.com', 'OWNER@EXAMPLE.COM',
+                     'owner@example.com', 'OWNER@EXAMPLE.COM',
+                     1, 'hash', 'stamp', 'stamp', NULL, 0, 0, NULL, 1, 0);
+                """;
+
+            command.Parameters.AddWithValue("@id", TestUsers.OwnerId);
+
+            await command.ExecuteNonQueryAsync();
+        }
 
         _repository = new TripRepository(_context);
     }
@@ -83,7 +112,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         _context!.ChangeTracker.Clear();
 
-        var reloaded = await _repository!.GetByIdAsync(trip.Id);
+        var reloaded = await _repository!.GetForMemberAsync(trip.Id, Owner);
 
         Assert.NotNull(reloaded);
 
@@ -95,7 +124,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = Japan();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
 
@@ -136,7 +165,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
             EndsOn,
             CreatedAt);
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
         var stop = Assert.Single(reloaded.StopsOf(reloaded.ParentDestinations[0].Id));
@@ -160,7 +189,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
             EndsOn,
             CreatedAt);
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var placeId = Guid.NewGuid();
         var plannedOn = new DateOnly(2027, 5, 18);
@@ -209,7 +238,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
             ],
             []);
 
-        await _repository.UpdateAsync(reloaded);
+        await _repository.UpdateAsync(reloaded, Owner);
 
         var after = await ReloadAsync(reloaded);
         var filed = Assert.Single(after.StopsOf(parent.Id));
@@ -225,7 +254,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = Japan();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var osaka = trip.Destinations[0].Id;
         var tokyo = trip.Destinations[3].Id;
@@ -241,7 +270,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
                 new TripDestinationDraft(osaka, "Osaka", new DateOnly(2027, 5, 26), new DateOnly(2027, 6, 5))
             ]);
 
-        await _repository!.UpdateAsync(trip);
+        await _repository!.UpdateAsync(trip, Owner);
 
         var reloaded = await ReloadAsync(trip);
 
@@ -260,7 +289,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = Japan();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var osaka = trip.Destinations[0].Id;
 
@@ -272,7 +301,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
                 new TripDestinationDraft(osaka, "Osaka", new DateOnly(2027, 5, 17), new DateOnly(2027, 5, 19))
             ]);
 
-        await _repository!.UpdateAsync(trip);
+        await _repository!.UpdateAsync(trip, Owner);
 
         var reloaded = await ReloadAsync(trip);
 
@@ -288,7 +317,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = Japan();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var osaka = trip.Destinations[0].Id;
 
@@ -298,7 +327,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
             EndsOn,
             [new TripDestinationDraft(osaka, "Osaka", null, null)]);
 
-        await _repository!.UpdateAsync(trip);
+        await _repository!.UpdateAsync(trip, Owner);
 
         var reloaded = await ReloadAsync(trip);
 
@@ -313,7 +342,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = Japan();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var osaka = trip.Destinations[0].Id;
 
@@ -326,7 +355,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
                 new TripDestinationDraft(null, "Nagoya", null, null)
             ]);
 
-        await _repository!.UpdateAsync(trip);
+        await _repository!.UpdateAsync(trip, Owner);
 
         var reloaded = await ReloadAsync(trip);
 
@@ -340,7 +369,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = Japan();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         trip.ApplyRoute(
             "日本",
@@ -348,7 +377,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
             EndsOn,
             [new TripDestinationDraft(trip.Destinations[0].Id, "大阪", null, null)]);
 
-        await _repository!.UpdateAsync(trip);
+        await _repository!.UpdateAsync(trip, Owner);
 
         var reloaded = await ReloadAsync(trip);
 
@@ -385,7 +414,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = JapanWithStops();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
 
@@ -405,7 +434,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = JapanWithStops();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
         var osaka = reloaded.ParentDestinations[0];
@@ -420,7 +449,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
                 Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id))),
             ]);
 
-        await _repository.UpdateAsync(reloaded);
+        await _repository.UpdateAsync(reloaded, Owner);
 
         var again = await ReloadAsync(reloaded);
 
@@ -432,7 +461,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = JapanWithStops();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
         var osaka = reloaded.ParentDestinations[0];
@@ -448,7 +477,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
                 Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id))),
             ]);
 
-        await _repository.UpdateAsync(reloaded);
+        await _repository.UpdateAsync(reloaded, Owner);
 
         var again = await ReloadAsync(reloaded);
 
@@ -462,7 +491,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = JapanWithStops();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
         var osaka = reloaded.ParentDestinations[0];
@@ -478,7 +507,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
                 Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id))),
             ]);
 
-        await _repository.UpdateAsync(reloaded);
+        await _repository.UpdateAsync(reloaded, Owner);
 
         var again = await ReloadAsync(reloaded);
 
@@ -491,7 +520,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = JapanWithStops();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
         var osaka = reloaded.ParentDestinations[0];
@@ -503,7 +532,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
             EndsOn,
             [Draft(kyoto, Drafts(reloaded.StopsOf(kyoto.Id)))]);
 
-        await _repository.UpdateAsync(reloaded);
+        await _repository.UpdateAsync(reloaded, Owner);
 
         var again = await ReloadAsync(reloaded);
 
@@ -517,7 +546,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
     {
         var trip = JapanWithStops();
 
-        await _repository!.AddAsync(trip);
+        await _repository!.AddAsync(trip, TripMember.Own(trip.Id, Owner, CreatedAt));
 
         var reloaded = await ReloadAsync(trip);
         var osaka = reloaded.ParentDestinations[0];
@@ -537,7 +566,7 @@ public sealed class TripRepositoryTests : IAsyncLifetime, IDisposable
                 Draft(kyoto, [Draft(osakaStops[0]), Draft(osakaStops[1])]),
             ]);
 
-        await _repository.UpdateAsync(reloaded);
+        await _repository.UpdateAsync(reloaded, Owner);
 
         var again = await ReloadAsync(reloaded);
 

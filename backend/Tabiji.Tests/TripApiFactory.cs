@@ -1,7 +1,10 @@
+using System.Net.Http.Json;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Tabiji.Api.Endpoints;
 using Tabiji.Application.Abstractions;
 using Tabiji.Domain.Trips;
 using Tabiji.Tests.Fakes;
@@ -11,9 +14,15 @@ namespace Tabiji.Tests;
 /// <summary>
 /// Hosts the real API with the trip repository replaced by an in-memory fake, so the
 /// endpoint tests exercise routing, status codes and JSON without needing a database.
+///
+/// The authentication cookie is replaced by a header, so a test can be a particular
+/// account. Everything else about authorization is the real thing: the fallback policy,
+/// the group policies, the antiforgery filter and the 401/404 answers.
 /// </summary>
 internal sealed class TripApiFactory : TabijiWebApplicationFactory
 {
+    private const string AntiforgeryHeader = "X-XSRF-TOKEN";
+
     private static readonly DateTimeOffset CreatedAt = new(2026, 10, 19, 9, 0, 0, TimeSpan.Zero);
 
     internal FakeTripRepository Repository { get; }
@@ -25,8 +34,32 @@ internal sealed class TripApiFactory : TabijiWebApplicationFactory
 
     internal TripApiFactory(IEnumerable<Trip> seed)
     {
-        Repository = new FakeTripRepository(seed);
+        Repository = new FakeTripRepository(seed, TestUsers.Owner);
     }
+
+    /// <summary>
+    /// A client acting as <see cref="TestUsers.Owner"/>, carrying the antiforgery
+    /// token its writes will be asked for.
+    /// </summary>
+    public new HttpClient CreateClient() => CreateClient(TestUsers.OwnerId);
+
+    /// <summary>
+    /// A client acting as the given account. The token is collected on the same
+    /// client, so the antiforgery cookie and the token stay together, and it is
+    /// collected as that account because the token embeds the account.
+    /// </summary>
+    internal HttpClient CreateClient(Guid userId)
+    {
+        var client = base.CreateClient();
+
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(AntiforgeryHeader, AntiforgeryToken(client));
+
+        return client;
+    }
+
+    /// <summary>A client with no account at all.</summary>
+    internal HttpClient CreateAnonymousClient() => base.CreateClient();
 
     protected override void ConfigureServices(IWebHostBuilder builder)
     {
@@ -34,7 +67,24 @@ internal sealed class TripApiFactory : TabijiWebApplicationFactory
         {
             services.RemoveAll<ITripRepository>();
             services.AddSingleton<ITripRepository>(Repository);
+
+            services.AddAuthentication(TestAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
+                    TestAuthHandler.SchemeName,
+                    _ => { });
         });
+    }
+
+    private static string AntiforgeryToken(HttpClient client)
+    {
+        var response = client
+            .GetFromJsonAsync<CsrfTokenResponse>("/api/auth/csrf")
+            .GetAwaiter()
+            .GetResult();
+
+        Assert.NotNull(response);
+
+        return response.Token;
     }
 
     /// <summary>

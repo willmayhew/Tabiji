@@ -1,23 +1,42 @@
+using System.Security.Claims;
+using Tabiji.Api.Identity;
 using Tabiji.Application.Trips;
 
 namespace Tabiji.Api.Endpoints;
 
+/// <summary>
+/// The trips a signed-in account may reach.
+///
+/// The group requires an account, and every operation names that account when
+/// it asks the application layer for a trip. A trip the caller is not a member
+/// of is answered exactly as a trip that does not exist, so an id cannot be
+/// used to discover somebody else's data.
+/// </summary>
 public static class TripEndpoints
 {
     public static IEndpointRouteBuilder MapTripEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/trips").WithTags("Trips");
+        var group = endpoints
+            .MapGroup("/api/trips")
+            .WithTags("Trips")
+            .RequireAuthorization();
 
         group.MapPost(
             "/",
             async (
                 CreateTripRequest request,
+                ClaimsPrincipal user,
                 TripService tripService,
                 CancellationToken cancellationToken) =>
             {
+                if (!CurrentUser.TryGetId(user, out var owner))
+                {
+                    return Results.Unauthorized();
+                }
+
                 try
                 {
-                    var trip = await tripService.CreateAsync(request, cancellationToken);
+                    var trip = await tripService.CreateAsync(request, owner, cancellationToken);
 
                     IResult result = Results.Created($"/api/trips/{trip.Id}", trip);
                     return result;
@@ -33,19 +52,26 @@ public static class TripEndpoints
                 }
             })
             .WithName("CreateTrip")
-            .WithSummary("Creates a new trip.");
+            .WithSummary("Creates a new trip, owned by the signed-in account.")
+            .RequireValidAntiforgeryToken();
 
         group.MapPut(
             "/{id:guid}",
             async (
                 Guid id,
                 UpdateTripRequest request,
+                ClaimsPrincipal user,
                 TripService tripService,
                 CancellationToken cancellationToken) =>
             {
+                if (!CurrentUser.TryGetId(user, out var actor))
+                {
+                    return Results.Unauthorized();
+                }
+
                 try
                 {
-                    var trip = await tripService.UpdateAsync(id, request, cancellationToken);
+                    var trip = await tripService.UpdateAsync(id, request, actor, cancellationToken);
 
                     IResult result = trip is null
                         ? Results.Problem(
@@ -66,28 +92,43 @@ public static class TripEndpoints
                 }
             })
             .WithName("UpdateTrip")
-            .WithSummary("Updates a trip and its route.");
+            .WithSummary("Updates a trip and its route.")
+            .RequireValidAntiforgeryToken();
 
         group.MapGet(
             "/",
-            async (TripService tripService, CancellationToken cancellationToken) =>
+            async (
+                ClaimsPrincipal user,
+                TripService tripService,
+                CancellationToken cancellationToken) =>
             {
-                var trips = await tripService.ListAsync(cancellationToken);
+                if (!CurrentUser.TryGetId(user, out var viewer))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var trips = await tripService.ListAsync(viewer, cancellationToken);
 
                 IResult result = Results.Ok(trips);
                 return result;
             })
             .WithName("ListTrips")
-            .WithSummary("Lists every trip, ordered by start date and then by name.");
+            .WithSummary("Lists the trips the signed-in account is a member of, ordered by start date and then by name.");
 
         group.MapGet(
             "/{id:guid}",
             async (
                 Guid id,
+                ClaimsPrincipal user,
                 TripService tripService,
                 CancellationToken cancellationToken) =>
             {
-                var trip = await tripService.GetAsync(id, cancellationToken);
+                if (!CurrentUser.TryGetId(user, out var viewer))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var trip = await tripService.GetAsync(id, viewer, cancellationToken);
 
                 IResult result = trip is null
                     ? Results.Problem(
@@ -104,10 +145,16 @@ public static class TripEndpoints
             "/{id:guid}",
             async (
                 Guid id,
+                ClaimsPrincipal user,
                 TripService tripService,
                 CancellationToken cancellationToken) =>
             {
-                var deleted = await tripService.DeleteAsync(id, cancellationToken);
+                if (!CurrentUser.TryGetId(user, out var actor))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var deleted = await tripService.DeleteAsync(id, actor, cancellationToken);
 
                 IResult result = deleted
                     ? Results.NoContent()
@@ -118,7 +165,8 @@ public static class TripEndpoints
                 return result;
             })
             .WithName("DeleteTrip")
-            .WithSummary("Deletes a trip and its route.");
+            .WithSummary("Deletes a trip and its route.")
+            .RequireValidAntiforgeryToken();
 
         return endpoints;
     }

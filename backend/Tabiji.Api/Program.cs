@@ -23,7 +23,12 @@ builder.Services.AddOpenApi();
 builder.Services.AddCors(options => options.AddPolicy(CorsPolicyName, policy => policy
     .WithOrigins(AllowedOrigins(builder.Configuration))
     .AllowAnyHeader()
-    .AllowAnyMethod()));
+    .AllowAnyMethod()
+    // The authentication cookie only travels on a cross-origin request that
+    // allows credentials. The development setup avoids the question with its
+    // same-origin proxy; a split-origin deployment needs this, and the origin
+    // list is explicit so a wildcard can never be combined with credentials.
+    .AllowCredentials()));
 
 // TLS ends at the reverse proxy, so the scheme and the client address have to
 // be read from the headers it forwards. Only a proxy on this machine is
@@ -41,6 +46,23 @@ var app = builder.Build();
 
 app.UseCors(CorsPolicyName);
 app.UseForwardedHeaders();
+
+// The account routes the product does not use do not exist. Answered before
+// authentication runs, so no credential is needed to learn that, and the
+// fallback policy below never has to make an exception for them.
+app.Use(async (context, next) =>
+{
+    if (UnusedIdentityEndpoints.IsUnused(context.Request.Path))
+    {
+        await Results.Problem(
+            title: "Not found",
+            statusCode: StatusCodes.Status404NotFound).ExecuteAsync(context);
+
+        return;
+    }
+
+    await next();
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -67,7 +89,8 @@ if (!builder.Configuration.GetValue(EmailDeliveryEnabledKey, false))
     });
 }
 
-app.MapOpenApi();
+app.MapOpenApi()
+    .AllowAnonymous();
 
 app.MapHealthChecks(
     "/health",
@@ -76,6 +99,7 @@ app.MapHealthChecks(
         Predicate = _ => false,
         ResponseWriter = HealthResponseWriter.WriteAsync
     })
+    .AllowAnonymous()
     .WithTags("Health")
     .WithSummary("Liveness probe. Does not touch the database.");
 
@@ -86,6 +110,7 @@ app.MapHealthChecks(
         Predicate = check => check.Tags.Contains("ready"),
         ResponseWriter = HealthResponseWriter.WriteAsync
     })
+    .AllowAnonymous()
     .WithTags("Health")
     .WithSummary("Readiness probe. Verifies that the database is reachable.");
 

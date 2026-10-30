@@ -248,6 +248,25 @@ public sealed class AuthEndpointTests : IAsyncLifetime, IDisposable
         }
     }
 
+    [DatabaseFact]
+    public async Task ManageEndpoints_AreGoneEvenWithAValidCookie()
+    {
+        using var client = _factory.CreateClient();
+        await RegisterAsync(client);
+        await LoginAsync(client);
+
+        // The finding this closes: a cookie-authenticated, state-changing
+        // route that answered without an antiforgery token. It does not exist
+        // for a signed-in caller either, and no token is needed to learn that.
+        var twoFactor = await client.PostAsync("/api/auth/manage/2fa", content: null);
+        var info = await client.GetAsync("/api/auth/manage/info");
+        var refresh = await client.PostAsync("/api/auth/refresh", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, twoFactor.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, info.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, refresh.StatusCode);
+    }
+
     private static DbContextOptions<TabijiDbContext> Options() =>
         new DbContextOptionsBuilder<TabijiDbContext>()
             .UseSqlServer(AuthApiFactory.ConnectionString)

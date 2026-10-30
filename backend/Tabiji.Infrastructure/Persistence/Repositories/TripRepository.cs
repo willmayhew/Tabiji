@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tabiji.Application.Abstractions;
+using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 
 namespace Tabiji.Infrastructure.Persistence.Repositories;
@@ -17,32 +18,65 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
     /// </summary>
     private const int ParkingOffset = 1000;
 
-    public async Task AddAsync(Trip trip, CancellationToken cancellationToken = default)
+    public async Task AddAsync(
+        Trip trip,
+        TripMember owner,
+        CancellationToken cancellationToken = default)
     {
         await dbContext.Trips.AddAsync(trip, cancellationToken);
+        await dbContext.TripMembers.AddAsync(owner, cancellationToken);
+
+        // One save, so a trip can never be written without the membership that
+        // makes it reachable.
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public Task<Trip?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<Trip?> GetForMemberAsync(
+        Guid tripId,
+        UserId member,
+        CancellationToken cancellationToken = default)
     {
+        var userId = member.Value;
+
         return dbContext.Trips
+            .Where(trip =>
+                trip.Id == tripId &&
+                dbContext.TripMembers.Any(
+                    membership => membership.TripId == trip.Id && membership.UserId == userId))
             .Include(trip => trip.Destinations.OrderBy(destination => destination.SortOrder))
-            .SingleOrDefaultAsync(trip => trip.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Trip>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Trip>> ListForMemberAsync(
+        UserId member,
+        CancellationToken cancellationToken = default)
     {
+        var userId = member.Value;
+
         return await dbContext.Trips
+            .Where(trip =>
+                dbContext.TripMembers.Any(
+                    membership => membership.TripId == trip.Id && membership.UserId == userId))
             .Include(trip => trip.Destinations.OrderBy(destination => destination.SortOrder))
             .OrderBy(trip => trip.StartsOn)
             .ThenBy(trip => trip.Name)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteForMemberAsync(
+        Guid tripId,
+        UserId actor,
+        CancellationToken cancellationToken = default)
     {
+        var userId = actor.Value;
+
+        // The membership is part of the predicate, not a check before it, so
+        // there is no window between deciding and deleting.
         var deleted = await dbContext.Trips
-            .Where(trip => trip.Id == id)
+            .Where(trip =>
+                trip.Id == tripId &&
+                dbContext.TripMembers.Any(
+                    membership => membership.TripId == trip.Id && membership.UserId == userId))
             .ExecuteDeleteAsync(cancellationToken);
 
         return deleted == 1;
@@ -50,6 +84,11 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
 
     /// <summary>
     /// Writes the trip and its route back in one go.
+    ///
+    /// Returns false, writing nothing, when the account is not a member of the
+    /// trip. A trip is normally loaded through
+    /// <see cref="GetForMemberAsync"/> first, so this is defence in depth
+    /// against a trip object that arrived some other way.
     ///
     /// The positions are moved in the database rather than through the change
     /// tracker. The tracker is asked to move a stop into a place another stop
@@ -63,8 +102,23 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
     /// The stops are updated in place rather than written afresh, so that a
     /// stop keeps its identity across an edit.
     /// </summary>
-    public async Task UpdateAsync(Trip trip, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateAsync(
+        Trip trip,
+        UserId actor,
+        CancellationToken cancellationToken = default)
     {
+        var userId = actor.Value;
+
+        var isMember = await dbContext.TripMembers
+            .AnyAsync(
+                member => member.TripId == trip.Id && member.UserId == userId,
+                cancellationToken);
+
+        if (!isMember)
+        {
+            return false;
+        }
+
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         // Change tracking is off while the route is put together, so that the
@@ -141,6 +195,8 @@ public sealed class TripRepository(TabijiDbContext dbContext) : ITripRepository
         await dbContext.SaveChangesAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
+
+        return true;
     }
 
     /// <summary>

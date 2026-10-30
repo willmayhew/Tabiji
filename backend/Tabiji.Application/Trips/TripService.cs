@@ -1,12 +1,19 @@
 using Tabiji.Application.Abstractions;
+using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 
 namespace Tabiji.Application.Trips;
 
 public sealed class TripService(ITripRepository repository, TimeProvider timeProvider)
 {
+    /// <summary>
+    /// Creates a trip and makes <paramref name="owner"/> its owner. The owner
+    /// is the account the request was authenticated as; it is never taken from
+    /// the request body.
+    /// </summary>
     public async Task<TripResponse> CreateAsync(
         CreateTripRequest request,
+        UserId owner,
         CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();
@@ -46,7 +53,7 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
             request.EndsOn,
             now);
 
-        await repository.AddAsync(trip, cancellationToken);
+        await repository.AddAsync(trip, TripMember.Own(trip.Id, owner, now), cancellationToken);
 
         return ToResponse(trip);
     }
@@ -57,14 +64,16 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
     /// The route is checked in full before anything is changed, so a request
     /// the domain refuses leaves the trip exactly as it was.
     ///
-    /// Returns null when there is no such trip.
+    /// Returns null when there is no such trip, or when the caller is not one
+    /// of its members. The two are deliberately the same answer.
     /// </summary>
     public async Task<TripResponse?> UpdateAsync(
         Guid id,
         UpdateTripRequest request,
+        UserId actor,
         CancellationToken cancellationToken = default)
     {
-        var trip = await repository.GetByIdAsync(id, cancellationToken);
+        var trip = await repository.GetForMemberAsync(id, actor, cancellationToken);
 
         if (trip is null)
         {
@@ -122,28 +131,36 @@ public sealed class TripService(ITripRepository repository, TimeProvider timePro
             destinations,
             places);
 
-        await repository.UpdateAsync(trip, cancellationToken);
+        var written = await repository.UpdateAsync(trip, actor, cancellationToken);
 
-        return ToResponse(trip);
+        return written ? ToResponse(trip) : null;
     }
 
-    public async Task<TripResponse?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<TripResponse?> GetAsync(
+        Guid id,
+        UserId viewer,
+        CancellationToken cancellationToken = default)
     {
-        var trip = await repository.GetByIdAsync(id, cancellationToken);
+        var trip = await repository.GetForMemberAsync(id, viewer, cancellationToken);
 
         return trip is null ? null : ToResponse(trip);
     }
 
-    public async Task<IReadOnlyList<TripResponse>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TripResponse>> ListAsync(
+        UserId viewer,
+        CancellationToken cancellationToken = default)
     {
-        var trips = await repository.ListAsync(cancellationToken);
+        var trips = await repository.ListForMemberAsync(viewer, cancellationToken);
 
         return trips.Select(ToResponse).ToArray();
     }
 
-    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<bool> DeleteAsync(
+        Guid id,
+        UserId actor,
+        CancellationToken cancellationToken = default)
     {
-        return repository.DeleteAsync(id, cancellationToken);
+        return repository.DeleteForMemberAsync(id, actor, cancellationToken);
     }
 
     /// <summary>

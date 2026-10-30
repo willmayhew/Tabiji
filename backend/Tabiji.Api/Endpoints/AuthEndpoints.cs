@@ -26,7 +26,13 @@ public static class AuthEndpoints
 
         // register, login, refresh, confirmEmail, resendConfirmationEmail,
         // forgotPassword, resetPassword and manage/*, all under this prefix.
-        group.MapIdentityApi<AppUser>();
+        //
+        // They are public by design: registration, sign-in and the email
+        // routes carry no cookie yet, so there is nothing to require. The two
+        // surfaces that are not public — the token refresh and manage/* —
+        // never reach an endpoint: Program.cs answers them 404 before
+        // authentication runs.
+        group.MapIdentityApi<AppUser>().AllowAnonymous();
 
         group.MapGet(
             "/session",
@@ -78,6 +84,10 @@ public static class AuthEndpoints
             })
             .WithName("Logout")
             .WithSummary("Clears the authentication cookie.")
+            // Clearing a cookie that is already gone is not an error, and the
+            // token is what proves the request came from the page that holds
+            // the cookie. No account is required beyond that.
+            .AllowAnonymous()
             .RequireValidAntiforgeryToken();
 
         return endpoints;

@@ -1,4 +1,5 @@
 using Tabiji.Application.Abstractions;
+using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 
 namespace Tabiji.Application.Trips;
@@ -20,13 +21,15 @@ public sealed class SavedPlaceService(ITripRepository trips)
 {
     /// <summary>
     /// The places of a trip that carry a position, in the order they were
-    /// saved and then by name. Returns null when there is no such trip.
+    /// saved and then by name. Returns null when there is no such trip, or the
+    /// caller is not one of its members.
     /// </summary>
     public async Task<IReadOnlyList<SavedPlaceResponse>?> ListAsync(
         Guid tripId,
+        UserId viewer,
         CancellationToken cancellationToken = default)
     {
-        var trip = await trips.GetByIdAsync(tripId, cancellationToken);
+        var trip = await trips.GetForMemberAsync(tripId, viewer, cancellationToken);
 
         if (trip is null)
         {
@@ -38,14 +41,16 @@ public sealed class SavedPlaceService(ITripRepository trips)
 
     /// <summary>
     /// One place of a trip, or null when the trip has no such place with a
-    /// position. A place belonging to a different trip is answered as null.
+    /// position, or the caller is not one of the trip's members. A place
+    /// belonging to a different trip is answered as null.
     /// </summary>
     public async Task<SavedPlaceResponse?> GetAsync(
         Guid tripId,
         Guid placeId,
+        UserId viewer,
         CancellationToken cancellationToken = default)
     {
-        var trip = await trips.GetByIdAsync(tripId, cancellationToken);
+        var trip = await trips.GetForMemberAsync(tripId, viewer, cancellationToken);
 
         if (trip is null)
         {
