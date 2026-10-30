@@ -1,9 +1,21 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { SessionService } from '../../core/auth/session.service';
 import { Trip } from '../../core/models/trip';
 import { Home } from './home';
+
+/** A stand-in for the session, so the screen's state is chosen by the test. */
+function session(authenticated: boolean) {
+  return {
+    isReady: signal(true),
+    isAuthenticated: signal(authenticated),
+    user: signal(authenticated ? { id: 'user-1', email: 'traveller@example.com' } : null),
+    markSignedOut: vi.fn(),
+  };
+}
 
 const journeys: Trip[] = [
   {
@@ -38,7 +50,12 @@ describe('Home', () => {
 
     await TestBed.configureTestingModule({
       imports: [Home],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: SessionService, useValue: session(true) },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Home);
@@ -132,5 +149,59 @@ describe('Home', () => {
     fixture.detectChanges();
 
     expect(element().querySelector('img')).toBeNull();
+  });
+});
+
+describe('Home — signed out', () => {
+  let fixture: ComponentFixture<Home>;
+  let http: HttpTestingController;
+
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
+
+    await TestBed.configureTestingModule({
+      imports: [Home],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: SessionService, useValue: session(false) },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(Home);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  function element(): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  function expectHealthRequests(): void {
+    http.expectOne('/health').flush({ status: 'Healthy', totalDurationMilliseconds: 1, checks: [] });
+    http.expectOne('/health/ready').flush({
+      status: 'Healthy',
+      totalDurationMilliseconds: 1,
+      checks: [],
+    });
+  }
+
+  it('should keep the health strip and invite a sign-in for the journeys', () => {
+    fixture.detectChanges();
+
+    expectHealthRequests();
+
+    // The journey index is private, so it is not asked for at all.
+    http.expectNone('/api/trips');
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Healthy');
+    expect(element().textContent).toContain('Your journeys are private to your account');
+
+    const link = element().querySelector('.journeys a.link-arrow') as HTMLAnchorElement;
+
+    expect(link.getAttribute('href')).toBe('/login?returnUrl=%2F');
   });
 });

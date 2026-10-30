@@ -106,6 +106,24 @@ describe('TripDetail', () => {
     fixture.detectChanges();
   });
 
+  it('should invite a sign-in when the API refuses the request', () => {
+    createComponent(trip.id);
+
+    http
+      .expectOne(`/api/trips/${trip.id}`)
+      .flush('expired', { status: 401, statusText: 'Unauthorized' });
+
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Sign in to carry on');
+    expect(element().textContent).toContain('Sign in to open this trip');
+    expect(element().querySelector('article.detail')).toBeNull();
+
+    const link = element().querySelector('app-sign-in-prompt a.button') as HTMLAnchorElement;
+
+    expect(link.getAttribute('href')).toBe(`/login?returnUrl=%2Ftrips%2F${trip.id}`);
+  });
+
   it('should show the trip', () => {
     showTrip();
 

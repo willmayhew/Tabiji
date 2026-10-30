@@ -20,6 +20,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router, RouterLink } from '@angular/router';
 import type { PlaceCategory } from '../../core/models/place';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
@@ -95,13 +96,14 @@ interface PickerTarget {
  */
 @Component({
   selector: 'app-trip-form',
-  imports: [ReactiveFormsModule, LocationPicker],
+  imports: [ReactiveFormsModule, LocationPicker, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-form.html',
   styleUrl: './trip-form.css',
 })
 export class TripForm {
   private readonly tripsService = inject(TripsService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly formBuilder = inject(NonNullableFormBuilder);
 
@@ -157,6 +159,7 @@ export class TripForm {
         error: (failure: HttpErrorResponse) => {
           this.deleting.set(false);
           this.error.set(describeHttpError(failure));
+          this.sessionExpired.set(failure.status === 401);
         },
     });
   }
@@ -181,6 +184,16 @@ export class TripForm {
 
   readonly error = signal<string | null>(null);
   readonly success = signal<string | null>(null);
+
+  /**
+   * Set when a write was refused for want of a session. The form keeps what
+   * the reader entered and offers the way back in, rather than throwing the
+   * page away and losing it.
+   */
+  protected readonly sessionExpired = signal(false);
+
+  /** Where signing in comes back to. */
+  protected readonly returnUrl = this.router.url;
 
   /** What the reader is told after a place is added, removed or moved. */
   protected readonly announcement = signal<string | null>(null);
@@ -393,12 +406,14 @@ export class TripForm {
     this.submitted.set(false);
     this.deleting.set(false);
     this.error.set(null);
+    this.sessionExpired.set(false);
     this.success.set(null);
   }
 
   protected submit(): void {
     this.submitted.set(true);
     this.error.set(null);
+    this.sessionExpired.set(false);
     this.success.set(null);
 
     if (this.form.invalid) {
@@ -427,6 +442,7 @@ export class TripForm {
           error: (failure: HttpErrorResponse) => {
             this.submitting.set(false);
             this.error.set(describeHttpError(failure));
+            this.sessionExpired.set(failure.status === 401);
           },
         });
 

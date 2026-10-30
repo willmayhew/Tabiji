@@ -405,6 +405,13 @@
 
   @if (error(); as message) {
     <p class="field-error field-error--api" role="alert">{{ message }}</p>
+    @if (sessionExpired()) {
+      <p class="field-error field-error--api">
+        <a class="link-arrow" [routerLink]="['/login']" [queryParams]="{ returnUrl: returnUrl }">
+          Sign in again
+        </a>
+      </p>
+    }
   }
 
   @if (success(); as message) {

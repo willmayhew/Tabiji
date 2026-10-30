@@ -20,52 +20,59 @@
     </div>
   </div>
 
-  @if (error(); as message) {
-    <div class="callout callout--danger">
-      <p>{{ message }}</p>
-      <button type="button" class="button" (click)="load()">Try again</button>
-    </div>
-  }
+  @if (signedOut()) {
+    <app-sign-in-prompt
+      returnUrl="/trips"
+      message="Sign in to see the trips on your account. They are private to you."
+    />
+  } @else {
+    @if (error(); as message) {
+      <div class="callout callout--danger">
+        <p>{{ message }}</p>
+        <button type="button" class="button" (click)="load()">Try again</button>
+      </div>
+    }
 
-  @if (loading()) {
-    <p class="visually-hidden">Loading trips</p>
-    <ul class="trip-grid" aria-busy="true">
-      @for (slot of skeletonSlots; track slot) {
-        <li class="trip-skeleton">
-          <span class="skeleton trip-skeleton__plate"></span>
-          <span class="skeleton trip-skeleton__line"></span>
-          <span class="skeleton trip-skeleton__line trip-skeleton__line--short"></span>
-        </li>
-      }
-    </ul>
-  } @else if (!error() && trips().length === 0) {
-    <div class="empty-state">
-      <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
-        <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
-        <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
-        <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
-        <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
-      </svg>
-      <h2 class="empty-state__title">No trips yet</h2>
-      <p class="empty-state__body">
-        Create the first one. Give it a name, a route and the dates you have in mind.
-      </p>
-      <a class="button" routerLink="/trips/new">Plan your first trip</a>
-    </div>
-  } @else if (!error()) {
-    <h2 class="visually-hidden">Trips</h2>
-    <ul class="trip-grid">
-      @for (trip of trips(); track trip.id; let first = $first) {
-        <li [class.trip-grid__item--feature]="first">
-          <a class="trip-link" [routerLink]="['/trips', trip.id]">
-            <app-trip-card
-              [trip]="trip"
-              [index]="$index + 1"
-              [aspect]="first ? 'band' : 'card'"
-            />
-          </a>
-        </li>
-      }
-    </ul>
+    @if (loading()) {
+      <p class="visually-hidden">Loading trips</p>
+      <ul class="trip-grid" aria-busy="true">
+        @for (slot of skeletonSlots; track slot) {
+          <li class="trip-skeleton">
+            <span class="skeleton trip-skeleton__plate"></span>
+            <span class="skeleton trip-skeleton__line"></span>
+            <span class="skeleton trip-skeleton__line trip-skeleton__line--short"></span>
+          </li>
+        }
+      </ul>
+    } @else if (!error() && trips().length === 0) {
+      <div class="empty-state">
+        <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
+          <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+          <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
+          <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
+          <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />
+        </svg>
+        <h2 class="empty-state__title">No trips yet</h2>
+        <p class="empty-state__body">
+          Create the first one. Give it a name, a route and the dates you have in mind.
+        </p>
+        <a class="button" routerLink="/trips/new">Plan your first trip</a>
+      </div>
+    } @else if (!error()) {
+      <h2 class="visually-hidden">Trips</h2>
+      <ul class="trip-grid">
+        @for (trip of trips(); track trip.id; let first = $first) {
+          <li [class.trip-grid__item--feature]="first">
+            <a class="trip-link" [routerLink]="['/trips', trip.id]">
+              <app-trip-card
+                [trip]="trip"
+                [index]="$index + 1"
+                [aspect]="first ? 'band' : 'card'"
+              />
+            </a>
+          </li>
+        }
+      </ul>
+    }
   }
 </section>

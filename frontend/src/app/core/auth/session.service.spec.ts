@@ -50,6 +50,25 @@ describe('SessionService', () => {
     expect(service.isAuthenticated()).toBe(false);
   });
 
+  it('should forget the account and the token when a request is refused', () => {
+    service.restore();
+    http.expectOne('/api/auth/session').flush({ authenticated: true, user: account });
+
+    const csrf = TestBed.inject(CsrfTokenService);
+    csrf.load().subscribe();
+    http.expectOne('/api/auth/csrf').flush({ token: 'abc' });
+
+    service.markSignedOut();
+
+    // The cookie is HttpOnly, so only the API can clear it; the screen must
+    // still stop believing it is signed in, and stop sending the token that
+    // was collected for that account.
+    expect(service.isReady()).toBe(true);
+    expect(service.isAuthenticated()).toBe(false);
+    expect(service.user()).toBeNull();
+    expect(csrf.token()).toBeNull();
+  });
+
   it('should read the account back after signing in', () => {
     let finished = false;
 

@@ -65,7 +65,14 @@
       }
     </div>
 
-    @if (tripsLoading()) {
+    @if (tripsSignedOut()) {
+      <div class="journeys__empty">
+        <p class="muted">Your journeys are private to your account.</p>
+        <a class="link-arrow" routerLink="/login" [queryParams]="{ returnUrl: '/' }">
+          Sign in to see them
+        </a>
+      </div>
+    } @else if (tripsLoading()) {
       <p class="visually-hidden">Loading journeys</p>
       <ul class="journey-list" aria-busy="true">
         @for (slot of [0, 1, 2]; track slot) {

@@ -1,9 +1,21 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { SessionService } from '../../core/auth/session.service';
 import { Trip } from '../../core/models/trip';
 import { TripCreate } from './trip-create';
+
+/** A stand-in for the session, so the screen's state is chosen by the test. */
+function session(authenticated: boolean) {
+  return {
+    isReady: signal(true),
+    isAuthenticated: signal(authenticated),
+    user: signal(authenticated ? { id: 'user-1', email: 'traveller@example.com' } : null),
+    markSignedOut: vi.fn(),
+  };
+}
 
 const created: Trip = {
   id: '5f2b1c4e-0000-0000-0000-000000000000',
@@ -27,7 +39,12 @@ describe('TripCreate', () => {
 
     await TestBed.configureTestingModule({
       imports: [TripCreate],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: SessionService, useValue: session(true) },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(TripCreate);
@@ -121,5 +138,44 @@ describe('TripCreate', () => {
     expect(navigate).toHaveBeenCalledWith(['/trips', created.id]);
 
     vi.useRealTimers();
+  });
+});
+
+describe('TripCreate — signed out', () => {
+  let fixture: ComponentFixture<TripCreate>;
+  let http: HttpTestingController;
+
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
+
+    await TestBed.configureTestingModule({
+      imports: [TripCreate],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: SessionService, useValue: session(false) },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(TripCreate);
+    http = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+  });
+
+  afterEach(() => http.verify());
+
+  function element(): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('should invite a sign-in instead of showing the form', () => {
+    expect(element().querySelector('form')).toBeNull();
+    expect(element().textContent).toContain('Sign in to carry on');
+    expect(element().textContent).toContain('Sign in to start a trip');
+
+    const link = element().querySelector('app-sign-in-prompt a.button') as HTMLAnchorElement;
+
+    expect(link.getAttribute('href')).toBe('/login?returnUrl=%2Ftrips%2Fnew');
   });
 });

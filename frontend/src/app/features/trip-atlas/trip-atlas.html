@@ -1,7 +1,13 @@
 <section class="panel">
   <a class="back-link" [routerLink]="['/trips', tripId()]">&larr; Back to the trip</a>
 
-  @if (loading()) {
+  @if (signedOut()) {
+    <app-sign-in-prompt
+      [level]="1"
+      [returnUrl]="returnUrl()"
+      message="Sign in to open the atlas. This trip is private to its owner."
+    />
+  } @else if (loading()) {
     <div class="atlas__loading">
       <p class="muted">Loading the atlas&hellip;</p>
       <span class="skeleton atlas__skeleton-map"></span>

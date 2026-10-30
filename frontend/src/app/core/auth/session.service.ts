@@ -8,9 +8,9 @@ import { CsrfTokenService } from './csrf-token.service';
 /**
  * Who the browser is signed in as.
  *
- * The first stateful service in the app: a signal the header reads, and the
- * three things that change it. Everything else in Tabiji is still anonymous,
- * so nothing protects a route on the strength of this yet.
+ * A signal the header and the trip screens read, and the things that change
+ * it. Trips are private to their owner, so the API is the boundary: this is
+ * what the screens use to decide whether to ask for anything at all.
  */
 @Injectable({ providedIn: 'root' })
 export class SessionService {
@@ -63,6 +63,20 @@ export class SessionService {
       }),
       map(() => undefined),
     );
+  }
+
+  /**
+   * Forgets the session locally after the API has refused a request.
+   *
+   * The cookie may still be in the browser — it is HttpOnly, so only the API
+   * can clear it — but the screen stops believing it is signed in, the header
+   * offers a way back in, and the token collected for that account is
+   * discarded rather than sent again.
+   */
+  markSignedOut(): void {
+    this.currentUser.set(null);
+    this.ready.set(true);
+    this.csrf.forget();
   }
 
   /**

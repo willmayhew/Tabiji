@@ -22,6 +22,10 @@ export function describeHttpError(failure: HttpErrorResponse): string {
     return 'Your session has expired. Sign in again.';
   }
 
+  if (failure.status === 403) {
+    return 'You do not have access to this trip.';
+  }
+
   if (failure.status === 429) {
     return 'Too many attempts. Wait a minute and try again.';
   }

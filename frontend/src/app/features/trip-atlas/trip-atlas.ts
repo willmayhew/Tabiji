@@ -13,6 +13,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
+import { SessionService } from '../../core/auth/session.service';
 import {
   stopsOf,
   Trip,
@@ -28,6 +29,7 @@ import { formatTripDates } from '../../shared/format/trip-dates';
 import { stopLabel } from '../../shared/format/place-labels';
 import { AtlasSelection } from '../../shared/map/map-engine';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
+import { SignInPrompt } from '../../shared/ui/sign-in-prompt';
 import { DestinationEditor, NewPlaceDraft } from './destination-editor';
 import { StopDraft, StopEditor } from './stop-editor';
 import { TripAtlasList } from './trip-atlas-list';
@@ -38,6 +40,7 @@ interface AtlasResult {
   trip: Trip | null;
   error: string | null;
   notFound: boolean;
+  signedOut: boolean;
 }
 
 /**
@@ -64,6 +67,7 @@ interface AtlasResult {
   imports: [
     RouterLink,
     StatusBadge,
+    SignInPrompt,
     StopEditor,
     DestinationEditor,
     TripAtlasMap,
@@ -76,6 +80,7 @@ interface AtlasResult {
 })
 export class TripAtlas {
   private readonly tripsService = inject(TripsService);
+  private readonly session = inject(SessionService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -87,6 +92,9 @@ export class TripAtlas {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly notFound = signal(false);
+
+  /** Set when the API refused the request for want of a session. */
+  readonly signedOut = signal(false);
 
   /** The destination, stop or legacy place the map and the list agree is selected. */
   readonly selection = signal<AtlasSelection | null>(null);
@@ -125,6 +133,7 @@ export class TripAtlas {
           this.trip.set(null);
           this.error.set(null);
           this.notFound.set(false);
+          this.signedOut.set(false);
           this.selection.set(null);
           this.expanded.set(new Set());
           this.destinationEditorOpen.set(false);
@@ -142,12 +151,18 @@ export class TripAtlas {
             startWith(undefined),
             switchMap(() =>
               this.tripsService.getById(id).pipe(
-                map((trip): AtlasResult => ({ trip, error: null, notFound: false })),
+                map((trip): AtlasResult => ({
+                  trip,
+                  error: null,
+                  notFound: false,
+                  signedOut: false,
+                })),
                 catchError((failure: HttpErrorResponse) =>
                   of<AtlasResult>({
                     trip: null,
                     error: describeHttpError(failure),
                     notFound: failure.status === 404,
+                    signedOut: failure.status === 401,
                   }),
                 ),
               ),
@@ -160,7 +175,12 @@ export class TripAtlas {
         this.trip.set(result.trip);
         this.error.set(result.error);
         this.notFound.set(result.notFound);
+        this.signedOut.set(result.signedOut);
         this.loading.set(false);
+
+        if (result.signedOut) {
+          this.session.markSignedOut();
+        }
 
         if (result.trip !== null) {
           this.pruneExpanded(result.trip);
@@ -170,6 +190,9 @@ export class TripAtlas {
 
   /** The trip's id, so the way back works even before the trip has loaded. */
   protected readonly tripId = computed(() => this.trip()?.id ?? this.routeId());
+
+  /** Where signing in comes back to. */
+  protected readonly returnUrl = computed(() => `/trips/${this.tripId()}/atlas`);
 
   protected readonly dates = computed(() => {
     const trip = this.trip();

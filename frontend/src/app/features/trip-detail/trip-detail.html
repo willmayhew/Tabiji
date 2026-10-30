@@ -1,7 +1,13 @@
 <section class="panel">
   <a class="back-link" routerLink="/trips">&larr; All trips</a>
 
-  @if (loading()) {
+  @if (signedOut()) {
+    <app-sign-in-prompt
+      [level]="1"
+      [returnUrl]="returnUrl()"
+      message="Sign in to open this trip. It is private to its owner."
+    />
+  } @else if (loading()) {
     <p class="muted">Loading trip&hellip;</p>
   } @else if (notFound()) {
     <div class="empty-state">

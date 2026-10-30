@@ -1,11 +1,19 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, forkJoin, of } from 'rxjs';
 import { HealthService } from '../../core/api/health.service';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
+import { SessionService } from '../../core/auth/session.service';
 import { HealthReport, HealthStatus } from '../../core/models/health-status';
 import { Trip } from '../../core/models/trip';
 import { formatTripDates } from '../../shared/format/trip-dates';
@@ -22,6 +30,7 @@ import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 export class Home {
   private readonly healthService = inject(HealthService);
   private readonly tripsService = inject(TripsService);
+  private readonly session = inject(SessionService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly liveness = signal<HealthReport | null>(null);
@@ -34,9 +43,30 @@ export class Home {
   protected readonly tripsLoading = signal(true);
   protected readonly tripsError = signal<string | null>(null);
 
+  /** Set when nobody is signed in: the index invites a sign-in instead. */
+  protected readonly tripsSignedOut = signal(false);
+
   constructor() {
     this.refresh();
-    this.loadTrips();
+
+    // The index is private to the account, so it waits for the session probe
+    // rather than asking for trips the API would refuse.
+    effect(() => {
+      if (!this.session.isReady()) {
+        return;
+      }
+
+      if (!this.session.isAuthenticated()) {
+        this.trips.set([]);
+        this.tripsError.set(null);
+        this.tripsLoading.set(false);
+        this.tripsSignedOut.set(true);
+        return;
+      }
+
+      this.tripsSignedOut.set(false);
+      this.loadTrips();
+    });
   }
 
   protected refresh(): void {
@@ -79,8 +109,15 @@ export class Home {
           this.tripsLoading.set(false);
         },
         error: (failure: HttpErrorResponse) => {
-          this.tripsError.set(describeHttpError(failure));
           this.tripsLoading.set(false);
+
+          if (failure.status === 401) {
+            this.session.markSignedOut();
+            this.tripsSignedOut.set(true);
+            return;
+          }
+
+          this.tripsError.set(describeHttpError(failure));
         },
       });
   }

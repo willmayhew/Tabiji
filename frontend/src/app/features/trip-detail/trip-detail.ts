@@ -13,27 +13,31 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, Subject, switchMap, tap } from 'rxjs';
 import { describeHttpError } from '../../core/api/http-error';
 import { TripsService } from '../../core/api/trips.service';
+import { SessionService } from '../../core/auth/session.service';
 import { Trip, TripDestination, TripStatus } from '../../core/models/trip';
 import { formatDestinationDates, formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
 import { routeSummary } from '../../shared/format/trip-destinations';
 import { TripForm } from '../../shared/form/trip-form';
+import { SignInPrompt } from '../../shared/ui/sign-in-prompt';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 interface TripDetailResult {
   trip: Trip | null;
   error: string | null;
   notFound: boolean;
+  signedOut: boolean;
 }
 
 @Component({
   selector: 'app-trip-detail',
-  imports: [RouterLink, StatusBadge, TripForm],
+  imports: [RouterLink, StatusBadge, TripForm, SignInPrompt],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './trip-detail.html',
   styleUrl: './trip-detail.css',
 })
 export class TripDetail {
   private readonly tripsService = inject(TripsService);
+  private readonly session = inject(SessionService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -45,6 +49,15 @@ export class TripDetail {
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly notFound = signal(false);
+
+  /** Set when the API refused the request for want of a session. */
+  readonly signedOut = signal(false);
+
+  /** The trip's id, so the way back works even before the trip has loaded. */
+  private readonly routeId = signal('');
+
+  /** Where signing in comes back to. */
+  protected readonly returnUrl = computed(() => `/trips/${this.routeId()}`);
 
   /** Whether the trip is being changed. */
   readonly editing = signal(false);
@@ -63,21 +76,33 @@ export class TripDetail {
           this.trip.set(null);
           this.error.set(null);
           this.notFound.set(false);
+          this.signedOut.set(false);
           this.editing.set(false);
           this.deleted.set(false);
         }),
-        map((params) => params.get('id') ?? ''),
+        map((params) => {
+          const id = params.get('id') ?? '';
+          this.routeId.set(id);
+
+          return id;
+        }),
         switchMap((id) =>
           this.retry.pipe(
             startWith(undefined),
             switchMap(() =>
               this.tripsService.getById(id).pipe(
-                map((trip): TripDetailResult => ({ trip, error: null, notFound: false })),
+                map((trip): TripDetailResult => ({
+                  trip,
+                  error: null,
+                  notFound: false,
+                  signedOut: false,
+                })),
                 catchError((failure: HttpErrorResponse) =>
                   of<TripDetailResult>({
                     trip: null,
                     error: describeHttpError(failure),
                     notFound: failure.status === 404,
+                    signedOut: failure.status === 401,
                   }),
                 ),
               ),
@@ -90,7 +115,12 @@ export class TripDetail {
         this.trip.set(result.trip);
         this.error.set(result.error);
         this.notFound.set(result.notFound);
+        this.signedOut.set(result.signedOut);
         this.loading.set(false);
+
+        if (result.signedOut) {
+          this.session.markSignedOut();
+        }
       });
   }
 

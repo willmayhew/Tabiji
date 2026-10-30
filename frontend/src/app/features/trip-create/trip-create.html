@@ -12,7 +12,17 @@
     </div>
 
     <div class="create__form">
-      <app-trip-form (saved)="onCreated($event)" />
+      @if (!isReady()) {
+        <p class="muted">Loading&hellip;</p>
+      } @else if (signedOut()) {
+        <app-sign-in-prompt
+          [level]="1"
+          returnUrl="/trips/new"
+          message="Sign in to start a trip. It will be private to your account."
+        />
+      } @else {
+        <app-trip-form (saved)="onCreated($event)" />
+      }
     </div>
 
     <aside class="create__aside">

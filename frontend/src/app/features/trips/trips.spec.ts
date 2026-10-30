@@ -1,9 +1,21 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { SessionService } from '../../core/auth/session.service';
 import { Trip } from '../../core/models/trip';
 import { Trips } from './trips';
+
+/** A stand-in for the session, so the screen's state is chosen by the test. */
+function session(authenticated: boolean) {
+  return {
+    isReady: signal(true),
+    isAuthenticated: signal(authenticated),
+    user: signal(authenticated ? { id: 'user-1', email: 'traveller@example.com' } : null),
+    markSignedOut: vi.fn(),
+  };
+}
 
 const tokyo: Trip = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -37,7 +49,12 @@ describe('Trips', () => {
 
     await TestBed.configureTestingModule({
       imports: [Trips],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: SessionService, useValue: session(true) },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Trips);
@@ -152,5 +169,62 @@ describe('Trips', () => {
     fixture.detectChanges();
 
     expect(element().querySelector('img')).toBeNull();
+  });
+});
+
+describe('Trips — signed out', () => {
+  let fixture: ComponentFixture<Trips>;
+  let http: HttpTestingController;
+  let current: ReturnType<typeof session>;
+
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
+
+    current = session(false);
+
+    await TestBed.configureTestingModule({
+      imports: [Trips],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: SessionService, useValue: current },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(Trips);
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  function element(): HTMLElement {
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('should invite a sign-in and ask the API for nothing', () => {
+    fixture.detectChanges();
+
+    // The API is the boundary; this only avoids a request it would refuse.
+    http.expectNone('/api/trips');
+
+    expect(element().textContent).toContain('Sign in to carry on');
+    expect(element().textContent).toContain('Sign in to see the trips on your account');
+
+    const link = element().querySelector('app-sign-in-prompt a.button') as HTMLAnchorElement;
+
+    expect(link.getAttribute('href')).toBe('/login?returnUrl=%2Ftrips');
+  });
+
+  it('should invite a sign-in when the API refuses an expired session', () => {
+    current.isAuthenticated.set(true);
+    fixture.detectChanges();
+
+    http.expectOne('/api/trips').flush('expired', { status: 401, statusText: 'Unauthorized' });
+    fixture.detectChanges();
+
+    expect(current.markSignedOut).toHaveBeenCalled();
+    expect(element().textContent).toContain('Sign in to carry on');
+    expect(element().textContent).not.toContain('Your session has expired');
   });
 });
