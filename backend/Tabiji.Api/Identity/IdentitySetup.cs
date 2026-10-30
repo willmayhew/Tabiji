@@ -19,6 +19,13 @@ public static class IdentitySetup
 {
     public const string RateLimitPolicyName = "auth";
 
+    /// <summary>
+    /// The bucket for issuing invitations. It is separate from the account
+    /// bucket because it is never a credential check and is already restricted
+    /// to a trip's owners.
+    /// </summary>
+    public const string InvitationRateLimitPolicyName = "invitations";
+
     private const string UnknownAddress = "unknown";
 
     public static IServiceCollection AddTabijiIdentity(
@@ -125,6 +132,21 @@ public static class IdentitySetup
                     {
                         PermitLimit = permitLimit,
                         Window = window,
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
+            });
+
+            options.AddPolicy(InvitationRateLimitPolicyName, context =>
+            {
+                var path = context.Request.Path.Value ?? string.Empty;
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    (context.Connection.RemoteIpAddress?.ToString() ?? UnknownAddress, path),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 20,
+                        Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0,
                         AutoReplenishment = true
                     });

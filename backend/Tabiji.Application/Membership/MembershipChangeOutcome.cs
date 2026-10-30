@@ -13,5 +13,6 @@ public enum MembershipChangeOutcome
     NotFound = 1,
     Forbidden = 2,
     LastOwner = 3,
-    InvalidRole = 4
+    InvalidRole = 4,
+    MemberNotFound = 5
 }

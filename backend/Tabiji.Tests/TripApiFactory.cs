@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -25,6 +26,8 @@ internal sealed class TripApiFactory : TabijiWebApplicationFactory
 
     private static readonly DateTimeOffset CreatedAt = new(2026, 10, 19, 9, 0, 0, TimeSpan.Zero);
 
+    private readonly string? _environment;
+
     internal FakeTripRepository Repository { get; }
 
     internal TripApiFactory()
@@ -33,8 +36,33 @@ internal sealed class TripApiFactory : TabijiWebApplicationFactory
     }
 
     internal TripApiFactory(IEnumerable<Trip> seed)
+        : this(seed, null)
+    {
+    }
+
+    /// <summary>
+    /// The same host in a chosen environment, for the rules that differ
+    /// between Development and Production.
+    /// </summary>
+    internal TripApiFactory(string environment)
+        : this(DefaultSeed, environment)
+    {
+    }
+
+    private TripApiFactory(IEnumerable<Trip> seed, string? environment)
     {
         Repository = new FakeTripRepository(seed, TestUsers.Owner);
+        _environment = environment;
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+
+        if (_environment is not null)
+        {
+            builder.UseEnvironment(_environment);
+        }
     }
 
     /// <summary>
@@ -52,10 +80,32 @@ internal sealed class TripApiFactory : TabijiWebApplicationFactory
     {
         var client = base.CreateClient();
 
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
-        client.DefaultRequestHeaders.Add(AntiforgeryHeader, AntiforgeryToken(client));
+        AddIdentityHeaders(client, userId);
 
         return client;
+    }
+
+    /// <summary>
+    /// The same client over a chosen address. Production sets its cookies
+    /// <c>Secure</c>, so a test of a Production rule has to speak HTTPS for the
+    /// antiforgery cookie to come back.
+    /// </summary>
+    internal HttpClient CreateClient(Guid userId, Uri baseAddress)
+    {
+        var client = base.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = baseAddress,
+        });
+
+        AddIdentityHeaders(client, userId);
+
+        return client;
+    }
+
+    private static void AddIdentityHeaders(HttpClient client, Guid userId)
+    {
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(AntiforgeryHeader, AntiforgeryToken(client));
     }
 
     /// <summary>A client with no account at all.</summary>

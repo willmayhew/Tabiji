@@ -175,7 +175,7 @@ public sealed class TripMembershipRepository(TabijiDbContext dbContext) : ITripM
 
         target = members.SingleOrDefault(candidate => candidate.UserId == member.Value);
 
-        return target is null ? MembershipChangeOutcome.NotFound : null;
+        return target is null ? MembershipChangeOutcome.MemberNotFound : null;
     }
 
     private static int OwnerCount(IReadOnlyList<TripMember> members) =>

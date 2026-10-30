@@ -6,7 +6,8 @@ namespace Tabiji.Tests;
 /// The accounts the tests act as.
 ///
 /// A trip is private to its owner, so a test that signs in has to name one.
-/// Two is enough: an owner and somebody who must never see the owner's trips.
+/// Three is enough for collaboration: the owner, an invitee, and somebody who
+/// must never see the trip at all.
 /// </summary>
 internal static class TestUsers
 {
@@ -14,7 +15,11 @@ internal static class TestUsers
 
     internal static readonly Guid OtherId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
+    internal static readonly Guid StrangerId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+
     internal static readonly UserId Owner = UserId.Create(OwnerId);
 
     internal static readonly UserId Other = UserId.Create(OtherId);
+
+    internal static readonly UserId Stranger = UserId.Create(StrangerId);
 }
