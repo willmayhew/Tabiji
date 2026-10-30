@@ -132,3 +132,43 @@ PRINT '--- 16. Every destination is on the main route (expected: 0 rows) ---';
 SELECT [Id], [Name], [ParentDestinationId]
 FROM [TripDestinations]
 WHERE [Kind] = 'Destination' AND [ParentDestinationId] IS NOT NULL;
+
+PRINT '--- 17. Every trip has an owner (expected: 0 rows) ---';
+SELECT t.[Id], t.[Name]
+FROM [Trips] t
+WHERE NOT EXISTS (SELECT 1 FROM [TripMembers] m WHERE m.[TripId] = t.[Id]);
+
+PRINT '--- 18. Every trip has exactly one owner (expected: 0 rows) ---';
+SELECT [TripId], COUNT(*) AS Owners
+FROM [TripMembers]
+WHERE [Role] = 'Owner'
+GROUP BY [TripId]
+HAVING COUNT(*) <> 1;
+
+PRINT '--- 19. Membership inventory (for the record) ---';
+SELECT (SELECT COUNT(*) FROM [Trips])                              AS Trips,
+       (SELECT COUNT(*) FROM [TripMembers])                        AS Memberships,
+       (SELECT COUNT(*) FROM [TripMembers] WHERE [Role] = 'Owner') AS Owners,
+       (SELECT COUNT(*) FROM [SavedPlaces_Legacy])                 AS LegacyRows;
+
+PRINT '--- 20. Recovery procedure for unowned trips (not run) ---';
+-- Query 17 names every trip the migration could not assign. That happens when
+-- the database had no account, or more than one, at the moment it was
+-- upgraded: deciding who owns those trips is a human decision, not something
+-- the migration may guess at. Until it is made, the trips are unreachable —
+-- the API answers 404 for a trip with no members, exactly as it does for a
+-- trip that does not exist.
+--
+-- Decide the owner, then run this insert once with that account. It is
+-- idempotent: it fills in only the trips that still have no member, so
+-- running it twice adds nothing.
+--
+--   DECLARE @owner uniqueidentifier =
+--       (SELECT [Id] FROM [AspNetUsers] WHERE [Email] = 'you@example.com');
+--
+--   INSERT INTO [TripMembers] ([TripId], [UserId], [Role], [GrantedAt])
+--   SELECT t.[Id], @owner, 'Owner', SYSDATETIMEOFFSET()
+--   FROM [Trips] t
+--   WHERE NOT EXISTS (SELECT 1 FROM [TripMembers] m WHERE m.[TripId] = t.[Id]);
+--
+-- Then run queries 17 and 18 again. Both must report 0 rows.

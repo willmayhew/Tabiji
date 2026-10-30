@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Tabiji.Domain.Membership;
 using Tabiji.Domain.Trips;
 using Tabiji.Infrastructure.Persistence;
 using Tabiji.Infrastructure.Persistence.Identity;
@@ -21,6 +23,7 @@ public sealed class IdentityModelTests
         "AspNetUserTokens",
         "AspNetUsers",
         "TripDestinations",
+        "TripMembers",
         "Trips"
     ];
 
@@ -128,8 +131,8 @@ public sealed class IdentityModelTests
         Assert.Equal("Trips", trip.GetTableName());
         Assert.Equal("TripDestinations", destination.GetTableName());
 
-        // A trip owns its destinations and nothing else; no account key was
-        // threaded through the travel model.
+        // A trip still owns its destinations and nothing else: the account is
+        // reached through a membership row, not threaded through the trip.
         Assert.Empty(trip.GetForeignKeys());
 
         var toTrip = destination.GetForeignKeys()
@@ -137,5 +140,105 @@ public sealed class IdentityModelTests
 
         Assert.NotNull(toTrip);
         Assert.Equal(DeleteBehavior.Cascade, toTrip.DeleteBehavior);
+    }
+
+    [Fact]
+    public void TripMember_IsKeyedOnTheTripAndTheAccount()
+    {
+        using var context = CreateContext();
+
+        var member = context.Model.FindEntityType(typeof(TripMember));
+
+        Assert.NotNull(member);
+        Assert.Equal("TripMembers", member.GetTableName());
+
+        var key = member.FindPrimaryKey();
+
+        Assert.NotNull(key);
+        Assert.Equal(
+            [nameof(TripMember.TripId), nameof(TripMember.UserId)],
+            key.Properties.Select(property => property.Name));
+
+        // Both halves are the same width as every other key in the database,
+        // which is why the account key is a Guid rather than Identity's
+        // default string.
+        Assert.All(key.Properties, property => Assert.Equal(typeof(Guid), property.ClrType));
+        Assert.All(key.Properties, property => Assert.Equal("uniqueidentifier", property.GetColumnType()));
+        Assert.All(key.Properties, property => Assert.False(property.IsNullable));
+
+        // The key is what makes a person one member of a trip, once.
+        Assert.Equal(2, key.Properties.Count);
+    }
+
+    [Fact]
+    public void TripMember_GivesAPersonOneRoleOnATrip()
+    {
+        using var context = CreateContext();
+
+        var member = context.Model.FindEntityType(typeof(TripMember));
+
+        Assert.NotNull(member);
+
+        var role = member.FindProperty(nameof(TripMember.Role));
+
+        Assert.NotNull(role);
+
+        // Roles are stored as their names, like every other enum in the
+        // database, so a row can be read without knowing the numbering.
+        Assert.Equal(typeof(TripMemberRole), role.ClrType);
+        Assert.Equal("nvarchar(20)", role.GetColumnType());
+        Assert.False(role.IsNullable);
+
+        var grantedAt = member.FindProperty(nameof(TripMember.GrantedAt));
+
+        Assert.NotNull(grantedAt);
+        Assert.Equal("datetimeoffset", grantedAt.GetColumnType());
+        Assert.False(grantedAt.IsNullable);
+    }
+
+    [Fact]
+    public void TripMember_BelongsToItsTripAndItsAccount()
+    {
+        using var context = CreateContext();
+
+        var member = context.Model.FindEntityType(typeof(TripMember));
+
+        Assert.NotNull(member);
+
+        var foreignKeys = member.GetForeignKeys();
+
+        Assert.Equal(2, foreignKeys.Count());
+
+        var toTrip = foreignKeys.Single(
+            key => key.PrincipalEntityType.ClrType == typeof(Trip));
+
+        // Deleting a trip deletes its membership with it.
+        Assert.Equal(DeleteBehavior.Cascade, toTrip.DeleteBehavior);
+
+        var toAccount = foreignKeys.Single(
+            key => key.PrincipalEntityType.ClrType == typeof(AppUser));
+
+        // Deleting an account must not quietly strip a trip of its owner: the
+        // database refuses, and the day accounts can be deleted has to decide
+        // what happens to their trips.
+        Assert.Equal(DeleteBehavior.NoAction, toAccount.DeleteBehavior);
+    }
+
+    [Fact]
+    public void TripMember_CanBeFoundByAccount()
+    {
+        using var context = CreateContext();
+
+        var member = context.Model.FindEntityType(typeof(TripMember));
+
+        Assert.NotNull(member);
+
+        var index = member.GetIndexes()
+            .SingleOrDefault(candidate =>
+                candidate.Properties.Count == 1 &&
+                candidate.Properties[0].Name == nameof(TripMember.UserId));
+
+        Assert.NotNull(index);
+        Assert.False(index.IsUnique);
     }
 }
