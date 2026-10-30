@@ -10,7 +10,8 @@ and it is drawn entirely in type and line, with no photography anywhere in the p
 This repository contains a .NET 10 modular monolith, an Angular 22 standalone SPA and a
 SQL Server database. The `Trip` slice is complete end to end: a trip can be created from
 the browser, listed, and opened, with an editorial interface built around it. Trips are
-private to the account that created them.
+private to their members: the account that created one can invite other registered users as
+editors, and only an owner can manage the membership or delete the trip.
 
 > **Status:** Phase 1b of the roadmap. See [`docs/roadmap.md`](docs/roadmap.md) for what
 > comes next and [`docs/architecture.md`](docs/architecture.md) for how the code is put
@@ -169,9 +170,21 @@ Base URL in development: `http://localhost:5080`.
 | `GET` | `/health/ready` | Readiness probe. Verifies the database is reachable. Anonymous. |
 | `GET` | `/api/trips` | Lists the trips the signed-in account is a member of, ordered by start date and then by name. |
 | `POST` | `/api/trips` | Creates a trip owned by the signed-in account. Requires `X-XSRF-TOKEN`. |
-| `GET` | `/api/trips/{id}` | Returns a single trip. |
-| `PUT` | `/api/trips/{id}` | Replaces a trip and its route. Requires `X-XSRF-TOKEN`. |
-| `DELETE` | `/api/trips/{id}` | Deletes a trip. Requires `X-XSRF-TOKEN`. |
+| `GET` | `/api/trips/{id}` | Returns a single trip and the caller's role in it. |
+| `PUT` | `/api/trips/{id}` | Replaces a trip and its route. Owners and editors. Requires `X-XSRF-TOKEN`. |
+| `DELETE` | `/api/trips/{id}` | Deletes a trip. Owners only. Requires `X-XSRF-TOKEN`. |
+| `GET` | `/api/trips/{id}/members` | Lists the travellers on a trip and the caller's role. Any member. |
+| `PATCH` | `/api/trips/{id}/members/{userId}` | Changes a member's role. Owners only. Requires `X-XSRF-TOKEN`. |
+| `DELETE` | `/api/trips/{id}/members/{userId}` | Removes a member. Owners only; the last owner cannot be removed. Requires `X-XSRF-TOKEN`. |
+| `GET` | `/api/trips/{id}/invitations` | Lists a trip's invitations. Owners only. |
+| `POST` | `/api/trips/{id}/invitations` | Invites an email address. Owners only. Requires `X-XSRF-TOKEN`. |
+| `DELETE` | `/api/trips/{id}/invitations/{invitationId}` | Revokes a pending invitation. Owners only. Requires `X-XSRF-TOKEN`. |
+| `GET` | `/api/invitations` | Lists the pending invitations addressed to the signed-in account. |
+| `POST` | `/api/invitations/preview` | Shows an invitation to the account it names. Requires `X-XSRF-TOKEN`. |
+| `POST` | `/api/invitations/accept` | Accepts an invitation by its token. Requires `X-XSRF-TOKEN`. |
+| `POST` | `/api/invitations/decline` | Declines an invitation by its token. Requires `X-XSRF-TOKEN`. |
+| `POST` | `/api/invitations/{invitationId}/accept` | Accepts an invitation by id, for the trips page. Requires `X-XSRF-TOKEN`. |
+| `POST` | `/api/invitations/{invitationId}/decline` | Declines an invitation by id, for the trips page. Requires `X-XSRF-TOKEN`. |
 | `GET` | `/api/trips/{tripId}/places` | Read-only view of the places that carry a position. |
 | `POST` | `/api/auth/register` | Creates an account. It does not sign the reader in. |
 | `POST` | `/api/auth/login?useCookies=true` | Signs in and sets the `.Tabiji.Auth` cookie. |
@@ -185,9 +198,20 @@ need an email transport (`confirmEmail`, `resendConfirmationEmail`, `forgotPassw
 `resetPassword`) answer `503` until one exists. The framework also maps `refresh` and
 `manage/*`; Tabiji does not use them, so they answer `404`.
 
-**Every trip route requires an account.** A trip is private to the account that created
-it, and a trip the caller cannot reach is answered `404` exactly as a trip that does not
-exist. The API is the boundary: the Angular screens only decide what to show.
+**Every trip route requires an account.** A trip is private to its members. The account
+that creates it is an **owner**; an accepted invitation makes someone an **editor**.
+Owners manage the trip and its membership; editors change the journey but cannot invite,
+remove, change roles or delete the trip. A trip the caller cannot reach is answered `404`
+exactly as a trip that does not exist; a member whose role is not enough is answered `403`;
+a conflict such as the last owner or a duplicate invitation is `409`. The API is the
+boundary: the Angular screens only decide what to show.
+
+Invitations are addressed to an email address and carry a single-use token. The raw token
+is never stored — the database keeps its SHA-256 — and it is never returned in a production
+response. In Development, with `Email:DeliveryEnabled=false`, the create response includes
+a link with the token in the URL **fragment** (`/invite#token=…`) so the flow can be used
+without an email provider. Outside Development creation answers `503` until one exists.
+The invitation lasts seven days (`Invitations:ExpiryDays`) and can be revoked or declined.
 
 A trust boundary is one thing; a session is another. The examples below sign in first and
 keep the cookie in a jar. A write also needs the antiforgery token from `GET
@@ -247,7 +271,8 @@ curl -b cookies.txt http://localhost:5080/api/trips
     ],
     "startsOn": "2027-05-16",
     "endsOn": "2027-06-05",
-    "status": "Planning"
+    "status": "Planning",
+    "viewerRole": "Owner"
   }
 ]
 ```
@@ -270,6 +295,21 @@ curl -b cookies.txt -X PUT http://localhost:5080/api/trips/c47a8f9c-ba3a-4e0e-b1
   -H "X-XSRF-TOKEN: CfDJ8..." \
   -d '{"name":"Japan Adventure","startsOn":"2027-05-08","endsOn":"2027-05-29","destinations":[{"id":"6d343873-45bc-42c6-abc2-5c271f99354a","name":"Osaka","startsOn":"2027-05-08","endsOn":"2027-05-12","stops":[{"id":"…","name":"Namba"},{"id":null,"name":"Tennoji"}]},{"id":null,"name":"Nagoya","startsOn":null,"endsOn":null,"stops":[]}]}'
 ```
+
+Invite someone to a trip — only an owner may, and in Development the response includes the
+link to send, because there is no email provider yet:
+
+```bash
+curl -b cookies.txt -X POST http://localhost:5080/api/trips/c47a8f9c-ba3a-4e0e-b1db-dc175473c7fa/invitations \
+  -H "Content-Type: application/json" \
+  -H "X-XSRF-TOKEN: CfDJ8..." \
+  -d '{"email":"friend@example.com"}'
+# {"id":"…","email":"friend@example.com","role":"Editor","status":"Pending",
+#  "invitationUrl":"http://localhost:4200/invite#token=…"}
+```
+
+The recipient opens that link, signs in as the address it names, and accepts or declines.
+An owner sees the pending invitations on the trip page and can revoke one there.
 
 A destination with an `id` is a destination that already exists: it is renamed,
 rescheduled and moved to its new position, and it keeps its identity. A destination with
@@ -344,8 +384,8 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 327 tests
-cd frontend && npm test           # 358 tests
+dotnet test backend/Tabiji.sln   # 447 tests
+cd frontend && npm test           # 382 tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that
@@ -371,7 +411,9 @@ motif, the destination plate, the shared editor and every screen.
 |---|---|---|
 | `ConnectionStrings:Tabiji` | `appsettings.json` (empty), `appsettings.Development.json` (LocalDB) | Use user secrets or `ConnectionStrings__Tabiji` for other servers. |
 | `Cors:AllowedOrigins` | `appsettings.json` | The Angular dev origin, `http://localhost:4200`. |
-| `Email:DeliveryEnabled` | `appsettings.json` (`false`) | Off until a mail transport exists; the four email-dependent account routes answer `503` while it is. |
+| `Email:DeliveryEnabled` | `appsettings.json` (`false`) | Off until a mail transport exists; the four email-dependent account routes and invitation creation outside Development answer `503` while it is. |
+| `Invitations:ExpiryDays` | `appsettings.json` (`7`) | How long an invitation remains acceptable, between 1 and 30 days. |
+| `Invitations:PublicBaseUrl` | `appsettings.Development.json` (`http://localhost:4200`) | The frontend origin used to build the development invitation link; set it in any deployment that enables email. |
 | `ASPNETCORE_ENVIRONMENT` | `launchSettings.json` | `Development` for the local profiles. |
 
 No credential is committed to this repository.

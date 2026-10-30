@@ -337,12 +337,12 @@ the route; and every existing saved place remains readable with its planned day.
 
 ### Phase 1b — Trips and membership
 
-*In progress.* Ownership is in place; invitations and further collaboration are not.
+*In progress.* Ownership, the owner/editor split and invitations are in place; cancelling,
+archiving and the route guard are not.
 
 - [x] `UserId` value object in the domain.
-- [x] `TripMember` record: a user, a trip, and a role (`Owner`, `Organiser`, `Member`).
-      Only `Owner` is granted today; the other roles are there so that collaboration is an
-      insert rather than a schema change.
+- [x] `TripMember` record: a user, a trip, and a role (`Owner`, `Editor`). The account that
+      creates a trip is its owner; an accepted invitation makes someone an editor.
 - [x] Backfill: every trip that existed before accounts was assigned to the one account
       that was already there, inside a guarded, additive migration. A database with no
       account, or more than one, is left unowned rather than guessed at;
@@ -352,10 +352,17 @@ the route; and every existing saved place remains readable with its planned day.
       account may reach, so a nested route cannot become a hole.
 - [x] Frontend: the trips list, the trip page, the atlas and the create page handle a
       signed-out reader and an expired session.
-- [ ] Invitations: create an invite for a trip, accept it, expire it.
+- [x] Invitations: create an invite for a trip, accept, decline, revoke and expire it. The
+      token is single-use, stored only as a SHA-256 hash, and addressed to one email. A
+      development link replaces email until a transport exists; outside Development creation
+      answers `503`.
+- [x] Membership management: owners invite, remove and change roles; editors can change the
+      journey but cannot manage the trip. The last owner cannot be removed or demoted.
+- [x] Only an owner may delete a trip.
+- [x] Frontend: the invitation flow, the members section, the trips-page invitation list,
+      and the invite page's signed-out, expired, revoked, used and wrong-account states.
 - [ ] Cancelling and archiving a trip. `TripStatus` already names the states; nothing
       transitions them yet.
-- [ ] Frontend: the invitation flow.
 - [ ] A route guard on the screens that need a session. Deliberately deferred: the session
       probe is asynchronous, so a guard on a page reload would race it and bounce a
       signed-in reader to `/login`. The screens show the right state without one, and the
@@ -371,9 +378,18 @@ the route; and every existing saved place remains readable with its planned day.
   deleted trip takes its membership with it; a deleted account does not silently strip a
   trip of its owner.
 - Invitations are their own aggregate with their own lifecycle
-  (`Pending` → `Accepted` / `Revoked` / `Expired`).
-- Expiry and acceptance must be safe under concurrent requests, so the accept operation
-  needs a conditional update rather than a read-then-write.
+  (`Pending` → `Accepted` / `Declined` / `Revoked` / `Expired`). The token is 32 random
+  bytes, kept only as a SHA-256 hash under a unique index; the development link carries it
+  in the URL fragment.
+- A filtered unique index on `(TripId, NormalizedEmail) WHERE Status = 'Pending'` refuses a
+  duplicate pending invitation without blocking a fresh one after a decline, revocation or
+  expiry.
+- Expiry and acceptance are safe under concurrent requests: the decision is a conditional
+  update on the pending row, and the membership is inserted in the same transaction.
+- The last-owner rule runs in a serializable transaction that locks the trip's membership
+  rows, so two owners cannot both step down.
+- Email delivery is still absent; the development link is the interim flow, and the
+  production answer is `503` until a provider exists.
 
 ---
 

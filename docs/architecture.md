@@ -25,8 +25,8 @@ today, not the finished product.
 **Non-goals (explicitly out of scope for now)**
 
 - Microservices. Tabiji is a modular monolith.
-- Invitations, shared trips and roles other than the owner. Ownership and the
-  authorisation that follows from it are Phase 1b and are described in §10.
+- Activity proposals, votes, comments and itinerary items. Invitations and the
+  owner/editor roles are Phase 1b and are described in §10.
 - Infrastructure as code, CI/CD pipelines, containerisation, cloud deployment.
 - Real-time collaboration, notifications, offline support.
 
@@ -1117,10 +1117,11 @@ developer and every build uses the same compiler.
 | Health endpoint tests | `backend/Tabiji.Tests/HealthEndpointTests.cs` | The health probes, via `WebApplicationFactory` | No |
 | Trip endpoint tests | `backend/Tabiji.Tests/TripEndpointTests.cs` | The trip HTTP surface, via `WebApplicationFactory` | No |
 | Authorisation tests | `backend/Tabiji.Tests/TripAuthorisationEndpointTests.cs`, `AntiforgeryOnTripEndpointsTests.cs`, `AuthorizationCoverageTests.cs` | Who may reach a trip, the token a write needs, and the promise that no endpoint is anonymous by accident | No |
+| Collaboration tests | `backend/Tabiji.Tests/TripCollaborationApiTests.cs`, `InvitationRepositoryTests.cs`, `InvitationServiceTests.cs` | Owner/editor rules, invitation lifecycle, single use, last owner, immediate loss of access | **Yes** (the API and repository classes) |
 | Ownership, end to end | `backend/Tabiji.Tests/TripOwnershipIntegrationTests.cs` | Two real accounts, the real cookie and a real store | **Yes** |
 | Migration tests | `backend/Tabiji.Tests/*MigrationTests.cs` | The operations of a migration, inspected by reflection; the ones that move data run against a disposable database | Mostly no |
-| Repository tests | `backend/Tabiji.Tests/TripRepositoryTests.cs` | The route written to a real database | **Yes** |
-| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the rules, the route motif, the destination plate, the map picker and the geocoder | No |
+| Repository tests | `backend/Tabiji.Tests/TripRepositoryTests.cs`, `InvitationRepositoryTests.cs` | The route, the membership and the invitation statements against a real database | **Yes** |
+| Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the rules, the route motif, the destination plate, the map picker, the geocoder, the members panel and the invitation page | No |
 
 The suite is written to run **without a database**, and most of it does. The one exception
 is the repository, because writing a route back is the one thing that cannot be checked any
@@ -1162,9 +1163,10 @@ be committed by accident.
 
 ## 10. Accounts and authentication
 
-Phase 1a gives the application accounts, and Phase 1b makes every trip private to the
-account that owns it. They are ASP.NET Core Identity with a cookie, and the trip API is
-protected by the membership row behind that cookie.
+Phase 1a gives the application accounts, and Phase 1b makes every trip private to its
+members: the owner who created it and the editors who accepted an invitation. They are
+ASP.NET Core Identity with a cookie, and the trip API is protected by the membership row
+behind that cookie.
 
 **The stack**
 
@@ -1220,23 +1222,50 @@ surface. They answer `404`, from a path check that runs before authentication
 route does not exist. Everything else that changes state without a cookie — registration,
 sign-in, the email routes — has no ambient credential to forge in the first place.
 
-**Trip ownership**
+**Trip ownership and collaboration**
 
-A trip is private to the account that created it. Ownership is a row, not a column: a trip
-has one or more `TripMembers`, and today exactly one, the account that created it, with
-`Role = Owner`.
+A trip is private to its members. The account that creates it is its **owner**; an accepted
+invitation makes someone an **editor**. Both may change the journey. Only an owner may
+manage the membership or delete the trip.
 
 | | |
 |---|---|
-| `TripMembers` | `(TripId, UserId)` primary key, `Role`, `GrantedAt`, an index on `UserId` |
-| `TripId` | foreign key to `Trips`, cascade — deleting a trip deletes its membership |
-| `UserId` | foreign key to `AspNetUsers`, **no action** — deleting an account must not quietly strip a trip of its owner |
-| Domain | `UserId`, `TripMemberRole`, `TripMember`, in `Tabiji.Domain/Membership`; no identity type crosses inwards |
+| `TripMembers` | `(TripId, UserId)` primary key, `Role` (`Owner`/`Editor`), `GrantedAt`, an index on `UserId` |
+| `Invitations` | `Id` primary key, `TripId`, `Email`/`NormalizedEmail`, `Role`, `TokenHash`, `Status`, `CreatedAt`/`ExpiresAt`, sender and decision columns |
+| `TripId` (members) | foreign key to `Trips`, cascade — deleting a trip deletes its membership |
+| `UserId` (members) | foreign key to `AspNetUsers`, **no action** — deleting an account must not quietly strip a trip of its owner |
+| `TripId` (invitations) | foreign key to `Trips`, cascade — deleting a trip deletes its invitations |
+| Sender, acceptor, decider | foreign keys to `AspNetUsers`, **no action** — the record survives, and account deletion is still refused while it exists |
+| Domain | `UserId`, `TripMemberRole`, `TripMember` in `Tabiji.Domain/Membership`; `Invitation`, `InvitationStatus`, `EmailAddress` in `Tabiji.Domain/Invitations`; no identity type crosses inwards |
 
 Ownership is written in the same save as the trip (`TripRepository.AddAsync` takes the trip
-and its owner), so a trip is never left with nobody able to reach it. The owner comes from
-the cookie's `NameIdentifier` claim (`Identity/CurrentUser.cs`); no request body can name
-an owner.
+and its owner), so a trip is never left with nobody able to reach it. The owner and the
+inviter come from the cookie's `NameIdentifier` claim (`Identity/CurrentUser.cs`); no
+request body can name either.
+
+**Invitations**
+
+An invitation is its own aggregate, addressed to one email address and tied to one trip. It
+is issued by an owner, lives for `Invitations:ExpiryDays` (seven by default), and moves
+through `Pending → Accepted | Declined | Revoked | Expired`. Expiry is evaluated against the
+clock; a write that meets a pending row past its expiry records `Expired`, which frees the
+filtered unique index for a fresh invitation.
+
+Only the SHA-256 of the token is stored, in `varbinary(32)` under a unique index. The raw
+token is 32 bytes of operating-system randomness in Base64Url form; it exists only in memory,
+is never logged, and is never written to browser storage. The development link puts it in
+the URL **fragment** (`/invite#token=…`), and the API receives it in the request body for
+preview, accept and decline, so it does not appear in an access log or a `Referer`.
+Acceptance and decline are conditional updates on `Status = 'Pending' AND ExpiresAt > now`;
+exactly one caller can win, and the membership is inserted in the same transaction.
+
+The addressee is matched against `AspNetUsers.NormalizedEmail`, so possession of the token is
+not enough: the signed-in account must be the address the invitation names. A filtered unique
+index on `(TripId, NormalizedEmail) WHERE Status = 'Pending'` refuses a second pending
+invitation while allowing a new one after a decline, revocation or expiry. Inviting an
+address with no account is allowed, and the invitation becomes acceptable when that address
+registers; the response is identical either way, so invitation creation cannot be used to
+discover who has an account.
 
 **The three layers of authorisation**
 
@@ -1246,27 +1275,33 @@ an owner.
    and the OpenAPI document. `AuthorizationCoverageTests` enumerates the routing table and
    fails, naming the endpoint, if anything is neither public on purpose nor protected.
 
-2. **The port decides which trips.** `ITripRepository` has no method that reads, writes or
-   deletes a trip without naming the caller. `GetForMemberAsync` and `ListForMemberAsync`
-   put a `WHERE EXISTS (SELECT 1 FROM TripMembers …)` into the statement itself, so a trip
-   the caller is not a member of is never loaded; `UpdateAsync` and `DeleteForMemberAsync`
-   check or require the same membership. `GetByIdAsync`, `ListAsync` and `DeleteAsync` were
-   **deleted** rather than kept alongside, so every call site had to be reconsidered and a
-   forgotten check is a compile error rather than a hole. The read-only
-   `/api/trips/{tripId}/places` routes are scoped by the same port.
+2. **The ports decide which trips and what may be done.** `ITripRepository` has no method
+   that reads, writes or deletes a trip without naming the caller, and a read returns the
+   caller's role with the trip. `UpdateAsync` requires `Owner` or `Editor`;
+   `DeleteForMemberAsync` requires `Owner`. `ITripMembershipRepository` and
+   `IInvitationRepository` name the caller on every operation: a non-member is `NotFound`, a
+   member without the role is `Forbidden`. The last-owner rule runs in a serializable
+   transaction with the trip's membership rows locked, so two owners cannot both step down.
+   Removing a member deletes the row every trip query already joins, so access ends with the
+   request. `GetByIdAsync`, `ListAsync` and `DeleteAsync` were **deleted** rather than kept
+   alongside, so every call site had to be reconsidered. The `/api/trips/{tripId}/places`
+   routes are scoped by the same port.
 
-3. **The token proves the request.** `POST`, `PUT` and `DELETE` on a trip carry
-   `RequireValidAntiforgeryToken`, the same filter `logout` uses. `SameSite=Lax` remains
-   the first line; this closes the gap for a same-site form post. The Angular client
-   already stamps `X-XSRF-TOKEN` on every unsafe request, so no screen changed for it.
+3. **The token proves the request.** Every state-changing trip and invitation route carries
+   `RequireValidAntiforgeryToken`, the same filter `logout` uses. `SameSite=Lax` remains the
+   first line; this closes the gap for a same-site form post. The Angular client stamps
+   `X-XSRF-TOKEN` on every unsafe request.
 
 **What a caller is told**
 
-Never `403` for a trip. A trip that does not exist and a trip the caller cannot reach are
-the same `404 ProblemDetails { title: "Trip not found" }`, so an id cannot be used to learn
-that somebody else's trip exists. An unauthenticated request is `401`, from the cookie
-handler that already avoids a redirect. The list is filtered rather than refused: an
-account with no trips gets `200 []`.
+A trip that does not exist and a trip the caller cannot reach are the same
+`404 ProblemDetails { title: "Trip not found" }`, so an id cannot be used to learn that
+somebody else's trip exists. A member whose role is not enough is `403` — the trip is not
+hidden from them. A conflict they are entitled to know about is `409`: the last owner, a
+duplicate invitation, an existing member, a terminal invitation. An unknown invitation token
+and a token addressed to another account are both `404`. An unauthenticated request is
+`401`, from the cookie handler that already avoids a redirect. The list is filtered rather
+than refused: an account with no trips gets `200 []`.
 
 **Trips and the development database**
 
@@ -1277,16 +1312,24 @@ one, the migration still applies and leaves those trips unowned rather than gues
 `verify-migration.sql` reports every trip without an owner. An unowned trip is unreachable —
 the API answers `404`, exactly as for a trip that does not exist — until somebody makes the
 decision: query 20 in the same file is an idempotent insert that gives every still-unowned
-trip a chosen owner, and queries 17 and 18 confirm the result. Refusing to migrate would
-block an upgrade over a database whose only sin is that nobody has signed up yet. The
-legacy `Trips.Destination` column and the `SavedPlaces_Legacy` archive are untouched.
+trip a chosen owner. Refusing to migrate would block an upgrade over a database whose only
+sin is that nobody has signed up yet.
 
-**Where membership goes next**
+The migration that creates `Invitations` is additive too: it creates one table and its
+indexes, and alters nothing that already exists. Narrowing the role vocabulary from the old
+`Owner/Organiser/Member` names to `Owner/Editor` is a code change only, because no other
+role was ever written; query 25 checks that before a deployment. Queries 17 and 21–24 check
+that every trip has an owner, that no duplicate pending invitation or invitation to an
+existing member exists, and that every accepted invitation has a membership. The legacy
+`Trips.Destination` column and the `SavedPlaces_Legacy` archive are untouched.
 
-The role is already stored, so collaboration needs no schema change: accepting an
-invitation is an insert into `TripMembers`, and a read that a role restricts narrows the
-`EXISTS` predicate rather than replacing the design. Invitations themselves are a separate
-aggregate with their own lifecycle, and they are not part of this milestone.
+**What collaboration leaves for later**
+
+Invitations, membership management and the owner/editor split are in place. What remains is
+the email transport that turns the development link into a real invitation, activity
+proposals and voting, a shared itinerary, and the route guard that the frontend deliberately
+still does without. A future role-restricted operation narrows the membership predicate in
+the repository rather than introducing a second authorisation mechanism.
 
 **Rate limiting and lockout**
 
@@ -1300,28 +1343,32 @@ navigation never throttles the session probe.
 There is no mail transport in the repository. `RequireConfirmedEmail` is therefore false,
 so a new account is usable immediately, and the four routes that would deliver a link —
 `confirmEmail`, `resendConfirmationEmail`, `forgotPassword`, `resetPassword` — answer
-`503 ProblemDetails` titled "Email delivery is not configured". Answering `200` and
-dropping the message would be a lie. `Email:DeliveryEnabled` turns the guard off in the
-change that adds a provider.
+`503 ProblemDetails` titled "Email delivery is not configured". Invitation creation uses the
+same answer outside Development. Answering `200` and dropping the message would be a lie.
+`Email:DeliveryEnabled` turns the guard off in the change that adds a provider; until then,
+Development returns the invitation link so the collaboration flow can still be exercised.
 
 **What is no longer anonymous**
 
-Every trip and place endpoint. There is a fallback authorization policy, so an endpoint is
-protected unless it says otherwise, and the only public surfaces are the account routes,
-the two probes and the OpenAPI document. What the caller may then reach is decided by the
-membership row, in the repository, not in the endpoint.
+Every trip, place and invitation endpoint. There is a fallback authorization policy, so an
+endpoint is protected unless it says otherwise, and the only public surfaces are the account
+routes, the two probes and the OpenAPI document. What the caller may then reach is decided by
+the membership row and the role in it, in the repository, not in the endpoint.
 
 ## 11. Where this goes next
 
 The layering is designed so that the roadmap features land without rework:
 
-- **Invitations, proposals, votes, comments and itinerary items** each become an aggregate
-  in `Domain`, a service and a port in `Application`, and a repository in `Infrastructure`.
-- **Trip membership** — the table and the role already exist. Inviting somebody is an
-  insert into `TripMembers`, and a role-restricted operation narrows the `EXISTS`
-  predicate in `TripRepository` rather than introducing a second authorisation mechanism.
-  An endpoint that needs a coarse rule ("only an organiser may archive") can use
-  `IAuthorizationService` on top, while the port stays the place that decides which trip.
+- **Invitations** are in place as their own aggregate with their own lifecycle. Turning the
+  development link into a delivered email is an `IInvitationNotifier` behind the existing
+  flag; no domain or schema change is needed.
+- **Proposals, votes, comments and itinerary items** each become an aggregate in `Domain`, a
+  service and a port in `Application`, and a repository in `Infrastructure`.
+- **Trip membership** already has two roles and a membership table. A future role-restricted
+  operation narrows the membership predicate in the repository rather than introducing a
+  second authorisation mechanism. An endpoint that needs a coarse rule ("only an owner may
+  archive") can use `IAuthorizationService` on top, while the port stays the place that
+  decides which trip.
 - **Real-time updates** would be added at the API layer over SignalR, with the domain
   unchanged.
 

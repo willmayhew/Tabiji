@@ -164,12 +164,24 @@ npm test
 - Do not read an owner, a member or a role from a request body. The account is the one the
   request was authenticated as (`backend/Tabiji.Api/Identity/CurrentUser.cs`).
 - Do not add a repository method that reads, writes or deletes a trip without naming the
-  caller. The membership check belongs in the statement (`ITripRepository`), not in the
-  endpoint, so a forgotten call cannot become a way in.
+  caller. The membership and role checks belong in the statement (`ITripRepository`,
+  `ITripMembershipRepository`, `IInvitationRepository`), not in the endpoint, so a forgotten
+  call cannot become a way in.
 - Do not answer `403` for a trip the caller cannot reach. It is `404`, identical to a trip
-  that does not exist, so an id cannot be used to discover someone else's data.
-- Do not put an `HttpOnly`, `SameSite` cookie behind a state-changing trip request without
-  `.RequireValidAntiforgeryToken()`. The Angular client already sends `X-XSRF-TOKEN`.
+  that does not exist, so an id cannot be used to discover someone else's data. `403` is for
+  a member whose role is not enough, and `409` for a conflict they may know about.
+- Do not let an invitation grant ownership. An invitation makes an editor; an owner promotes
+  an existing member. Never allow the last owner to be removed or demoted — the check and
+  the write run in one serializable transaction that locks the trip's memberships.
+- Do not store, log or return a raw invitation token. Keep only its SHA-256, put the
+  development link's token in the URL fragment, send the token in the request body, and
+  never include it in a production response. `Email:DeliveryEnabled=false` means invitation
+  creation outside Development is `503`.
+- Do not let invitation creation reveal whether an address has an account. The response is
+  the same whether or not the invitee is registered.
+- Do not put an `HttpOnly`, `SameSite` cookie behind a state-changing trip or invitation
+  request without `.RequireValidAntiforgeryToken()`. The Angular client already sends
+  `X-XSRF-TOKEN`.
 - Do not hardcode secrets, and do not disable the NuGet audit to make a warning go away.
   Pin the package to a patched version instead.
 - Do not build out the roadmap features ahead of their phase. See `docs/roadmap.md`.
