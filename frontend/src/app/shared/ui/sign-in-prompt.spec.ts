@@ -37,6 +37,16 @@ describe('SignInPrompt', () => {
     expect(link.getAttribute('href')).toBe('/login?returnUrl=%2Ftrips%2F123%2Fatlas');
   });
 
+  it('should offer registration on the same terms', () => {
+    fixture.componentRef.setInput('returnUrl', '/invite#token=abc');
+    fixture.detectChanges();
+
+    const link = element().querySelector('a:not(.button)') as HTMLAnchorElement;
+
+    expect(link.textContent).toContain('Create an account');
+    expect(link.getAttribute('href')).toBe('/register?returnUrl=%2Finvite%23token%3Dabc');
+  });
+
   it('should use a section heading by default and the page heading when asked', () => {
     fixture.detectChanges();
 

@@ -71,6 +71,42 @@ test.describe('the invitation journey', () => {
     await invitee.close();
   });
 
+  test('INV-03 a reader with no account can register and still accept', async ({
+    browser,
+    ownerContext,
+  }) => {
+    const email = 'newcomer@tabiji.test';
+    const trip = await createTrip(ownerContext, 'Hiroshima peace park');
+    const invitation = await invite(ownerContext, trip.id, email);
+
+    const invitee = await browser.newContext();
+    const page = await invitee.newPage();
+    await page.goto(invitation.invitationUrl!);
+    await expect(page.getByRole('heading', { name: 'Sign in to carry on' })).toBeVisible();
+
+    // The prompt offers an account, and the invitation survives the detour.
+    await page.getByRole('link', { name: 'Create an account' }).click();
+    await expect(page).toHaveURL(/\/register/);
+
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password', { exact: true }).fill('CorrectHorse42!');
+    await page.getByLabel('Repeat the password').fill('CorrectHorse42!');
+    await page.getByRole('button', { name: 'Create account' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill('CorrectHorse42!');
+    await page.getByRole('button', { name: 'Sign in' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Hiroshima peace park' })).toBeVisible();
+    await page.getByRole('button', { name: 'Accept invitation' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/trips/${trip.id}`));
+    await expect(page.locator('.member-row', { hasText: email })).toBeVisible();
+    await invitee.close();
+  });
+
   test('INV-04 an invitee can decline', async ({ ownerContext, editorContext }) => {
     const trip = await createTrip(ownerContext, 'Nara day trip');
     const invitation = await invite(ownerContext, trip.id, ACCOUNTS.editor.email);

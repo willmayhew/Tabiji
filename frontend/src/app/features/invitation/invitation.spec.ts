@@ -2,12 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import {
-  ActivatedRoute,
-  convertToParamMap,
-  provideRouter,
-  Router,
-} from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { SessionService } from '../../core/auth/session.service';
 import { Invitation } from './invitation';
 
@@ -135,6 +130,13 @@ describe('Invitation', () => {
     const link = element().querySelector('app-sign-in-prompt a.button') as HTMLAnchorElement;
 
     expect(link.getAttribute('href')).toBe('/login?returnUrl=%2Finvite%23token%3Dabc');
+
+    // A reader with no account is offered one, without losing the invitation.
+    const register = element().querySelector(
+      'app-sign-in-prompt a:not(.button)',
+    ) as HTMLAnchorElement;
+
+    expect(register.getAttribute('href')).toBe('/register?returnUrl=%2Finvite%23token%3Dabc');
   });
 
   it('should not reveal an invitation that is not for this account', async () => {

@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/api/auth.service';
 import { describeHttpError } from '../../core/api/http-error';
 import {
@@ -18,6 +18,10 @@ import {
  * issues no cookie, so this hands them to the sign-in screen. The API's own
  * error codes are translated into messages beside the field they belong to,
  * because "PasswordTooShort" is not a sentence.
+ *
+ * A reader who arrived from an invitation carries the invitation with them:
+ * the token is single use and cannot be recovered, so losing it here would
+ * cost the owner a new invitation.
  */
 @Component({
   selector: 'app-register',
@@ -28,10 +32,14 @@ import {
 export class Register {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly formBuilder = inject(NonNullableFormBuilder);
 
   protected readonly passwordMinLength = PASSWORD_MIN_LENGTH;
+
+  /** Where signing in comes back to, validated the way Login validates it. */
+  protected readonly returnUrl = this.readReturnUrl();
 
   readonly form = this.formBuilder.group(
     {
@@ -65,13 +73,30 @@ export class Register {
       .subscribe({
         next: () => {
           this.submitting.set(false);
-          void this.router.navigate(['/login'], { queryParams: { registered: 'true' } });
+          void this.router.navigate(['/login'], {
+            queryParams: {
+              registered: 'true',
+              ...(this.returnUrl !== null ? { returnUrl: this.returnUrl } : {}),
+            },
+          });
         },
         error: (failure: HttpErrorResponse) => {
           this.submitting.set(false);
           this.reportFailure(failure);
         },
       });
+  }
+
+  /**
+   * Only a path on this site is kept, so a crafted link cannot send the
+   * reader to another origin. Null when there is nothing to come back to.
+   */
+  private readReturnUrl(): string | null {
+    const requested = this.route.snapshot.queryParamMap.get('returnUrl');
+
+    return requested !== null && requested.startsWith('/') && !requested.startsWith('//')
+      ? requested
+      : null;
   }
 
   protected errorFor(field: 'email' | 'password' | 'confirmPassword'): string | null {

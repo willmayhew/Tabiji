@@ -2,9 +2,7 @@
   <div class="auth__card">
     <p class="eyebrow">Account</p>
     <h1>Create an account</h1>
-    <p class="auth__lede">
-      Your trips, kept together. An address and a password are all it takes.
-    </p>
+    <p class="auth__lede">Your trips, kept together. An address and a password are all it takes.</p>
 
     <form class="auth__form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
       <div class="field">
@@ -68,6 +66,9 @@
       </button>
     </form>
 
-    <p class="auth__aside">Already have an account? <a routerLink="/login">Sign in</a>.</p>
+    <p class="auth__aside">
+      Already have an account?
+      <a routerLink="/login" [queryParams]="returnUrl ? { returnUrl: returnUrl } : {}">Sign in</a>.
+    </p>
   </div>
 </section>
