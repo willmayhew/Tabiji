@@ -592,6 +592,13 @@
   list-style: none;
 }
 
+/* A list opening directly under a section head shares that head's rule. The
+   head already opened the section with a hairline, and a second one a line
+   further down reads as a mistake rather than a border. */
+.section-head + .journey-list {
+  border-top: none;
+}
+
 .journey-list__row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

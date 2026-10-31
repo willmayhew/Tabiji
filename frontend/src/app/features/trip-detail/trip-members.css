@@ -1,4 +1,10 @@
+/* This section is a component template of its own, so the layout the trip
+   page's stylesheet gives a `.detail__section` never reaches it. It carries
+   its own, or its blocks would stack flush: the button that sends an
+   invitation would land on the rule that opens the invitations below it. */
 .members {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-md);
 }
 
@@ -9,6 +15,11 @@
   padding: 0;
   list-style: none;
   border-top: var(--rule-hairline) solid var(--color-rule);
+}
+
+/* The list opens under a section head, so the head's rule is already there. */
+.section-head + .member-list {
+  border-top: none;
 }
 
 .member-row {
@@ -66,6 +77,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+}
+
+/* The member list closes with the rule under its last row, and that rule is
+   the only one between the travellers and the form — whether or not the
+   note about the last owner sits between them. */
+.members__invite {
+  padding-top: 0;
+}
+
+/* The invitations have nothing above them but the form, so they open with a
+   rule of their own, a line clear of the button. */
+.members__invitations {
   padding-top: var(--space-md);
   border-top: var(--rule-hairline) solid var(--color-rule);
 }
