@@ -1,5 +1,4 @@
-import { expect, type BrowserContext } from '@playwright/test';
-import { api } from './fixtures';
+import { ACCOUNTS, api, expect, type BrowserContext } from './fixtures';
 
 /** A date n days from today, as the API's DateOnly binding accepts it. */
 export function iso(daysFromNow: number): string {
@@ -69,4 +68,23 @@ export async function membersOf(context: BrowserContext, tripId: string): Promis
   const response = await api(context, 'GET', `/api/trips/${tripId}/members`);
   expect(response.status(), await response.text()).toBe(200);
   return (await response.json()) as TripMembers;
+}
+
+/**
+ * Makes the editor a member of a trip, the way an accepted invitation does,
+ * so a test about membership management does not have to walk the whole
+ * invitation journey to get there.
+ */
+export async function makeEditor(
+  ownerContext: BrowserContext,
+  editorContext: BrowserContext,
+  tripId: string,
+): Promise<void> {
+  const invitation = await invite(ownerContext, tripId, ACCOUNTS.editor.email);
+
+  const accepted = await api(editorContext, 'POST', '/api/invitations/accept', {
+    token: tokenOf(invitation.invitationUrl!),
+  });
+
+  expect(accepted.status()).toBe(200);
 }
