@@ -20,6 +20,8 @@ builder.Services.AddTabijiIdentity(builder.Environment);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 
+builder.Services.AddSingleton<InvitationUrlBuilder>();
+
 builder.Services.AddCors(options => options.AddPolicy(CorsPolicyName, policy => policy
     .WithOrigins(AllowedOrigins(builder.Configuration))
     .AllowAnyHeader()
@@ -41,6 +43,16 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+
+// A deployment that sends invitations by email needs the address their links
+// should point at. Without it the links would name localhost, so this refuses
+// to start rather than mailing something nobody can open.
+if (builder.Configuration.GetValue(EmailDeliveryEnabledKey, false)
+    && string.IsNullOrWhiteSpace(builder.Configuration[InvitationUrlBuilder.PublicBaseUrlKey]))
+{
+    throw new InvalidOperationException(
+        $"{InvitationUrlBuilder.PublicBaseUrlKey} must be set when {EmailDeliveryEnabledKey} is true.");
+}
 
 var app = builder.Build();
 

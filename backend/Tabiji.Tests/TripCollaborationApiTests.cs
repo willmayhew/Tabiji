@@ -104,6 +104,29 @@ public sealed class TripCollaborationApiTests : IAsyncLifetime, IDisposable
     }
 
     [DatabaseFact]
+    public async Task CollaborationReadsAreNotStored()
+    {
+        using var owner = _factory.CreateClient(TestUsers.OwnerId);
+
+        var trip = await CreateTripAsync(owner);
+
+        var tripResponse = await owner.GetAsync($"/api/trips/{trip.Id}");
+        var membersResponse = await owner.GetAsync($"/api/trips/{trip.Id}/members");
+
+        // A member list and a trip are private to the account that asked for
+        // them, so no cache along the way may keep a copy.
+        Assert.Contains(
+            "no-store",
+            tripResponse.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.Ordinal);
+
+        Assert.Contains(
+            "no-store",
+            membersResponse.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.Ordinal);
+    }
+
+    [DatabaseFact]
     public async Task InviteeAcceptsAndBecomesAnEditorWhoMayEditButNotManage()
     {
         using var owner = _factory.CreateClient(TestUsers.OwnerId);

@@ -13,10 +13,9 @@ namespace Tabiji.Api.Endpoints;
 /// delivery still unconfigured, creation is refused rather than leaving an
 /// invitation nobody can receive.
 /// </summary>
-public static class TripInvitationEndpoints
+public static partial class TripInvitationEndpoints
 {
-    private const string PublicBaseUrlKey = "Invitations:PublicBaseUrl";
-    private const string DefaultPublicBaseUrl = "http://localhost:4200";
+    private const string LogCategory = "Tabiji.Api.Endpoints.TripInvitationEndpoints";
 
     public static IEndpointRouteBuilder MapTripInvitationEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -60,8 +59,12 @@ public static class TripInvitationEndpoints
                 InvitationService invitations,
                 IWebHostEnvironment environment,
                 IConfiguration configuration,
+                InvitationUrlBuilder invitationUrls,
+                ILoggerFactory loggerFactory,
                 CancellationToken cancellationToken) =>
             {
+                var logger = loggerFactory.CreateLogger(LogCategory);
+
                 if (!CurrentUser.TryGetId(user, out var actor))
                 {
                     return Results.Unauthorized();
@@ -75,6 +78,8 @@ public static class TripInvitationEndpoints
 
                 if (deliveryEnabled || !environment.IsDevelopment())
                 {
+                    InvitationDeliveryUnavailable(logger, tripId);
+
                     return CollaborationProblems.EmailDeliveryUnavailable();
                 }
 
@@ -96,6 +101,9 @@ public static class TripInvitationEndpoints
                 if (created is { Outcome: InvitationCreateOutcome.Created, Invitation: not null })
                 {
                     var invitation = created.Invitation;
+
+                    InvitationCreated(logger, invitation.Id, tripId);
+
                     var response = new InvitationResponse(
                         invitation.Id,
                         invitation.TripId,
@@ -105,12 +113,14 @@ public static class TripInvitationEndpoints
                         invitation.CreatedAt,
                         invitation.ExpiresAt,
                         invitation.InvitedByEmail,
-                        BuildInvitationUrl(configuration, created.Token));
+                        created.Token is null ? null : invitationUrls.Build(created.Token));
 
                     return Results.Created(
                         $"/api/trips/{tripId}/invitations/{invitation.Id}",
                         response);
                 }
+
+                InvitationRefused(logger, tripId, created.Outcome);
 
                 return created.Outcome switch
                 {
@@ -137,8 +147,11 @@ public static class TripInvitationEndpoints
                 Guid invitationId,
                 ClaimsPrincipal user,
                 InvitationService invitations,
+                ILoggerFactory loggerFactory,
                 CancellationToken cancellationToken) =>
             {
+                var logger = loggerFactory.CreateLogger(LogCategory);
+
                 if (!CurrentUser.TryGetId(user, out var actor))
                 {
                     return Results.Unauthorized();
@@ -150,9 +163,17 @@ public static class TripInvitationEndpoints
                     invitationId,
                     cancellationToken);
 
+                if (result.Outcome is InvitationActionOutcome.Changed)
+                {
+                    InvitationRevoked(logger, invitationId, tripId);
+
+                    return Results.NoContent();
+                }
+
+                InvitationRevokeRefused(logger, invitationId, tripId, result.Outcome);
+
                 return result.Outcome switch
                 {
-                    InvitationActionOutcome.Changed => Results.NoContent(),
                     InvitationActionOutcome.Forbidden => CollaborationProblems.OnlyAnOwner(),
                     _ => CollaborationProblems.InvitationNotFound(),
                 };
@@ -164,20 +185,40 @@ public static class TripInvitationEndpoints
         return endpoints;
     }
 
-    private static string? BuildInvitationUrl(IConfiguration configuration, string? token)
-    {
-        if (string.IsNullOrEmpty(token))
-        {
-            return null;
-        }
+    [LoggerMessage(
+        EventId = 1000,
+        Level = LogLevel.Information,
+        Message = "Invitation {InvitationId} created for trip {TripId}.")]
+    private static partial void InvitationCreated(ILogger logger, Guid invitationId, Guid tripId);
 
-        var baseUrl = configuration[PublicBaseUrlKey];
+    [LoggerMessage(
+        EventId = 1001,
+        Level = LogLevel.Information,
+        Message = "Refused to invite to trip {TripId}: {Outcome}.")]
+    private static partial void InvitationRefused(
+        ILogger logger,
+        Guid tripId,
+        InvitationCreateOutcome outcome);
 
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            baseUrl = DefaultPublicBaseUrl;
-        }
+    [LoggerMessage(
+        EventId = 1002,
+        Level = LogLevel.Warning,
+        Message = "Refused to invite to trip {TripId}: email delivery is not configured.")]
+    private static partial void InvitationDeliveryUnavailable(ILogger logger, Guid tripId);
 
-        return $"{baseUrl.TrimEnd('/')}/invite#token={Uri.EscapeDataString(token)}";
-    }
+    [LoggerMessage(
+        EventId = 1003,
+        Level = LogLevel.Information,
+        Message = "Invitation {InvitationId} revoked from trip {TripId}.")]
+    private static partial void InvitationRevoked(ILogger logger, Guid invitationId, Guid tripId);
+
+    [LoggerMessage(
+        EventId = 1004,
+        Level = LogLevel.Information,
+        Message = "Refused to revoke invitation {InvitationId} from trip {TripId}: {Outcome}.")]
+    private static partial void InvitationRevokeRefused(
+        ILogger logger,
+        Guid invitationId,
+        Guid tripId,
+        InvitationActionOutcome outcome);
 }

@@ -19,7 +19,8 @@ public static class TripEndpoints
         var group = endpoints
             .MapGroup("/api/trips")
             .WithTags("Trips")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithNoStore();
 
         group.MapPost(
             "/",

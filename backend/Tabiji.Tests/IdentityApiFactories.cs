@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace Tabiji.Tests;
 
@@ -54,5 +55,28 @@ internal sealed class EnvironmentApiFactory(string environmentName) : TabijiWebA
         base.ConfigureWebHost(builder);
 
         builder.UseEnvironment(environmentName);
+    }
+}
+
+/// <summary>
+/// The host with email delivery switched on, for the checks that decide whether
+/// it is allowed to start. The public address is what an invitation link would
+/// point at; leaving it out is the configuration under test, so this runs
+/// outside Development where no development default supplies one.
+/// </summary>
+internal sealed class EmailDeliveryApiFactory(string? publicBaseUrl) : TabijiWebApplicationFactory
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+
+        builder.UseEnvironment(Environments.Production);
+        builder.UseSetting("Email:DeliveryEnabled", "true");
+        builder.UseSetting("ConnectionStrings:Tabiji", AuthApiFactory.ConnectionString);
+
+        if (publicBaseUrl is not null)
+        {
+            builder.UseSetting("Invitations:PublicBaseUrl", publicBaseUrl);
+        }
     }
 }

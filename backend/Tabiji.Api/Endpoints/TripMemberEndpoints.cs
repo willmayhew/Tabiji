@@ -19,7 +19,8 @@ public static class TripMemberEndpoints
         var group = endpoints
             .MapGroup("/api/trips/{tripId:guid}/members")
             .WithTags("Trip members")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .WithNoStore();
 
         group.MapGet(
             "/",
