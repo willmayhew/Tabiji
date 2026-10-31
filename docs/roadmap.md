@@ -361,6 +361,11 @@ archiving and the route guard are not.
 - [x] Only an owner may delete a trip.
 - [x] Frontend: the invitation flow, the members section, the trips-page invitation list,
       and the invite page's signed-out, expired, revoked, used and wrong-account states.
+- [x] Verification: the collaboration journeys are driven end to end in a browser
+      (`frontend/e2e`, Playwright), on servers and a database of their own, with two
+      independent sessions standing for the two accounts. A reader who arrives from an
+      invitation can register and still keep it; the invite link can be copied; the owner
+      is told why the last owner's controls are locked.
 - [ ] Cancelling and archiving a trip. `TripStatus` already names the states; nothing
       transitions them yet.
 - [ ] A route guard on the screens that need a session. Deliberately deferred: the session

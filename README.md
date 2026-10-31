@@ -158,6 +158,20 @@ npm run build         # production build into frontend/dist/tabiji
 npm test              # unit tests (Vitest)
 ```
 
+### Browser suite
+
+```powershell
+cd frontend
+npx playwright install chromium   # once
+npm run e2e                       # starts its own API on 5081 and app on 4300
+npm run e2e:ui                    # the same, with the Playwright UI
+npm run e2e -- e2e/invitation-journey.spec.ts
+```
+
+The suite lives in `frontend/e2e` and is described under [Testing](#testing). If your
+shell sets `NODE_ENV=production`, npm skips devDependencies — including Playwright; see the
+note in the setup section.
+
 ---
 
 ## API
@@ -384,8 +398,9 @@ decision records.
 ## Testing
 
 ```powershell
-dotnet test backend/Tabiji.sln   # 447 tests
-cd frontend && npm test           # 382 tests
+dotnet test backend/Tabiji.sln   # 450 tests
+cd frontend && npm test           # 399 unit tests
+npm run e2e                       # 30 browser tests
 ```
 
 The backend suite contains domain and use-case unit tests plus API integration tests that
@@ -403,6 +418,16 @@ with the real migrations and dropped again afterwards.
 The frontend suite covers the root component, the two API clients, the rules, the route
 motif, the destination plate, the shared editor and every screen.
 
+The browser suite (`frontend/e2e`, Playwright, Chromium) drives the real Angular app
+against the real API. Two independent browser contexts stand for two accounts, so an owner
+and an invitee are genuinely separate sessions rather than two tabs of one. It starts its
+own servers — the app on `4300`, the API on `5081` — so it never collides with a
+development session, and its own LocalDB database, `TabijiE2E`, which `global-setup`
+drops and recreates from the real migrations before every run. **The development database
+is never opened.** The suite signs the three fixed accounts
+(`owner@tabiji.test`, `editor@tabiji.test`, `stranger@tabiji.test`) in once per run through
+the real endpoints and reuses the cookie jar, because `/api/auth/login` is rate limited.
+
 ---
 
 ## Configuration
@@ -413,7 +438,7 @@ motif, the destination plate, the shared editor and every screen.
 | `Cors:AllowedOrigins` | `appsettings.json` | The Angular dev origin, `http://localhost:4200`. |
 | `Email:DeliveryEnabled` | `appsettings.json` (`false`) | Off until a mail transport exists; the four email-dependent account routes and invitation creation outside Development answer `503` while it is. |
 | `Invitations:ExpiryDays` | `appsettings.json` (`7`) | How long an invitation remains acceptable, between 1 and 30 days. |
-| `Invitations:PublicBaseUrl` | `appsettings.Development.json` (`http://localhost:4200`) | The frontend origin used to build the development invitation link; set it in any deployment that enables email. |
+| `Invitations:PublicBaseUrl` | `appsettings.Development.json` (`http://localhost:4200`) | The frontend origin the invitation link is built from. Required when `Email:DeliveryEnabled` is true — the host refuses to start without it rather than mailing links to localhost. |
 | `ASPNETCORE_ENVIRONMENT` | `launchSettings.json` | `Development` for the local profiles. |
 
 No credential is committed to this repository.

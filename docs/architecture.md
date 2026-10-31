@@ -1107,6 +1107,23 @@ developer and every build uses the same compiler.
 **The EF tool is pinned locally.** `.config/dotnet-tools.json` pins `dotnet-ef` to
 10.0.13, matching the EF Core runtime version. Run `dotnet tool restore` once.
 
+**Browser verification is Playwright, on its own servers and its own database.** The
+collaboration journey needs two accounts at once, which a unit test cannot honestly stand
+in for, so `frontend/e2e` drives the real app against the real API in Chromium. It gets
+ports of its own (`4300` for the app, `5081` for the API) and a LocalDB database of its own
+(`TabijiE2E`, dropped and recreated from the real migrations by `global-setup`), so a run
+never collides with a development session and never opens the development database. Each
+account is signed in once per run and the cookie jar is reused, because `/api/auth/login`
+is rate limited. Nothing was added to the product to make it testable: the only inputs are
+environment variables and a second proxy configuration.
+
+**Private reads are not cached, and invitations are logged.** Every trip, member and
+invitation read answers `Cache-Control: no-store`, so a shared machine cannot show one
+account's trips out of a back-navigation cache. Invitation activity — issued, accepted,
+declined, revoked, and each refusal — is logged through source-generated `LoggerMessage`
+delegates that name the invitation by its identifier. The token is never logged, and
+neither is an address.
+
 ## 8. Testing
 
 | Suite | Location | Scope | Needs a database? |
@@ -1122,6 +1139,7 @@ developer and every build uses the same compiler.
 | Migration tests | `backend/Tabiji.Tests/*MigrationTests.cs` | The operations of a migration, inspected by reflection; the ones that move data run against a disposable database | Mostly no |
 | Repository tests | `backend/Tabiji.Tests/TripRepositoryTests.cs`, `InvitationRepositoryTests.cs` | The route, the membership and the invitation statements against a real database | **Yes** |
 | Frontend unit tests | `frontend/src/app/**/*.spec.ts` | Components, the API clients, the rules, the route motif, the destination plate, the map picker, the geocoder, the members panel and the invitation page | No |
+| Browser tests | `frontend/e2e/*.spec.ts` | The collaboration journeys end to end in Chromium: two accounts, invitations, roles, editor limits, session and reload | **Yes** (a database of their own) |
 
 The suite is written to run **without a database**, and most of it does. The one exception
 is the repository, because writing a route back is the one thing that cannot be checked any
@@ -1359,9 +1377,13 @@ the membership row and the role in it, in the repository, not in the endpoint.
 
 The layering is designed so that the roadmap features land without rework:
 
-- **Invitations** are in place as their own aggregate with their own lifecycle. Turning the
-  development link into a delivered email is an `IInvitationNotifier` behind the existing
-  flag; no domain or schema change is needed.
+- **Invitations** are in place as their own aggregate with their own lifecycle. The link
+  is built in one place (`InvitationUrlBuilder`, over `Invitations:PublicBaseUrl`) with the
+  token in the URL fragment. Turning the development link into a delivered email is an
+  `IInvitationNotifier` behind the existing flag: the invitation is written and committed
+  first, the notification follows, and a failure to send leaves the invitation pending
+  rather than losing it. No domain or schema change is needed. A deployment that enables
+  delivery must name the public address, and the host refuses to start without it.
 - **Proposals, votes, comments and itinerary items** each become an aggregate in `Domain`, a
   service and a port in `Application`, and a repository in `Infrastructure`.
 - **Trip membership** already has two roles and a membership table. A future role-restricted
