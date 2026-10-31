@@ -74,6 +74,12 @@ export class TripMembers implements OnInit {
   readonly actionError = signal<string | null>(null);
   readonly announcement = signal<string | null>(null);
 
+  /** The member whose role change or removal is being written, so only that row goes quiet. */
+  readonly busyMemberId = signal<string | null>(null);
+
+  /** Why the last owner's controls are locked, in one place. */
+  protected readonly lastOwnerHint = 'A trip must keep at least one owner.';
+
   readonly inviteForm = this.formBuilder.group({
     email: this.formBuilder.control('', {
       validators: [Validators.required, Validators.email],
@@ -248,18 +254,21 @@ export class TripMembers implements OnInit {
     }
 
     this.actionError.set(null);
+    this.busyMemberId.set(member.userId);
 
     this.membersService
       .changeRole(this.tripId(), member.userId, role)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (members) => {
+          this.busyMemberId.set(null);
           this.applyMembers(members);
           this.announcement.set(
             `${member.email} is now ${role === 'Owner' ? 'an owner' : 'an editor'}.`,
           );
         },
         error: (failure: HttpErrorResponse) => {
+          this.busyMemberId.set(null);
           this.actionError.set(describeHttpError(failure));
           select.value = member.role;
         },
@@ -268,7 +277,7 @@ export class TripMembers implements OnInit {
 
   protected remove(member: TripMember): void {
     if (this.isLastOwner(member)) {
-      this.actionError.set('A trip must keep at least one owner.');
+      this.actionError.set(this.lastOwnerHint);
       return;
     }
 
@@ -277,12 +286,15 @@ export class TripMembers implements OnInit {
     }
 
     this.actionError.set(null);
+    this.busyMemberId.set(member.userId);
 
     this.membersService
       .remove(this.tripId(), member.userId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          this.busyMemberId.set(null);
+
           if (this.isSelf(member)) {
             this.leftTrip.emit();
             return;
@@ -292,6 +304,7 @@ export class TripMembers implements OnInit {
           this.load();
         },
         error: (failure: HttpErrorResponse) => {
+          this.busyMemberId.set(null);
           this.actionError.set(describeHttpError(failure));
         },
       });

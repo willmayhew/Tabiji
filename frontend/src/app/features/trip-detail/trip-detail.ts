@@ -16,7 +16,11 @@ import { TripsService } from '../../core/api/trips.service';
 import { SessionService } from '../../core/auth/session.service';
 import { MemberRole } from '../../core/models/member';
 import { Trip, TripDestination, TripStatus } from '../../core/models/trip';
-import { formatDestinationDates, formatTripDate, formatTripDates } from '../../shared/format/trip-dates';
+import {
+  formatDestinationDates,
+  formatTripDate,
+  formatTripDates,
+} from '../../shared/format/trip-dates';
 import { routeSummary } from '../../shared/format/trip-destinations';
 import { TripForm } from '../../shared/form/trip-form';
 import { SignInPrompt } from '../../shared/ui/sign-in-prompt';
@@ -65,10 +69,11 @@ export class TripDetail {
   protected readonly viewerRole = computed(() => this.trip()?.viewerRole ?? null);
 
   /**
-   * Only an owner may destroy a trip. When the role is not known — an older
-   * response or a fixture — the existing behaviour is kept.
+   * Only an owner may destroy a trip. The API refuses everybody else; this
+   * only keeps the control away until the role is known, so an editor is
+   * never offered something the trip will refuse.
    */
-  protected readonly canDelete = computed(() => this.viewerRole() !== 'Editor');
+  protected readonly canDelete = computed(() => this.viewerRole() === 'Owner');
 
   /** Whether the trip is being changed. */
   readonly editing = signal(false);

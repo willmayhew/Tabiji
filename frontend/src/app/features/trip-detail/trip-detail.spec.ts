@@ -135,8 +135,8 @@ describe('TripDetail', () => {
   it('should set the route out in order', () => {
     showTrip();
 
-    const names = [...element().querySelectorAll('.route__name')].map(
-      (node) => node.textContent?.trim(),
+    const names = [...element().querySelectorAll('.route__name')].map((node) =>
+      node.textContent?.trim(),
     );
 
     expect(names).toEqual(['Rome', 'Amalfi', 'Naples']);
@@ -145,8 +145,8 @@ describe('TripDetail', () => {
   it('should show the dates of each stop', () => {
     showTrip();
 
-    const dates = [...element().querySelectorAll('.route__dates-text')].map(
-      (node) => node.textContent?.trim(),
+    const dates = [...element().querySelectorAll('.route__dates-text')].map((node) =>
+      node.textContent?.trim(),
     );
 
     expect(dates).toEqual(['1 Apr – 4 Apr 2027', '4 Apr – 6 Apr 2027', 'Dates not decided']);
@@ -255,9 +255,9 @@ describe('TripDetail', () => {
 
     expect(element().querySelector('#trip-name')).not.toBeNull();
     expect((element().querySelector('#trip-destination-0') as HTMLInputElement).value).toBe('Rome');
-    expect((element().querySelector('#trip-destination-0-startsOn') as HTMLInputElement).value).toBe(
-      '2027-04-01',
-    );
+    expect(
+      (element().querySelector('#trip-destination-0-startsOn') as HTMLInputElement).value,
+    ).toBe('2027-04-01');
   });
 
   it('should put the whole trip back when the reader saves it', () => {
@@ -279,9 +279,33 @@ describe('TripDetail', () => {
       startsOn: '2027-04-01',
       endsOn: '2027-04-08',
       destinations: [
-        { id: 'a1', name: 'Rome', startsOn: '2027-04-01', endsOn: '2027-04-04', latitude: null, longitude: null, stops: [] },
-        { id: 'b2', name: 'Amalfi', startsOn: '2027-04-04', endsOn: '2027-04-06', latitude: null, longitude: null, stops: [] },
-        { id: 'c3', name: 'Naples', startsOn: null, endsOn: null, latitude: null, longitude: null, stops: [] },
+        {
+          id: 'a1',
+          name: 'Rome',
+          startsOn: '2027-04-01',
+          endsOn: '2027-04-04',
+          latitude: null,
+          longitude: null,
+          stops: [],
+        },
+        {
+          id: 'b2',
+          name: 'Amalfi',
+          startsOn: '2027-04-04',
+          endsOn: '2027-04-06',
+          latitude: null,
+          longitude: null,
+          stops: [],
+        },
+        {
+          id: 'c3',
+          name: 'Naples',
+          startsOn: null,
+          endsOn: null,
+          latitude: null,
+          longitude: null,
+          stops: [],
+        },
       ],
     });
 
@@ -366,6 +390,46 @@ describe('TripDetail', () => {
 
     expect(element().textContent).toContain('Save changes');
     expect(element().textContent).not.toContain('Delete this trip');
+  });
+
+  it('should keep the delete control away until the role is known', () => {
+    showTrip();
+
+    const edit = element().querySelector('.detail__edit-button') as HTMLButtonElement;
+
+    edit.click();
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Save changes');
+    expect(element().textContent).not.toContain('Delete this trip');
+  });
+
+  it('should offer the delete control to the owner', () => {
+    createComponent(trip.id);
+
+    http.expectOne(`/api/trips/${trip.id}`).flush({ ...trip, viewerRole: 'Owner' });
+    fixture.detectChanges();
+
+    http.expectOne(`/api/trips/${trip.id}/members`).flush({
+      viewerRole: 'Owner',
+      members: [
+        {
+          userId: 'owner-1',
+          email: 'owner@example.com',
+          role: 'Owner',
+          grantedAt: '2026-10-30T09:00:00Z',
+        },
+      ],
+    });
+    http.expectOne(`/api/trips/${trip.id}/invitations`).flush([]);
+    fixture.detectChanges();
+
+    const edit = element().querySelector('.detail__edit-button') as HTMLButtonElement;
+
+    edit.click();
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Delete this trip');
   });
 });
 

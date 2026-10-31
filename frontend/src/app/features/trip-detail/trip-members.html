@@ -35,7 +35,9 @@
                 class="member-row__role"
                 [id]="roleId(member)"
                 [value]="member.role"
-                [disabled]="isLastOwner(member)"
+                [disabled]="isLastOwner(member) || busyMemberId() === member.userId"
+                [attr.title]="isLastOwner(member) ? lastOwnerHint : null"
+                [attr.aria-describedby]="isLastOwner(member) ? 'owner-hint' : null"
                 (change)="changeRole(member, $event)"
               >
                 <option value="Editor">Editor</option>
@@ -45,7 +47,9 @@
               <button
                 type="button"
                 class="icon-button icon-button--danger"
-                [disabled]="isLastOwner(member)"
+                [disabled]="isLastOwner(member) || busyMemberId() === member.userId"
+                [attr.title]="isLastOwner(member) ? lastOwnerHint : null"
+                [attr.aria-describedby]="isLastOwner(member) ? 'owner-hint' : null"
                 (click)="remove(member)"
                 [attr.aria-label]="'Remove ' + member.email"
               >
@@ -58,7 +62,7 @@
     </ul>
 
     @if (hasSingleOwner()) {
-      <p class="field-hint">A trip must keep at least one owner.</p>
+      <p class="field-hint" id="owner-hint">{{ lastOwnerHint }}</p>
     }
   }
 

@@ -231,6 +231,55 @@ describe('TripMembers', () => {
     }
   });
 
+  it('should explain the controls the last owner cannot use', () => {
+    create('Owner', { viewerRole: 'Owner', members: [owner] });
+
+    const select = element().querySelector('.member-row__role') as HTMLSelectElement;
+    const remove = element().querySelector('.member-row__actions button') as HTMLButtonElement;
+    const hint = element().querySelector('#owner-hint') as HTMLElement;
+
+    expect(select.disabled).toBe(true);
+    expect(remove.disabled).toBe(true);
+    expect(select.getAttribute('title')).toBe('A trip must keep at least one owner.');
+    expect(select.getAttribute('aria-describedby')).toBe('owner-hint');
+    expect(remove.getAttribute('aria-describedby')).toBe('owner-hint');
+    expect(hint.textContent).toContain('A trip must keep at least one owner.');
+  });
+
+  it('should keep a row quiet while its write is in flight', () => {
+    const secondEditor: TripMember = {
+      userId: 'editor-2',
+      email: 'editor2@example.com',
+      role: 'Editor',
+      grantedAt: '2026-10-30T09:00:00Z',
+    };
+
+    create('Owner', { viewerRole: 'Owner', members: [owner, editor, secondEditor] });
+
+    const promotedSelect = element().querySelectorAll('.member-row__role')[1] as HTMLSelectElement;
+
+    promotedSelect.value = 'Owner';
+    promotedSelect.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const request = http.expectOne(`/api/trips/trip-1/members/${editor.userId}`);
+    const row = promotedSelect.closest('.member-row') as HTMLElement;
+    const otherSelect = element().querySelectorAll('.member-row__role')[2] as HTMLSelectElement;
+
+    // Only the row being written is locked.
+    expect(row.querySelector('select')?.disabled).toBe(true);
+    expect(row.querySelector('button')?.disabled).toBe(true);
+    expect(otherSelect.disabled).toBe(false);
+
+    request.flush({
+      viewerRole: 'Owner',
+      members: [owner, { ...editor, role: 'Owner' }, secondEditor],
+    });
+    fixture.detectChanges();
+
+    expect(promotedSelect.disabled).toBe(false);
+  });
+
   it('should revoke a pending invitation', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
