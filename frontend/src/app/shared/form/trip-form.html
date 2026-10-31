@@ -118,19 +118,6 @@
           <span class="route__actions">
             <button
               type="button"
-              class="icon-button route__toggle"
-              [id]="stopsToggleId(index)"
-              (click)="toggleDestination(index)"
-              [attr.aria-expanded]="isExpanded(index)"
-              [attr.aria-controls]="stopsPanelId(index)"
-              [attr.aria-label]="
-                (isExpanded(index) ? 'Hide' : 'Show') + ' stops at ' + destinationLabel(index)
-              "
-            >
-              <span aria-hidden="true">{{ isExpanded(index) ? '▾' : '▸' }}</span>
-            </button>
-            <button
-              type="button"
               class="icon-button"
               [id]="stopActionId(index, 'up')"
               (click)="moveUp(index)"
@@ -171,158 +158,170 @@
             <p class="field-error" [id]="'trip-destination-schedule-' + index">{{ message }}</p>
           }
 
-          <!-- The panel is always in the document, so collapsing a
-               destination never removes the stops the reader entered. -->
-          <div
-            class="route__stops"
-            [id]="stopsPanelId(index)"
-            [hidden]="!isExpanded(index)"
-          >
-            <p class="route__stops-caption">Stops in {{ destinationLabel(index) }}</p>
+          <!-- The stops of a destination are folded away until they are
+               wanted: the route stays readable at a glance, and a destination
+               opens when its stops are. The panel itself is always in the
+               document, so folding it never removes what the reader entered,
+               and the button that adds a stop stands outside it. -->
+          <div class="route__stops-region">
+            <button
+              type="button"
+              class="route__stops-head"
+              [id]="stopsToggleId(index)"
+              (click)="toggleDestination(index)"
+              [attr.aria-expanded]="isExpanded(index)"
+              [attr.aria-controls]="stopsPanelId(index)"
+              [attr.aria-label]="
+                (isExpanded(index) ? 'Hide' : 'Show') + ' stops in ' + destinationLabel(index)
+              "
+            >
+              <span class="route__stops-caret" aria-hidden="true">{{
+                isExpanded(index) ? '▾' : '▸'
+              }}</span>
+              <span class="route__stops-label" aria-hidden="true">
+                Stops in {{ destinationLabel(index) }}
+              </span>
+              <span class="route__stops-count" aria-hidden="true">{{ stopCount(index) }}</span>
+            </button>
 
-            <ol class="stops" formArrayName="stops">
-              @for (stop of stopsAt(index)?.controls ?? []; track stop; let stopIndex = $index) {
-                <li class="stops__row" [formGroupName]="stopIndex">
-                  <span class="stops__node" aria-hidden="true"></span>
+            <div class="route__stops" [id]="stopsPanelId(index)" [hidden]="!isExpanded(index)">
+              <ol class="stops" formArrayName="stops">
+                @for (stop of stopsAt(index)?.controls ?? []; track stop; let stopIndex = $index) {
+                  <li class="stops__row" [formGroupName]="stopIndex">
+                    <span class="stops__node" aria-hidden="true"></span>
 
-                  <div class="stops__body">
-                    <div class="route__field">
-                      <input
-                        class="route__input"
-                        [id]="stopInputId(index, stopIndex)"
-                        type="text"
-                        formControlName="name"
-                        [attr.maxlength]="destinationMaxLength"
-                        autocomplete="off"
-                        (input)="onNameTyped(index, stopIndex)"
-                        [attr.aria-label]="
-                          'Stop ' + (stopIndex + 1) + ' at ' + destinationLabel(index)
-                        "
-                        [attr.aria-invalid]="stopError(index, stopIndex) ? 'true' : null"
-                        [attr.aria-describedby]="stopDescribedBy(index, stopIndex)"
-                      />
+                    <div class="stops__body">
+                      <div class="route__field">
+                        <input
+                          class="route__input"
+                          [id]="stopInputId(index, stopIndex)"
+                          type="text"
+                          formControlName="name"
+                          [attr.maxlength]="destinationMaxLength"
+                          autocomplete="off"
+                          (input)="onNameTyped(index, stopIndex)"
+                          [attr.aria-label]="
+                            'Stop ' + (stopIndex + 1) + ' at ' + destinationLabel(index)
+                          "
+                          [attr.aria-invalid]="stopError(index, stopIndex) ? 'true' : null"
+                          [attr.aria-describedby]="stopDescribedBy(index, stopIndex)"
+                        />
+                        <button
+                          type="button"
+                          class="icon-button route__map"
+                          [id]="stopMapButtonId(index, stopIndex)"
+                          (click)="openPicker(index, stopIndex)"
+                          [attr.aria-label]="'Choose ' + stopLabel(index, stopIndex) + ' on a map'"
+                          aria-haspopup="dialog"
+                        >
+                          <svg
+                            class="route__map-icon"
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                            focusable="false"
+                          >
+                            <path
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="1.5"
+                              stroke-linejoin="round"
+                              d="M10 2.5c-2.9 0-5.2 2.3-5.2 5.2 0 3.6 4.3 8.1 4.9 8.7a.4.4 0 0 0 .6 0c.6-.6 4.9-5.1 4.9-8.7 0-2.9-2.3-5.2-5.2-5.2Z"
+                            />
+                            <circle
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="1.5"
+                              cx="10"
+                              cy="7.7"
+                              r="1.9"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <div class="route__dates">
+                        <span class="route__date">
+                          <span class="route__date-label" aria-hidden="true">Arrive</span>
+                          <input
+                            class="route__date-input"
+                            type="date"
+                            [id]="stopDateInputId(index, 'startsOn', stopIndex)"
+                            formControlName="startsOn"
+                            [attr.aria-label]="'Arrival date at ' + stopLabel(index, stopIndex)"
+                            [attr.aria-invalid]="scheduleError(index, stopIndex) ? 'true' : null"
+                            [attr.aria-describedby]="stopDescribedBy(index, stopIndex)"
+                          />
+                        </span>
+
+                        <span class="route__date">
+                          <span class="route__date-label" aria-hidden="true">Leave</span>
+                          <input
+                            class="route__date-input"
+                            type="date"
+                            [id]="stopDateInputId(index, 'endsOn', stopIndex)"
+                            formControlName="endsOn"
+                            [attr.aria-label]="'Departure date from ' + stopLabel(index, stopIndex)"
+                            [attr.aria-invalid]="scheduleError(index, stopIndex) ? 'true' : null"
+                            [attr.aria-describedby]="stopDescribedBy(index, stopIndex)"
+                          />
+                        </span>
+                      </div>
+                    </div>
+
+                    <span class="route__actions">
                       <button
                         type="button"
-                        class="icon-button route__map"
-                        [id]="stopMapButtonId(index, stopIndex)"
-                        (click)="openPicker(index, stopIndex)"
-                        [attr.aria-label]="'Choose ' + stopLabel(index, stopIndex) + ' on a map'"
-                        aria-haspopup="dialog"
+                        class="icon-button"
+                        [id]="stopActionId(index, 'up', stopIndex)"
+                        (click)="moveStopUp(index, stopIndex)"
+                        [disabled]="stopIndex === 0"
+                        [attr.aria-label]="'Move ' + stopLabel(index, stopIndex) + ' up'"
                       >
-                        <svg
-                          class="route__map-icon"
-                          viewBox="0 0 20 20"
-                          aria-hidden="true"
-                          focusable="false"
-                        >
-                          <path
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.5"
-                            stroke-linejoin="round"
-                            d="M10 2.5c-2.9 0-5.2 2.3-5.2 5.2 0 3.6 4.3 8.1 4.9 8.7a.4.4 0 0 0 .6 0c.6-.6 4.9-5.1 4.9-8.7 0-2.9-2.3-5.2-5.2-5.2Z"
-                          />
-                          <circle
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="1.5"
-                            cx="10"
-                            cy="7.7"
-                            r="1.9"
-                          />
-                        </svg>
+                        <span aria-hidden="true">&uarr;</span>
                       </button>
-                    </div>
+                      <button
+                        type="button"
+                        class="icon-button"
+                        [id]="stopActionId(index, 'down', stopIndex)"
+                        (click)="moveStopDown(index, stopIndex)"
+                        [disabled]="stopIndex === (stopsAt(index)?.length ?? 1) - 1"
+                        [attr.aria-label]="'Move ' + stopLabel(index, stopIndex) + ' down'"
+                      >
+                        <span aria-hidden="true">&darr;</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="icon-button icon-button--danger"
+                        [id]="stopActionId(index, 'remove', stopIndex)"
+                        (click)="removeStop(index, stopIndex)"
+                        [attr.aria-label]="'Remove ' + stopLabel(index, stopIndex)"
+                      >
+                        <span aria-hidden="true">&times;</span>
+                      </button>
+                    </span>
 
-                    <div class="route__dates">
-                      <span class="route__date">
-                        <span class="route__date-label" aria-hidden="true">Arrive</span>
-                        <input
-                          class="route__date-input"
-                          type="date"
-                          [id]="stopDateInputId(index, 'startsOn', stopIndex)"
-                          formControlName="startsOn"
-                          [attr.aria-label]="'Arrival date at ' + stopLabel(index, stopIndex)"
-                          [attr.aria-invalid]="
-                            scheduleError(index, stopIndex) ? 'true' : null
-                          "
-                          [attr.aria-describedby]="stopDescribedBy(index, stopIndex)"
-                        />
-                      </span>
-
-                      <span class="route__date">
-                        <span class="route__date-label" aria-hidden="true">Leave</span>
-                        <input
-                          class="route__date-input"
-                          type="date"
-                          [id]="stopDateInputId(index, 'endsOn', stopIndex)"
-                          formControlName="endsOn"
-                          [attr.aria-label]="'Departure date from ' + stopLabel(index, stopIndex)"
-                          [attr.aria-invalid]="
-                            scheduleError(index, stopIndex) ? 'true' : null
-                          "
-                          [attr.aria-describedby]="stopDescribedBy(index, stopIndex)"
-                        />
-                      </span>
-                    </div>
-                  </div>
-
-                  <span class="route__actions">
-                    <button
-                      type="button"
-                      class="icon-button"
-                      [id]="stopActionId(index, 'up', stopIndex)"
-                      (click)="moveStopUp(index, stopIndex)"
-                      [disabled]="stopIndex === 0"
-                      [attr.aria-label]="'Move ' + stopLabel(index, stopIndex) + ' up'"
-                    >
-                      <span aria-hidden="true">&uarr;</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="icon-button"
-                      [id]="stopActionId(index, 'down', stopIndex)"
-                      (click)="moveStopDown(index, stopIndex)"
-                      [disabled]="stopIndex === (stopsAt(index)?.length ?? 1) - 1"
-                      [attr.aria-label]="'Move ' + stopLabel(index, stopIndex) + ' down'"
-                    >
-                      <span aria-hidden="true">&darr;</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="icon-button icon-button--danger"
-                      [id]="stopActionId(index, 'remove', stopIndex)"
-                      (click)="removeStop(index, stopIndex)"
-                      [attr.aria-label]="'Remove ' + stopLabel(index, stopIndex)"
-                    >
-                      <span aria-hidden="true">&times;</span>
-                    </button>
-                  </span>
-
-                  @if (stopError(index, stopIndex); as message) {
-                    <p class="field-error" [id]="'trip-stop-error-' + index + '-' + stopIndex">
-                      {{ message }}
-                    </p>
-                  }
-                  @if (stopDatesError(index, stopIndex); as message) {
-                    <p
-                      class="field-error"
-                      [id]="'trip-stop-dates-error-' + index + '-' + stopIndex"
-                    >
-                      {{ message }}
-                    </p>
-                  }
-                  @if (scheduleError(index, stopIndex); as message) {
-                    <p
-                      class="field-error"
-                      [id]="'trip-stop-schedule-' + index + '-' + stopIndex"
-                    >
-                      {{ message }}
-                    </p>
-                  }
-                </li>
-              }
-            </ol>
+                    @if (stopError(index, stopIndex); as message) {
+                      <p class="field-error" [id]="'trip-stop-error-' + index + '-' + stopIndex">
+                        {{ message }}
+                      </p>
+                    }
+                    @if (stopDatesError(index, stopIndex); as message) {
+                      <p
+                        class="field-error"
+                        [id]="'trip-stop-dates-error-' + index + '-' + stopIndex"
+                      >
+                        {{ message }}
+                      </p>
+                    }
+                    @if (scheduleError(index, stopIndex); as message) {
+                      <p class="field-error" [id]="'trip-stop-schedule-' + index + '-' + stopIndex">
+                        {{ message }}
+                      </p>
+                    }
+                  </li>
+                }
+              </ol>
+            </div>
 
             <div class="route__add route__add--stop">
               <button
@@ -336,6 +335,9 @@
               <p class="field-hint">Up to {{ maxStopsPerDestination }} stops.</p>
             </div>
 
+            <!-- The message about the stops as a whole belongs outside the
+                 panel: a folded destination must never hide a reason the
+                 form cannot be sent. -->
             @if (stopsError(index); as message) {
               <p class="field-error" [id]="'trip-destination-stops-error-' + index">
                 {{ message }}
@@ -431,12 +433,12 @@
       <div class="form__actions-row">
         <button
           type="button"
-          class="button button--secondary button--block form__actions-main" 
+          class="button button--secondary button--block form__actions-main"
           (click)="cancel()"
         >
           Cancel
         </button>
-        
+
         @if (canDelete()) {
           <button
             type="button"
@@ -447,9 +449,8 @@
             {{ deleting() ? 'Deleting…' : 'Delete this trip' }}
           </button>
         }
-      </div>   
+      </div>
     }
-
   </div>
 </form>
 

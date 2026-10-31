@@ -167,7 +167,7 @@ export class TripForm {
           this.error.set(describeHttpError(failure));
           this.sessionExpired.set(failure.status === 401);
         },
-    });
+      });
   }
 
   readonly form = this.formBuilder.group(
@@ -350,8 +350,6 @@ export class TripForm {
 
     this.form.controls.destinations.clear();
 
-    const expanded = new Set<AbstractControl>();
-
     for (const destination of destinations) {
       const stops = stopsOf(destination)
         .slice()
@@ -386,21 +384,12 @@ export class TripForm {
       );
 
       this.form.controls.destinations.push(control);
-
-      if (stops.length > 0) {
-        expanded.add(control);
-      }
     }
 
-    if (expanded.size === 0) {
-      const first = this.form.controls.destinations.at(0);
-
-      if (first !== undefined) {
-        expanded.add(first);
-      }
-    }
-
-    this.expanded.set(expanded);
+    // A trip handed to the form arrives folded: every destination is there to
+    // be read at a glance, and the stops of one are opened when they are
+    // wanted. A destination the reader adds is opened for them.
+    this.expanded.set(new Set());
 
     this.form.patchValue({
       name: trip.name,
@@ -692,7 +681,10 @@ export class TripForm {
   protected addStop(destinationIndex: number): void {
     const destination = this.destinations.at(destinationIndex);
 
-    if (destination === undefined || destination.controls.stops.length >= this.maxStopsPerDestination) {
+    if (
+      destination === undefined ||
+      destination.controls.stops.length >= this.maxStopsPerDestination
+    ) {
       return;
     }
 
@@ -717,10 +709,7 @@ export class TripForm {
     destination.controls.stops.removeAt(stopIndex);
 
     this.announcement.set(`Removed ${name}.`);
-    this.focusStop(
-      destinationIndex,
-      Math.min(stopIndex, destination.controls.stops.length - 1),
-    );
+    this.focusStop(destinationIndex, Math.min(stopIndex, destination.controls.stops.length - 1));
   }
 
   protected moveStopUp(destinationIndex: number, stopIndex: number): void {
@@ -973,9 +962,9 @@ export class TripForm {
    * it is on, or the trip or destination it belongs to.
    */
   protected scheduleError(index: number, stopIndex?: number): string | null {
-    const errors = this.form.errors as
-      | { tripSchedule?: { message?: string; index?: number; stopIndex?: number } }
-      | null;
+    const errors = this.form.errors as {
+      tripSchedule?: { message?: string; index?: number; stopIndex?: number };
+    } | null;
     const problem = errors?.tripSchedule;
 
     if (!problem || problem.index !== index) {
@@ -1108,11 +1097,7 @@ export class TripForm {
     this.focusElement(this.stopActionId(index, action), false);
   }
 
-  private focusStopAction(
-    index: number,
-    stopIndex: number,
-    action: 'up' | 'down',
-  ): void {
+  private focusStopAction(index: number, stopIndex: number, action: 'up' | 'down'): void {
     this.focusElement(this.stopActionId(index, action, stopIndex), false);
   }
 
