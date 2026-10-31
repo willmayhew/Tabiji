@@ -103,8 +103,10 @@ describe('TripMembers', () => {
     expect(element().textContent).toContain('editor@example.com');
     expect(element().textContent).toContain('You');
     expect(element().textContent).toContain('Invite a traveller');
-    expect(element().textContent).toContain('Pending invitations');
+    expect(element().textContent).toContain('Invitations');
     expect(element().textContent).toContain('invited@example.com');
+
+    expect(element().textContent).toContain('1 pending');
 
     const selects = element().querySelectorAll('.member-row__role');
 
@@ -122,10 +124,34 @@ describe('TripMembers', () => {
 
     expect(element().textContent).toContain('editor@example.com');
     expect(element().textContent).not.toContain('Invite a traveller');
-    expect(element().textContent).not.toContain('Pending invitations');
+    expect(element().textContent).not.toContain('Invitations');
     expect(element().querySelector('.member-row__role')).toBeNull();
     expect(element().querySelector('.member-row__actions')).toBeNull();
     http.expectNone('/api/trips/trip-1/invitations');
+  });
+
+  it('should show decided invitations as history, with the pending count apart', () => {
+    fixture = TestBed.createComponent(TripMembers);
+    fixture.componentRef.setInput('tripId', 'trip-1');
+    fixture.componentRef.setInput('viewerRole', 'Owner');
+    fixture.detectChanges();
+
+    http.expectOne('/api/trips/trip-1/members').flush({ viewerRole: 'Owner', members: [owner] });
+    http.expectOne('/api/trips/trip-1/invitations').flush([
+      { ...invitation, status: 'Declined' },
+      { ...invitation, id: 'inv-2', email: 'pending@example.com', status: 'Pending' },
+    ]);
+    fixture.detectChanges();
+
+    expect(element().textContent).toContain('Invitations');
+    expect(element().textContent).toContain('1 pending');
+
+    // Only the invitation that could still be accepted offers a revoke.
+    const revokeButtons = [...element().querySelectorAll('.invitation-row button')];
+
+    expect(revokeButtons.length).toBe(1);
+    expect(element().textContent).toContain('pending@example.com');
+    expect(element().textContent).toContain('Declined');
   });
 
   it('should invite an address and show the development link', () => {

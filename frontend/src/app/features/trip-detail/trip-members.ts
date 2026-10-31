@@ -89,6 +89,11 @@ export class TripMembers implements OnInit {
 
   readonly hasSingleOwner = computed(() => this.ownerCount() === 1);
 
+  /** The invitations that could still be accepted, out of the whole history. */
+  readonly pendingInvitations = computed(() =>
+    this.invitations().filter((item) => item.status === 'Pending'),
+  );
+
   ngOnInit(): void {
     this.load();
   }

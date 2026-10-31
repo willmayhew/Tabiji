@@ -111,10 +111,14 @@
     </div>
 
     <div class="members__invitations">
-      <h3 class="detail__heading">Pending invitations</h3>
+      <h3 class="detail__heading">Invitations</h3>
+
+      @if (pendingInvitations().length > 0) {
+        <p class="field-hint">{{ pendingInvitations().length }} pending</p>
+      }
 
       @if (invitations().length === 0) {
-        <p class="muted">No pending invitations.</p>
+        <p class="muted">No invitations yet.</p>
       } @else {
         <ul class="invitation-list">
           @for (invitation of invitations(); track invitation.id) {

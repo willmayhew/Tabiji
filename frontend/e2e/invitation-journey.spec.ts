@@ -29,8 +29,9 @@ test.describe('the invitation journey', () => {
     await page.getByRole('button', { name: 'Copy link' }).click();
     await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
 
-    // The invitation joins the pending list with its expiry.
-    await expect(page.getByRole('heading', { name: 'Pending invitations' })).toBeVisible();
+    // The invitation joins the list, with the pending count kept honest.
+    await expect(page.getByRole('heading', { name: 'Invitations' })).toBeVisible();
+    await expect(page.getByText('1 pending')).toBeVisible();
     await expect(page.locator('.invitation-row', { hasText: ACCOUNTS.editor.email })).toBeVisible();
     await expect(page.locator('.invitation-row__expiry')).toContainText('Expires');
   });
