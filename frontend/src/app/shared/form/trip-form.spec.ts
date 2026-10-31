@@ -686,9 +686,12 @@ describe('TripForm', () => {
     expect(fixture.componentInstance.form.controls.startsOn.value).toBe('2027-04-01');
   });
 
-  it('should keep the first destination of a new trip open', () => {
-    expect(stopsHead(0).getAttribute('aria-expanded')).toBe('true');
-    expect(stopsPanel(0).hidden).toBe(false);
+  it('should offer a new destination no dropdown until it holds a stop', () => {
+    // There is nothing to open, so nothing is offered: the button that adds a
+    // stop is the only control the stops area shows.
+    expect(element().querySelector('#trip-destination-0-stops-toggle')).toBeNull();
+    expect(stopsPanel(0).hidden).toBe(true);
+    expect(addStopButton(0)).toBeTruthy();
   });
 
   it('should fold the stops of a trip that already exists', () => {
@@ -698,8 +701,8 @@ describe('TripForm', () => {
     expect(stopsHead(0).getAttribute('aria-expanded')).toBe('false');
     expect(stopsPanel(0).hidden).toBe(true);
 
-    // The count beside the dropdown button says what is folded away.
-    expect(element().querySelector('.atlas-list__stop-count')?.textContent?.trim()).toBe('1');
+    // The heading says what is folded away.
+    expect(element().querySelector('.route__stops-count')?.textContent?.trim()).toBe('1');
 
     // Folded away, not thrown away: the stop is still in the form, so saving
     // the trip keeps it.
