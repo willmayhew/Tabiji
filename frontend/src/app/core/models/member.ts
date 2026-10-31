@@ -69,7 +69,3 @@ export interface AcceptedInvitation {
   tripId: string;
   role: MemberRole;
 }
-
-export function isActionable(status: InvitationStatus): boolean {
-  return status === 'Pending';
-}

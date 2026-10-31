@@ -7,7 +7,15 @@
   </div>
 
   @if (loading()) {
-    <p class="muted">Loading travellers&hellip;</p>
+    <p class="visually-hidden">Loading travellers</p>
+    <ul class="member-list" aria-busy="true">
+      @for (slot of skeletonSlots; track slot) {
+        <li class="member-row">
+          <span class="skeleton member-row__skeleton-email"></span>
+          <span class="skeleton member-row__skeleton-badge"></span>
+        </li>
+      }
+    </ul>
   } @else if (error(); as message) {
     <div class="callout callout--danger">
       <p>{{ message }}</p>
@@ -131,6 +139,9 @@
               <app-status-badge [label]="invitation.status" [tone]="toneFor(invitation.status)" />
               <span class="invitation-row__expiry">
                 Expires {{ invitation.expiresAt | date: 'mediumDate' }}
+                @if (invitation.status === 'Pending') {
+                  <span class="invitation-when">· {{ expiryHint(invitation.expiresAt) }}</span>
+                }
               </span>
               @if (invitation.status === 'Pending') {
                 <button type="button" class="button button--ghost" (click)="revoke(invitation)">

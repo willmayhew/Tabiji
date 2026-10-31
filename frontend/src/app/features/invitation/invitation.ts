@@ -15,8 +15,9 @@ import { describeHttpError } from '../../core/api/http-error';
 import { InvitationsService } from '../../core/api/invitations.service';
 import { SessionService } from '../../core/auth/session.service';
 import { InvitationPreview, InvitationStatus } from '../../core/models/member';
+import { expiryHint, invitationTone } from '../../shared/format/invitation';
 import { SignInPrompt } from '../../shared/ui/sign-in-prompt';
-import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
+import { StatusBadge } from '../../shared/ui/status-badge';
 
 /**
  * The page an invitation link opens.
@@ -116,19 +117,9 @@ export class Invitation {
     );
   }
 
-  protected toneFor(status: InvitationStatus): BadgeTone {
-    switch (status) {
-      case 'Pending':
-        return 'warning';
-      case 'Accepted':
-        return 'healthy';
-      case 'Declined':
-      case 'Revoked':
-        return 'danger';
-      default:
-        return 'neutral';
-    }
-  }
+  protected readonly toneFor = invitationTone;
+
+  protected readonly expiryHint = expiryHint;
 
   protected statusMessage(status: InvitationStatus): string {
     switch (status) {

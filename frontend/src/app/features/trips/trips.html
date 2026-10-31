@@ -14,7 +14,12 @@
 
     <div class="panel-header__actions">
       <a class="button" routerLink="/trips/new">New trip</a>
-      <button type="button" class="button button--secondary" (click)="load()" [disabled]="loading()">
+      <button
+        type="button"
+        class="button button--secondary"
+        (click)="load()"
+        [disabled]="loading()"
+      >
         Refresh
       </button>
     </div>
@@ -38,7 +43,8 @@
         <div class="section-head">
           <h2>Invitations waiting for you</h2>
           <p class="section-head__meta">
-            {{ invitations().length }} {{ invitations().length === 1 ? 'invitation' : 'invitations' }}
+            {{ invitations().length }}
+            {{ invitations().length === 1 ? 'invitation' : 'invitations' }}
           </p>
         </div>
 
@@ -47,9 +53,10 @@
             <li class="invitation-row">
               <span class="invitation-row__email">{{ invitation.tripName }}</span>
               <span class="muted">from {{ invitation.invitedByEmail }}</span>
-              <app-status-badge label="Pending" tone="warning" />
+              <app-status-badge [label]="invitation.status" [tone]="toneFor(invitation.status)" />
               <span class="invitation-row__expiry">
                 Expires {{ invitation.expiresAt | date: 'mediumDate' }}
+                <span class="invitation-when">· {{ expiryHint(invitation.expiresAt) }}</span>
               </span>
               <span class="invitations-waiting__actions">
                 <button
@@ -96,7 +103,10 @@
     } @else if (!error() && trips().length === 0) {
       <div class="empty-state">
         <svg class="empty-state__motif" viewBox="0 0 120 48" focusable="false" aria-hidden="true">
-          <path class="empty-state__graticule" d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48" />
+          <path
+            class="empty-state__graticule"
+            d="M 20 0 L 20 48 M 48 0 L 48 48 M 76 0 L 76 48 M 100 0 L 100 48"
+          />
           <path class="empty-state__route" d="M 6 38 C 30 6 46 42 66 20 S 104 4 114 14" />
           <circle class="empty-state__node" cx="6" cy="38" r="1.6" />
           <circle class="empty-state__node empty-state__node--end" cx="114" cy="14" r="1.6" />

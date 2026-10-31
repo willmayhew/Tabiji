@@ -1396,3 +1396,8 @@ label.route__node:hover {
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
+
+/* How long a pending invitation has left, beside the date it ends. */
+.invitation-when {
+  color: var(--color-ink-faint);
+}

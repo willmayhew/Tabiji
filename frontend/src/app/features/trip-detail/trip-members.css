@@ -50,6 +50,17 @@
   font-size: var(--text-sm);
 }
 
+.member-row__skeleton-email {
+  inline-size: 12rem;
+  block-size: 1em;
+}
+
+.member-row__skeleton-badge {
+  inline-size: 4.5rem;
+  block-size: 1em;
+  justify-self: end;
+}
+
 .members__invite,
 .members__invitations {
   display: flex;

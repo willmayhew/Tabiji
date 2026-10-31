@@ -20,12 +20,12 @@ import { TripMembersService } from '../../core/api/trip-members.service';
 import { SessionService } from '../../core/auth/session.service';
 import {
   CreatedInvitation,
-  InvitationStatus,
   MemberRole,
   TripInvitation,
   TripMember,
   TripMembers as TripMembersView,
 } from '../../core/models/member';
+import { expiryHint, invitationTone } from '../../shared/format/invitation';
 import { BadgeTone, StatusBadge } from '../../shared/ui/status-badge';
 
 /**
@@ -147,23 +147,16 @@ export class TripMembers implements OnInit {
     return `member-role-${member.userId}`;
   }
 
+  /** Placeholder rows shown while the members are fetched. */
+  protected readonly skeletonSlots = [0, 1];
+
   protected roleTone(role: MemberRole): BadgeTone {
     return role === 'Owner' ? 'healthy' : 'neutral';
   }
 
-  protected toneFor(status: InvitationStatus): BadgeTone {
-    switch (status) {
-      case 'Pending':
-        return 'warning';
-      case 'Accepted':
-        return 'healthy';
-      case 'Declined':
-      case 'Revoked':
-        return 'danger';
-      default:
-        return 'neutral';
-    }
-  }
+  protected readonly toneFor = invitationTone;
+
+  protected readonly expiryHint = expiryHint;
 
   protected inviteEmailError(): string | null {
     const control = this.inviteForm.controls.email;

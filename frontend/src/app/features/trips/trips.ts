@@ -17,6 +17,7 @@ import { TripsService } from '../../core/api/trips.service';
 import { SessionService } from '../../core/auth/session.service';
 import { AcceptedInvitation, RecipientInvitation } from '../../core/models/member';
 import { Trip } from '../../core/models/trip';
+import { expiryHint, invitationTone } from '../../shared/format/invitation';
 import { SignInPrompt } from '../../shared/ui/sign-in-prompt';
 import { StatusBadge } from '../../shared/ui/status-badge';
 import { TripCard } from '../../shared/ui/trip-card';
@@ -49,6 +50,10 @@ export class Trips {
 
   /** Placeholder cards shown while the list is loading. */
   protected readonly skeletonSlots = [0, 1, 2];
+
+  protected readonly toneFor = invitationTone;
+
+  protected readonly expiryHint = expiryHint;
 
   constructor() {
     // The session probe answers asynchronously. Until it does, the skeleton
