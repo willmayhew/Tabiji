@@ -116,6 +116,24 @@
           </div>
 
           <span class="route__actions">
+            <span class="atlas-list__stops-head">
+              <span class="atlas-list__stop-count" aria-hidden="true">{{ stopCount(index) }}</span>
+
+              <button
+                type="button"
+                class="atlas-list__chevron"
+                [id]="stopsToggleId(index)"
+                (click)="toggleDestination(index)"
+                [attr.aria-expanded]="isExpanded(index)"
+                [attr.aria-controls]="stopsPanelId(index)"
+                [attr.aria-label]="
+                  (isExpanded(index) ? 'Hide' : 'Show') + ' stops in ' + destinationLabel(index)
+                "
+              >
+                <span aria-hidden="true">{{ isExpanded(index) ? '▾' : '▸' }}</span>
+              </button>
+            </span>
+
             <button
               type="button"
               class="icon-button"
@@ -159,31 +177,11 @@
           }
 
           <!-- The stops of a destination are folded away until they are
-               wanted: the route stays readable at a glance, and a destination
-               opens when its stops are. The panel itself is always in the
+               wanted — the dropdown button the atlas uses, with the count of
+               what is inside it beside it. The panel itself is always in the
                document, so folding it never removes what the reader entered,
                and the button that adds a stop stands outside it. -->
           <div class="route__stops-region">
-            <button
-              type="button"
-              class="route__stops-head"
-              [id]="stopsToggleId(index)"
-              (click)="toggleDestination(index)"
-              [attr.aria-expanded]="isExpanded(index)"
-              [attr.aria-controls]="stopsPanelId(index)"
-              [attr.aria-label]="
-                (isExpanded(index) ? 'Hide' : 'Show') + ' stops in ' + destinationLabel(index)
-              "
-            >
-              <span class="route__stops-caret" aria-hidden="true">{{
-                isExpanded(index) ? '▾' : '▸'
-              }}</span>
-              <span class="route__stops-label" aria-hidden="true">
-                Stops in {{ destinationLabel(index) }}
-              </span>
-              <span class="route__stops-count" aria-hidden="true">{{ stopCount(index) }}</span>
-            </button>
-
             <div class="route__stops" [id]="stopsPanelId(index)" [hidden]="!isExpanded(index)">
               <ol class="stops" formArrayName="stops">
                 @for (stop of stopsAt(index)?.controls ?? []; track stop; let stopIndex = $index) {

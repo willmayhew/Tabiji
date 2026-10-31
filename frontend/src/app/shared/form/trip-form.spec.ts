@@ -698,6 +698,9 @@ describe('TripForm', () => {
     expect(stopsHead(0).getAttribute('aria-expanded')).toBe('false');
     expect(stopsPanel(0).hidden).toBe(true);
 
+    // The count beside the dropdown button says what is folded away.
+    expect(element().querySelector('.atlas-list__stop-count')?.textContent?.trim()).toBe('1');
+
     // Folded away, not thrown away: the stop is still in the form, so saving
     // the trip keeps it.
     expect(childStopInput(0, 0).value).toBe('Gion');

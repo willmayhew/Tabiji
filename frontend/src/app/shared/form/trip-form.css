@@ -42,9 +42,9 @@
 /* The stops within a destination ---------------------------------------
    The region is a grid item of the destination row, spanning every column,
    so it sits under the destination without disturbing the hairline that
-   joins the destinations. Inside it the stops are folded away behind their
-   own disclosure, which stays open to the form: the panel is only hidden,
-   never removed, so folding it cannot lose what the reader entered. */
+   joins the destinations. The stops are folded away behind the dropdown
+   button in the row above; the panel is only hidden, never removed, so
+   folding it cannot lose what the reader entered. */
 
 .route__stops-region {
   grid-column: 1 / -1;
@@ -64,39 +64,6 @@
 
 .route__stops[hidden] {
   display: none;
-}
-
-/* The disclosure of a destination's stops: the words and the caret are one
-   button, so pressing the label opens what it names. The count is there
-   before it is opened, so a folded destination still says what it holds. */
-.route__stops-head {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: var(--space-3xs);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-ink-faint);
-  font: inherit;
-  font-size: var(--text-eyebrow);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color var(--dur-fast) var(--ease-standard);
-}
-
-.route__stops-head:hover {
-  color: var(--color-forest);
-}
-
-.route__stops-caret {
-  font-size: var(--text-xs);
-}
-
-.route__stops-count {
-  color: var(--color-terracotta-deep);
-  font-variant-numeric: tabular-nums;
 }
 
 .stops {
