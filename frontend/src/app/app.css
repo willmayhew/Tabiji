@@ -38,10 +38,13 @@
   padding-top: env(safe-area-inset-top);
 }
 
+/* The brand and the account hold the two corners, so the navigation sits in
+   the middle of the bar rather than wherever the width of an email address
+   happens to leave it. */
 .app-header__inner {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-md);
   width: 100%;
   max-width: var(--container-max);
@@ -50,6 +53,7 @@
 }
 
 .brand {
+  justify-self: start;
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
@@ -79,6 +83,7 @@
 }
 
 .app-nav {
+  justify-self: center;
   display: flex;
   align-items: center;
   gap: var(--space-md);
@@ -114,12 +119,18 @@
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
+  justify-self: end;
+  /* The navigation is centred between two equal columns, so on a narrow bar
+     the account has to give way rather than grow into the navigation. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* The address is a label for the account, not a heading: it never pushes the
    navigation aside, and it never wraps. */
 .app-header__account {
   max-width: 11rem;
+  min-width: 0;
   overflow: hidden;
   color: var(--color-ink-soft);
   font-size: var(--text-sm);
