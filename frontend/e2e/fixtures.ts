@@ -62,11 +62,16 @@ type CollaborationFixtures = {
  * One browser context per account, so a test can hold an owner and an invitee
  * at the same time with genuinely separate cookies. Contexts are closed when
  * the test ends.
+ *
+ * The clipboard permission is granted up front: the owner copies a
+ * development invitation link, and a headless browser otherwise answers the
+ * copy with a refusal the product has to handle.
  */
 export const test = base.extend<CollaborationFixtures>({
   ownerContext: async ({ browser, request }, use) => {
     const context = await browser.newContext({
       storageState: await accountState(request, 'owner'),
+      permissions: ['clipboard-read', 'clipboard-write'],
     });
     await use(context);
     await context.close();
@@ -74,6 +79,7 @@ export const test = base.extend<CollaborationFixtures>({
   editorContext: async ({ browser, request }, use) => {
     const context = await browser.newContext({
       storageState: await accountState(request, 'editor'),
+      permissions: ['clipboard-read', 'clipboard-write'],
     });
     await use(context);
     await context.close();
@@ -81,6 +87,7 @@ export const test = base.extend<CollaborationFixtures>({
   strangerContext: async ({ browser, request }, use) => {
     const context = await browser.newContext({
       storageState: await accountState(request, 'stranger'),
+      permissions: ['clipboard-read', 'clipboard-write'],
     });
     await use(context);
     await context.close();

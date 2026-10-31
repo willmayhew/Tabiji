@@ -66,6 +66,14 @@
   max-width: var(--measure-tight);
 }
 
+/* The development invitation link and its copy button sit side by side. */
+.members__link {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
 @media (max-width: 40rem) {
   .member-row {
     grid-template-columns: minmax(0, 1fr);

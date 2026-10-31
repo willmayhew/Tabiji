@@ -78,6 +78,23 @@ describe('TripMembers', () => {
     fixture.detectChanges();
   }
 
+  function inviteAddress(email: string): void {
+    const input = element().querySelector('#invite-email') as HTMLInputElement;
+
+    input.value = email;
+    input.dispatchEvent(new Event('input'));
+
+    element().querySelector('form.members__form')!.dispatchEvent(new Event('submit'));
+
+    http.expectOne('/api/trips/trip-1/invitations').flush({
+      ...invitation,
+      id: 'inv-2',
+      email,
+      invitationUrl: 'http://localhost:4200/invite#token=abc',
+    });
+    fixture.detectChanges();
+  }
+
   it('should show the travellers and the owner controls', () => {
     create('Owner', { viewerRole: 'Owner', members: [owner, editor] });
 
@@ -139,6 +156,53 @@ describe('TripMembers', () => {
     const link = element().querySelector('a.link-arrow') as HTMLAnchorElement;
 
     expect(link.getAttribute('href')).toBe('http://localhost:4200/invite#token=abc');
+  });
+
+  it('should copy the development link', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+    try {
+      create('Owner', { viewerRole: 'Owner', members: [owner, editor] });
+      inviteAddress('new@example.com');
+
+      const copy = [...element().querySelectorAll('.members__link button')].find((button) =>
+        button.textContent?.includes('Copy link'),
+      ) as HTMLButtonElement;
+
+      copy.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(writeText).toHaveBeenCalledWith('http://localhost:4200/invite#token=abc');
+      expect(copy.textContent).toContain('Copied');
+    } finally {
+      delete (navigator as { clipboard?: unknown }).clipboard;
+    }
+  });
+
+  it('should say when the link cannot be copied', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('unavailable')) },
+      configurable: true,
+    });
+
+    try {
+      create('Owner', { viewerRole: 'Owner', members: [owner, editor] });
+      inviteAddress('new@example.com');
+
+      const copy = [...element().querySelectorAll('.members__link button')].find((button) =>
+        button.textContent?.includes('Copy link'),
+      ) as HTMLButtonElement;
+
+      copy.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(element().textContent).toContain('The link could not be copied');
+    } finally {
+      delete (navigator as { clipboard?: unknown }).clipboard;
+    }
   });
 
   it('should revoke a pending invitation', () => {

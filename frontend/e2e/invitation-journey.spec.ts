@@ -23,6 +23,11 @@ test.describe('the invitation journey', () => {
     // Development has no email provider, so the link is shown for the owner to share.
     const link = page.getByRole('link', { name: 'Open the invitation link' });
     await expect(link).toHaveAttribute('href', /\/invite#token=/);
+    await expect(page.getByRole('button', { name: 'Copy link' })).toBeVisible();
+
+    // The link is shown once, so it can be kept with one click.
+    await page.getByRole('button', { name: 'Copy link' }).click();
+    await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
 
     // The invitation joins the pending list with its expiry.
     await expect(page.getByRole('heading', { name: 'Pending invitations' })).toBeVisible();

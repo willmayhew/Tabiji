@@ -96,10 +96,17 @@
       }
 
       @if (createdInvitation()?.invitationUrl; as url) {
-        <p class="field-hint">No email provider is configured, so share this link yourself:</p>
-        <a class="link-arrow" [href]="url" target="_blank" rel="noopener">
-          Open the invitation link
-        </a>
+        <p class="field-hint">
+          No email provider is configured, so share this link yourself. It is shown only once:
+        </p>
+        <div class="members__link">
+          <a class="link-arrow" [href]="url" target="_blank" rel="noopener">
+            Open the invitation link
+          </a>
+          <button type="button" class="button button--ghost" (click)="copyLink(url)">
+            {{ linkCopied() ? 'Copied' : 'Copy link' }}
+          </button>
+        </div>
       }
     </div>
 

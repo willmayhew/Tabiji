@@ -80,6 +80,9 @@ export class TripMembers implements OnInit {
     }),
   });
 
+  /** Whether the development invitation link was just copied. */
+  readonly linkCopied = signal(false);
+
   readonly ownerCount = computed(
     () => this.members().filter((member) => member.role === 'Owner').length,
   );
@@ -193,6 +196,7 @@ export class TripMembers implements OnInit {
           this.inviting.set(false);
           this.inviteForm.reset();
           this.inviteSubmitted.set(false);
+          this.linkCopied.set(false);
           this.createdInvitation.set(created);
           this.inviteSuccess.set(`Invitation sent to ${created.email}.`);
           this.invitations.update((list) => [created, ...list]);
@@ -203,6 +207,21 @@ export class TripMembers implements OnInit {
           this.inviteError.set(describeHttpError(failure));
         },
       });
+  }
+
+  /**
+   * Copies the development invitation link. The raw token is returned once,
+   * when the invitation is created, so this is the only durable way to keep
+   * it; the copy is announced as well as shown.
+   */
+  protected async copyLink(url: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(url);
+      this.linkCopied.set(true);
+      this.announcement.set('Invitation link copied.');
+    } catch {
+      this.actionError.set('The link could not be copied. Select it and copy it by hand.');
+    }
   }
 
   protected changeRole(member: TripMember, event: Event): void {
